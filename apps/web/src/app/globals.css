@@ -1,0 +1,91 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 0 0% 100%;
+    --background-secondary: 0 0% 98%;
+    --foreground: 0 0% 9%;
+    --foreground-secondary: 0 0% 32%;
+    --foreground-muted: 0 0% 64%;
+
+    --accent: 217 91% 60%;
+    --accent-hover: 224 76% 48%;
+    --accent-light: 214 95% 93%;
+
+    --status-critical: 0 84% 60%;
+    --status-warning: 32 95% 44%;
+    --status-healthy: 142 72% 29%;
+
+    --border: 0 0% 90%;
+    --border-hover: 0 0% 83%;
+
+    --card: 0 0% 100%;
+    --card-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+
+    --radius-card: 12px;
+    --radius-button: 6px;
+    --radius-input: 8px;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground antialiased;
+    font-feature-settings: "rlig" 1, "calt" 1;
+  }
+
+  /* Custom scrollbar */
+  ::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+
+  ::-webkit-scrollbar-track {
+    @apply bg-transparent;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    @apply bg-border rounded-full;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    @apply bg-border-hover;
+  }
+}
+
+@layer utilities {
+  .text-balance {
+    text-wrap: balance;
+  }
+
+  .animation-delay-150 {
+    animation-delay: 150ms;
+  }
+
+  .animation-delay-300 {
+    animation-delay: 300ms;
+  }
+}
+
+/* Satoshi font - if not available, falls back to Inter */
+@font-face {
+  font-family: 'Satoshi';
+  src: url('/fonts/Satoshi-Variable.woff2') format('woff2');
+  font-weight: 300 900;
+  font-display: swap;
+  font-style: normal;
+}
+
+@font-face {
+  font-family: 'Satoshi';
+  src: url('/fonts/Satoshi-VariableItalic.woff2') format('woff2');
+  font-weight: 300 900;
+  font-display: swap;
+  font-style: italic;
+}

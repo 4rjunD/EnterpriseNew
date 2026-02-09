@@ -1,0 +1,40 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "lib": ["dom", "dom.iterable", "ES2022"],
+    "allowJs": true,
+    "skipLibCheck": true,
+    "strict": true,
+    "noEmit": true,
+    "esModuleInterop": true,
+    "module": "esnext",
+    "moduleResolution": "bundler",
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "jsx": "preserve",
+    "incremental": true,
+    "plugins": [
+      {
+        "name": "next"
+      }
+    ],
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["./src/*"],
+      "@nexflow/ui": ["../../packages/ui/src"],
+      "@nexflow/ui/*": ["../../packages/ui/src/*"],
+      "@nexflow/database": ["../../packages/database/src"],
+      "@nexflow/database/*": ["../../packages/database/src/*"],
+      "@nexflow/api-client": ["../../packages/api-client/src"],
+      "@nexflow/api-client/*": ["../../packages/api-client/src/*"],
+      "@nexflow/integrations": ["../../packages/integrations/src"],
+      "@nexflow/integrations/*": ["../../packages/integrations/src/*"],
+      "@nexflow/ai": ["../../packages/ai/src"],
+      "@nexflow/ai/*": ["../../packages/ai/src/*"],
+      "@nexflow/config": ["../../packages/config/src"],
+      "@nexflow/config/*": ["../../packages/config/src/*"]
+    }
+  },
+  "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx", ".next/types/**/*.ts"],
+  "exclude": ["node_modules"]
+}

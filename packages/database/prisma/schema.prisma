@@ -1,0 +1,538 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+// ============================================================================
+// Core Entities
+// ============================================================================
+
+model Organization {
+  id        String   @id @default(cuid())
+  name      String
+  slug      String   @unique
+  logo      String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  users        User[]
+  teams        Team[]
+  projects     Project[]
+  integrations Integration[]
+  agents       AgentConfig[]
+
+  @@map("organizations")
+}
+
+model User {
+  id             String   @id @default(cuid())
+  email          String   @unique
+  name           String?
+  password       String?
+  image          String?
+  role           UserRole @default(IC)
+  status         UserStatus @default(OFFLINE)
+  timezone       String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  teamMemberships TeamMember[]
+  assignedTasks   Task[]          @relation("assignee")
+  createdTasks    Task[]          @relation("creator")
+  pullRequests    PullRequest[]   @relation("author")
+  reviewRequests  PullRequest[]   @relation("reviewers")
+  behavioralMetrics BehavioralMetric[]
+  agentActions    AgentAction[]   @relation("targetUser")
+  notifications   Notification[]
+
+  @@index([organizationId])
+  @@map("users")
+}
+
+enum UserRole {
+  ADMIN
+  MANAGER
+  IC
+}
+
+enum UserStatus {
+  ONLINE
+  BUSY
+  AWAY
+  OFFLINE
+}
+
+model Team {
+  id          String   @id @default(cuid())
+  name        String
+  description String?
+  color       String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  members  TeamMember[]
+  projects Project[]
+  tasks    Task[]
+
+  @@unique([organizationId, name])
+  @@index([organizationId])
+  @@map("teams")
+}
+
+model TeamMember {
+  id        String   @id @default(cuid())
+  role      TeamRole @default(MEMBER)
+  joinedAt  DateTime @default(now())
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  teamId String
+  team   Team   @relation(fields: [teamId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, teamId])
+  @@map("team_members")
+}
+
+enum TeamRole {
+  LEAD
+  MEMBER
+}
+
+// ============================================================================
+// Projects & Tasks
+// ============================================================================
+
+model Project {
+  id           String        @id @default(cuid())
+  name         String
+  description  String?
+  key          String
+  status       ProjectStatus @default(ACTIVE)
+  startDate    DateTime?
+  targetDate   DateTime?
+  scope        String?       @db.Text
+  dependencies String[]
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  teamId         String?
+  team           Team?        @relation(fields: [teamId], references: [id])
+
+  tasks        Task[]
+  pullRequests PullRequest[]
+  predictions  Prediction[]
+  bottlenecks  Bottleneck[]
+
+  @@unique([organizationId, key])
+  @@index([organizationId])
+  @@map("projects")
+}
+
+enum ProjectStatus {
+  PLANNING
+  ACTIVE
+  ON_HOLD
+  COMPLETED
+  ARCHIVED
+}
+
+model Task {
+  id          String       @id @default(cuid())
+  title       String
+  description String?      @db.Text
+  status      TaskStatus   @default(BACKLOG)
+  priority    TaskPriority @default(MEDIUM)
+  storyPoints Int?
+  dueDate     DateTime?
+  labels      String[]
+  isStale     Boolean      @default(false)
+  staleAt     DateTime?
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+
+  // External source tracking
+  source       TaskSource @default(INTERNAL)
+  externalId   String?
+  externalUrl  String?
+  lastSyncedAt DateTime?
+
+  projectId String?
+  project   Project? @relation(fields: [projectId], references: [id])
+  teamId    String?
+  team      Team?    @relation(fields: [teamId], references: [id])
+
+  assigneeId String?
+  assignee   User?   @relation("assignee", fields: [assigneeId], references: [id])
+  creatorId  String?
+  creator    User?   @relation("creator", fields: [creatorId], references: [id])
+
+  // Blocking relationships
+  blockedByIds String[]
+  blocksIds    String[]
+
+  pullRequests PullRequest[]
+  bottlenecks  Bottleneck[]
+
+  @@unique([source, externalId])
+  @@index([projectId])
+  @@index([assigneeId])
+  @@index([status])
+  @@map("tasks")
+}
+
+enum TaskStatus {
+  BACKLOG
+  TODO
+  IN_PROGRESS
+  IN_REVIEW
+  DONE
+  CANCELLED
+}
+
+enum TaskPriority {
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
+}
+
+enum TaskSource {
+  INTERNAL
+  JIRA
+  LINEAR
+  NOTION
+}
+
+// ============================================================================
+// Pull Requests (GitHub)
+// ============================================================================
+
+model PullRequest {
+  id          String   @id @default(cuid())
+  number      Int
+  title       String
+  description String?  @db.Text
+  status      PRStatus @default(OPEN)
+  url         String
+  isDraft     Boolean  @default(false)
+  additions   Int      @default(0)
+  deletions   Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  mergedAt    DateTime?
+  closedAt    DateTime?
+
+  // External tracking
+  externalId   String  @unique
+  repository   String
+  baseBranch   String
+  headBranch   String
+  lastSyncedAt DateTime?
+
+  // Bottleneck detection
+  isStuck           Boolean  @default(false)
+  stuckAt           DateTime?
+  lastActivityAt    DateTime?
+  unresolvedComments Int     @default(0)
+  ciStatus          CIStatus @default(UNKNOWN)
+
+  authorId String?
+  author   User?   @relation("author", fields: [authorId], references: [id])
+
+  reviewerIds String[]
+  reviewers   User[]   @relation("reviewers")
+
+  projectId String?
+  project   Project? @relation(fields: [projectId], references: [id])
+
+  taskId String?
+  task   Task?   @relation(fields: [taskId], references: [id])
+
+  bottlenecks Bottleneck[]
+
+  @@index([projectId])
+  @@index([authorId])
+  @@index([status])
+  @@map("pull_requests")
+}
+
+enum PRStatus {
+  OPEN
+  MERGED
+  CLOSED
+}
+
+enum CIStatus {
+  PASSING
+  FAILING
+  PENDING
+  UNKNOWN
+}
+
+// ============================================================================
+// Integrations
+// ============================================================================
+
+model Integration {
+  id           String            @id @default(cuid())
+  type         IntegrationType
+  status       IntegrationStatus @default(DISCONNECTED)
+  accessToken  String?
+  refreshToken String?
+  tokenExpiry  DateTime?
+  webhookId    String?
+  webhookSecret String?
+  metadata     Json?
+  lastSyncAt   DateTime?
+  syncError    String?
+  createdAt    DateTime          @default(now())
+  updatedAt    DateTime          @updatedAt
+
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@unique([organizationId, type])
+  @@map("integrations")
+}
+
+enum IntegrationType {
+  GITHUB
+  JIRA
+  LINEAR
+  NOTION
+  SLACK
+  DISCORD
+}
+
+enum IntegrationStatus {
+  CONNECTED
+  DISCONNECTED
+  ERROR
+  SYNCING
+}
+
+// ============================================================================
+// AI Predictions
+// ============================================================================
+
+model Prediction {
+  id         String         @id @default(cuid())
+  type       PredictionType
+  confidence Float
+  value      Json
+  reasoning  String?        @db.Text
+  isActive   Boolean        @default(true)
+  validUntil DateTime?
+  createdAt  DateTime       @default(now())
+  updatedAt  DateTime       @updatedAt
+
+  projectId String?
+  project   Project? @relation(fields: [projectId], references: [id])
+
+  @@index([projectId])
+  @@index([type])
+  @@map("predictions")
+}
+
+enum PredictionType {
+  DEADLINE_RISK
+  BURNOUT_INDICATOR
+  VELOCITY_FORECAST
+  SCOPE_CREEP
+}
+
+// ============================================================================
+// Bottlenecks
+// ============================================================================
+
+model Bottleneck {
+  id          String           @id @default(cuid())
+  type        BottleneckType
+  severity    BottleneckSeverity
+  title       String
+  description String?          @db.Text
+  impact      String?
+  status      BottleneckStatus @default(ACTIVE)
+  detectedAt  DateTime         @default(now())
+  resolvedAt  DateTime?
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+
+  projectId     String?
+  project       Project?     @relation(fields: [projectId], references: [id])
+  taskId        String?
+  task          Task?        @relation(fields: [taskId], references: [id])
+  pullRequestId String?
+  pullRequest   PullRequest? @relation(fields: [pullRequestId], references: [id])
+
+  agentActions AgentAction[]
+
+  @@index([status])
+  @@index([type])
+  @@map("bottlenecks")
+}
+
+enum BottleneckType {
+  STUCK_PR
+  STALE_TASK
+  DEPENDENCY_BLOCK
+  REVIEW_DELAY
+  CI_FAILURE
+}
+
+enum BottleneckSeverity {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+enum BottleneckStatus {
+  ACTIVE
+  RESOLVED
+  IGNORED
+}
+
+// ============================================================================
+// Autonomous Agents
+// ============================================================================
+
+model AgentConfig {
+  id           String      @id @default(cuid())
+  type         AgentType
+  enabled      Boolean     @default(false)
+  autoApprove  Boolean     @default(false)
+  thresholds   Json?
+  quietHours   Json?
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
+
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  actions AgentAction[]
+
+  @@unique([organizationId, type])
+  @@map("agent_configs")
+}
+
+enum AgentType {
+  TASK_REASSIGNER
+  NUDGE_SENDER
+  SCOPE_ADJUSTER
+}
+
+model AgentAction {
+  id            String           @id @default(cuid())
+  status        AgentActionStatus @default(PENDING)
+  action        String
+  reasoning     String?          @db.Text
+  suggestion    Json?
+  result        Json?
+  approvedBy    String?
+  approvedAt    DateTime?
+  executedAt    DateTime?
+  createdAt     DateTime         @default(now())
+  updatedAt     DateTime         @updatedAt
+
+  agentConfigId String
+  agentConfig   AgentConfig @relation(fields: [agentConfigId], references: [id])
+
+  bottleneckId String?
+  bottleneck   Bottleneck? @relation(fields: [bottleneckId], references: [id])
+
+  targetUserId String?
+  targetUser   User?   @relation("targetUser", fields: [targetUserId], references: [id])
+
+  @@index([status])
+  @@index([agentConfigId])
+  @@map("agent_actions")
+}
+
+enum AgentActionStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  EXECUTED
+  FAILED
+}
+
+// ============================================================================
+// Behavioral Metrics (Admin-only visibility)
+// ============================================================================
+
+model BehavioralMetric {
+  id         String   @id @default(cuid())
+  date       DateTime @db.Date
+  source     MetricSource
+
+  // Activity metrics
+  messageCount      Int @default(0)
+  avgResponseTimeMs Int?
+  activeHoursStart  Int?
+  activeHoursEnd    Int?
+  weekendActivity   Boolean @default(false)
+
+  // Derived scores (0-100)
+  collaborationScore Int?
+  communicationHealth Int?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, date, source])
+  @@index([userId])
+  @@index([date])
+  @@map("behavioral_metrics")
+}
+
+enum MetricSource {
+  SLACK
+  DISCORD
+}
+
+// ============================================================================
+// Notifications
+// ============================================================================
+
+model Notification {
+  id        String             @id @default(cuid())
+  type      NotificationType
+  title     String
+  message   String
+  read      Boolean            @default(false)
+  data      Json?
+  createdAt DateTime           @default(now())
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, read])
+  @@map("notifications")
+}
+
+enum NotificationType {
+  BOTTLENECK_DETECTED
+  PREDICTION_ALERT
+  AGENT_SUGGESTION
+  TASK_ASSIGNED
+  PR_REVIEW_REQUESTED
+  DEADLINE_APPROACHING
+  SYNC_ERROR
+}

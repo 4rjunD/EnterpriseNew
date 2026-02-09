@@ -1,0 +1,25 @@
+{
+  "name": "@nexflow/worker",
+  "version": "1.0.0",
+  "private": true,
+  "main": "./dist/index.js",
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@nexflow/ai": "workspace:*",
+    "@nexflow/database": "workspace:*",
+    "@nexflow/integrations": "workspace:*",
+    "@nexflow/config": "workspace:*",
+    "bullmq": "^4.0.0",
+    "ioredis": "^5.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.10.0",
+    "tsx": "^4.6.0",
+    "typescript": "^5.3.0"
+  }
+}
