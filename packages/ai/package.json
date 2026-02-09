@@ -16,6 +16,7 @@
   "dependencies": {
     "@nexflow/config": "workspace:*",
     "@nexflow/database": "workspace:*",
+    "@nexflow/integrations": "workspace:*",
     "openai": "^4.104.0",
     "zod": "^3.22.4"
   },

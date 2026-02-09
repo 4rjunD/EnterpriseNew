@@ -1,6 +1,12 @@
 import { Agent, AgentContext, AgentDecision, AgentResult } from './agent-base'
-import { prisma, TaskStatus, PRStatus, BottleneckType, BottleneckStatus } from '@nexflow/database'
+import { prisma, TaskStatus, PRStatus, BottleneckStatus } from '@nexflow/database'
 import { BOTTLENECK_THRESHOLDS } from '@nexflow/config'
+
+// Lazy import to avoid circular dependencies
+async function getNotificationService() {
+  const { notificationService } = await import('@nexflow/integrations')
+  return notificationService
+}
 
 interface NudgeSenderThresholds {
   reminderIntervalHours: number
@@ -27,6 +33,7 @@ export class NudgeSenderAgent extends Agent {
       },
       include: {
         author: true,
+        project: true,
         bottlenecks: { where: { status: BottleneckStatus.ACTIVE } },
       },
     })
@@ -71,6 +78,7 @@ export class NudgeSenderAgent extends Agent {
           prId: pr.id,
           prNumber: pr.number,
           prTitle: pr.title,
+          prUrl: pr.url,
           authorId: pr.author.id,
           authorName: pr.author.name,
           reminderCount: existingNudges + 1,
@@ -88,7 +96,10 @@ export class NudgeSenderAgent extends Agent {
         isStale: true,
         status: TaskStatus.IN_PROGRESS,
       },
-      include: { assignee: true },
+      include: {
+        assignee: true,
+        project: true,
+      },
     })
 
     for (const task of staleTasks) {
@@ -105,6 +116,9 @@ export class NudgeSenderAgent extends Agent {
 
       if (existingNudges >= this.thresholds.maxReminders) continue
 
+      // Build task URL
+      const taskUrl = task.externalUrl || `${process.env.NEXTAUTH_URL}/dashboard/tasks/${task.id}`
+
       decisions.push({
         shouldAct: true,
         action: 'nudge_task',
@@ -112,6 +126,7 @@ export class NudgeSenderAgent extends Agent {
         suggestion: {
           taskId: task.id,
           taskTitle: task.title,
+          taskUrl,
           assigneeId: task.assignee.id,
           assigneeName: task.assignee.name,
           reminderCount: existingNudges + 1,
@@ -135,29 +150,36 @@ export class NudgeSenderAgent extends Agent {
       const isTaskNudge = decision.action === 'nudge_task'
       const suggestion = decision.suggestion as Record<string, unknown>
 
-      // Create notification
-      await prisma.notification.create({
-        data: {
-          userId: targetUserId,
-          type: isTaskNudge ? 'BOTTLENECK_DETECTED' : 'PR_REVIEW_REQUESTED',
-          title: isTaskNudge
-            ? 'Task needs attention'
-            : 'Pull request needs attention',
-          message: isTaskNudge
-            ? `Your task "${suggestion.taskTitle}" has been in progress for a while. Please update its status or let us know if you're blocked.`
-            : `Your PR #${suggestion.prNumber} "${suggestion.prTitle}" has been waiting for review. Please follow up or request additional reviewers.`,
-          data: isTaskNudge
-            ? { taskId: suggestion.taskId }
-            : { prId: suggestion.prId },
-        },
+      // Send notifications via the unified notification service
+      const notificationService = await getNotificationService()
+      const results = await notificationService.sendNudge({
+        userId: targetUserId,
+        organizationId: this.context.organizationId,
+        type: isTaskNudge ? 'task' : 'pr',
+        title: (isTaskNudge ? suggestion.taskTitle : suggestion.prTitle) as string,
+        itemId: (isTaskNudge ? suggestion.taskId : suggestion.prId) as string,
+        url: (isTaskNudge ? suggestion.taskUrl : suggestion.prUrl) as string,
+        reminderCount: suggestion.reminderCount as number,
       })
 
-      // TODO: Also send Slack/Discord message if integration is connected
+      // Check if any channel succeeded
+      const successfulChannels = results.filter((r: { success: boolean }) => r.success)
+      const failedChannels = results.filter((r: { success: boolean; channel: string; error?: string }) => !r.success)
+
+      if (successfulChannels.length === 0) {
+        return {
+          success: false,
+          message: `Failed to send nudge via any channel: ${failedChannels.map((r: { channel: string; error?: string }) => `${r.channel}: ${r.error}`).join(', ')}`,
+        }
+      }
 
       return {
         success: true,
-        message: `Nudge sent for ${isTaskNudge ? 'task' : 'PR'}`,
-        data: decision.suggestion,
+        message: `Nudge sent for ${isTaskNudge ? 'task' : 'PR'} via ${successfulChannels.map((r: { channel: string }) => r.channel).join(', ')}`,
+        data: {
+          ...decision.suggestion,
+          channels: successfulChannels.map((r: { channel: string }) => r.channel),
+        },
       }
     } catch (error) {
       return {

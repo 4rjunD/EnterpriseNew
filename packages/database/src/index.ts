@@ -1,4 +1,5 @@
 export { prisma, PrismaClient } from './client'
+export { encrypt, decrypt, isEncrypted, TokenEncryption, tokenEncryption } from './encryption'
 
 // Re-export Prisma types
 export type {

@@ -1,0 +1,119 @@
+# Render Blueprint for NexFlow Enterprise
+# Deploy: https://render.com/docs/blueprint-spec
+
+services:
+  # Main Web Application (Next.js)
+  - type: web
+    name: nexflow-web
+    env: node
+    region: oregon
+    plan: starter
+    buildCommand: pnpm install && pnpm db:generate && pnpm --filter @nexflow/web build
+    startCommand: pnpm --filter @nexflow/web start
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: DATABASE_URL
+        fromDatabase:
+          name: nexflow-db
+          property: connectionString
+      - key: REDIS_URL
+        fromService:
+          name: nexflow-redis
+          type: redis
+          property: connectionString
+      - key: NEXTAUTH_URL
+        sync: false
+      - key: NEXTAUTH_SECRET
+        generateValue: true
+      - key: TOKEN_ENCRYPTION_KEY
+        generateValue: true
+      # OAuth Providers (optional)
+      - key: GOOGLE_CLIENT_ID
+        sync: false
+      - key: GOOGLE_CLIENT_SECRET
+        sync: false
+      - key: GITHUB_CLIENT_ID
+        sync: false
+      - key: GITHUB_CLIENT_SECRET
+        sync: false
+      # Integrations
+      - key: LINEAR_CLIENT_ID
+        sync: false
+      - key: LINEAR_CLIENT_SECRET
+        sync: false
+      - key: SLACK_CLIENT_ID
+        sync: false
+      - key: SLACK_CLIENT_SECRET
+        sync: false
+      - key: SLACK_SIGNING_SECRET
+        sync: false
+      - key: DISCORD_CLIENT_ID
+        sync: false
+      - key: DISCORD_CLIENT_SECRET
+        sync: false
+      - key: DISCORD_BOT_TOKEN
+        sync: false
+      # Twilio
+      - key: TWILIO_ACCOUNT_SID
+        sync: false
+      - key: TWILIO_AUTH_TOKEN
+        sync: false
+      - key: TWILIO_FROM_NUMBER
+        sync: false
+      - key: TWILIO_VERIFY_SERVICE_SID
+        sync: false
+      # AI
+      - key: OPENAI_API_KEY
+        sync: false
+
+  # Background Worker (BullMQ)
+  - type: worker
+    name: nexflow-worker
+    env: node
+    region: oregon
+    plan: starter
+    buildCommand: pnpm install && pnpm db:generate && pnpm --filter @nexflow/worker build
+    startCommand: pnpm --filter @nexflow/worker start
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: DATABASE_URL
+        fromDatabase:
+          name: nexflow-db
+          property: connectionString
+      - key: REDIS_URL
+        fromService:
+          name: nexflow-redis
+          type: redis
+          property: connectionString
+      - key: HEALTH_CHECK_PORT
+        value: "9090"
+      - key: TOKEN_ENCRYPTION_KEY
+        generateValue: true
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: TWILIO_ACCOUNT_SID
+        sync: false
+      - key: TWILIO_AUTH_TOKEN
+        sync: false
+      - key: TWILIO_FROM_NUMBER
+        sync: false
+      - key: SLACK_CLIENT_ID
+        sync: false
+      - key: SLACK_CLIENT_SECRET
+        sync: false
+      - key: SLACK_SIGNING_SECRET
+        sync: false
+
+databases:
+  - name: nexflow-db
+    plan: starter
+    databaseName: nexflow
+    user: nexflow
+    region: oregon
+
+# Note: Redis requires a paid plan on Render
+# For free tier, use an external Redis provider like Upstash
+# and set REDIS_URL manually

@@ -1,0 +1,40 @@
+# Render.com deployment configuration for NexFlow Worker
+# Documentation: https://render.com/docs/yaml-spec
+
+services:
+  - type: worker
+    name: nexflow-worker
+    env: node
+    region: oregon
+    plan: standard
+    buildCommand: pnpm install && pnpm db:generate && pnpm --filter @nexflow/worker build
+    startCommand: pnpm --filter @nexflow/worker start
+    healthCheckPath: /health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: DATABASE_URL
+        sync: false
+      - key: REDIS_URL
+        sync: false
+      - key: HEALTH_CHECK_PORT
+        value: "9090"
+      - key: TOKEN_ENCRYPTION_KEY
+        generateValue: true
+      # Optional integrations
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: TWILIO_ACCOUNT_SID
+        sync: false
+      - key: TWILIO_AUTH_TOKEN
+        sync: false
+      - key: TWILIO_FROM_NUMBER
+        sync: false
+      - key: TWILIO_VERIFY_SERVICE_SID
+        sync: false
+      - key: SLACK_CLIENT_ID
+        sync: false
+      - key: SLACK_CLIENT_SECRET
+        sync: false
+      - key: SLACK_SIGNING_SECRET
+        sync: false

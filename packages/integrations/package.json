@@ -11,7 +11,9 @@
     "./jira": "./src/jira/index.ts",
     "./notion": "./src/notion/index.ts",
     "./slack": "./src/slack/index.ts",
-    "./discord": "./src/discord/index.ts"
+    "./discord": "./src/discord/index.ts",
+    "./twilio": "./src/twilio/index.ts",
+    "./notifications": "./src/notifications/index.ts"
   },
   "scripts": {
     "lint": "eslint src/",
@@ -24,6 +26,7 @@
     "@slack/web-api": "^6.9.0",
     "@nexflow/database": "workspace:*",
     "discord.js": "^14.14.0",
+    "twilio": "^4.20.0",
     "zod": "^3.22.4"
   },
   "devDependencies": {

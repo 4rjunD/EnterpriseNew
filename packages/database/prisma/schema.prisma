@@ -52,9 +52,42 @@ model User {
   behavioralMetrics BehavioralMetric[]
   agentActions    AgentAction[]   @relation("targetUser")
   notifications   Notification[]
+  notificationPreferences UserNotificationPreferences?
 
   @@index([organizationId])
   @@map("users")
+}
+
+model UserNotificationPreferences {
+  id        String   @id @default(cuid())
+  userId    String   @unique
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // Channel toggles
+  emailEnabled   Boolean @default(true)
+  slackEnabled   Boolean @default(true)
+  smsEnabled     Boolean @default(false)
+  inAppEnabled   Boolean @default(true)
+
+  // Phone settings
+  phoneNumber    String?
+  phoneVerified  Boolean @default(false)
+
+  // Slack settings
+  slackUserId    String?
+
+  // Notification type routing
+  nudgeViaSms        Boolean @default(true)
+  reassignmentViaSms Boolean @default(true)
+  criticalOnlyViaSms Boolean @default(false)
+
+  // Quiet hours (JSON: { start: "22:00", end: "08:00", timezone: "America/New_York" })
+  quietHours     Json?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("user_notification_preferences")
 }
 
 enum UserRole {

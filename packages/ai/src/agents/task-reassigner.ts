@@ -1,5 +1,11 @@
 import { Agent, AgentContext, AgentDecision, AgentResult } from './agent-base'
-import { prisma, TaskStatus, AgentType } from '@nexflow/database'
+import { prisma, TaskStatus } from '@nexflow/database'
+
+// Lazy import to avoid circular dependencies
+async function getNotificationService() {
+  const { notificationService } = await import('@nexflow/integrations')
+  return notificationService
+}
 
 interface TaskReassignerThresholds {
   overloadThreshold: number
@@ -64,6 +70,9 @@ export class TaskReassignerAgent extends Agent {
         (a, b) => a.createdAt.getTime() - b.createdAt.getTime()
       )[0]
 
+      // Build task URL
+      const taskUrl = taskToReassign.externalUrl || `${process.env.NEXTAUTH_URL}/dashboard/tasks/${taskToReassign.id}`
+
       decisions.push({
         shouldAct: true,
         action: 'reassign_task',
@@ -71,6 +80,7 @@ export class TaskReassignerAgent extends Agent {
         suggestion: {
           taskId: taskToReassign.id,
           taskTitle: taskToReassign.title,
+          taskUrl,
           fromUserId: overloadedUser.id,
           fromUserName: overloadedUser.name,
           toUserId: bestCandidate.id,
@@ -85,32 +95,68 @@ export class TaskReassignerAgent extends Agent {
   }
 
   async execute(decision: AgentDecision): Promise<AgentResult> {
-    const { taskId, toUserId } = decision.suggestion as {
+    const {
+      taskId,
+      taskTitle,
+      taskUrl,
+      toUserId,
+      toUserName,
+      fromUserId,
+      fromUserName,
+    } = decision.suggestion as {
       taskId: string
+      taskTitle: string
+      taskUrl: string
       toUserId: string
+      toUserName: string
+      fromUserId: string
+      fromUserName: string
     }
 
     try {
+      // Update the task assignment
       await prisma.task.update({
         where: { id: taskId },
         data: { assigneeId: toUserId },
       })
 
-      // Create notification for new assignee
-      await prisma.notification.create({
-        data: {
-          userId: toUserId,
-          type: 'TASK_ASSIGNED',
-          title: 'Task assigned to you',
-          message: `A task has been reassigned to you by NexFlow Agent`,
-          data: { taskId },
-        },
+      // Send notification to new assignee via all channels
+      const notificationService = await getNotificationService()
+      const results = await notificationService.sendReassignment({
+        userId: toUserId,
+        organizationId: this.context.organizationId,
+        taskId,
+        taskTitle,
+        url: taskUrl,
+        fromUserId,
+        fromUserName,
       })
+
+      // Check if any channel succeeded
+      const successfulChannels = results.filter((r: { success: boolean }) => r.success)
+
+      // Also notify the previous assignee (optional, lower priority)
+      if (fromUserId) {
+        await notificationService.send({
+          userId: fromUserId,
+          organizationId: this.context.organizationId,
+          type: 'AGENT_SUGGESTION',
+          title: 'Task reassigned',
+          message: `Your task "${taskTitle}" has been reassigned to ${toUserName} by NexFlow Agent to balance workload.`,
+          priority: 'low',
+          data: { taskId, toUserId, toUserName },
+          url: taskUrl,
+          channels: ['in_app'], // Only in-app for the previous assignee
+        })
+      }
 
       return {
         success: true,
-        message: 'Task reassigned successfully',
-        data: decision.suggestion,
+        message: `Task reassigned successfully. Notified via ${successfulChannels.map((r: { channel: string }) => r.channel).join(', ')}`,
+        data: {
+          ...decision.suggestion,
+          channels: successfulChannels.map((r: { channel: string }) => r.channel),
+        },
       }
     } catch (error) {
       return {

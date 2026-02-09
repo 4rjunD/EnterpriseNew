@@ -15,7 +15,8 @@
     "@nexflow/integrations": "workspace:*",
     "@nexflow/config": "workspace:*",
     "bullmq": "^4.0.0",
-    "ioredis": "^5.0.0"
+    "ioredis": "^5.0.0",
+    "zod": "^3.22.4"
   },
   "devDependencies": {
     "@types/node": "^20.10.0",
