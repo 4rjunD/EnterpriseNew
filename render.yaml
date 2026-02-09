@@ -5,9 +5,9 @@ services:
   # Main Web Application (Next.js)
   - type: web
     name: nexflow-web
-    env: node
+    runtime: node
     region: oregon
-    plan: starter
+    plan: free
     buildCommand: pnpm install && pnpm db:generate && pnpm --filter @nexflow/web build
     startCommand: pnpm --filter @nexflow/web start
     healthCheckPath: /api/health
@@ -18,17 +18,14 @@ services:
         fromDatabase:
           name: nexflow-db
           property: connectionString
-      - key: REDIS_URL
-        fromService:
-          name: nexflow-redis
-          type: redis
-          property: connectionString
       - key: NEXTAUTH_URL
         sync: false
       - key: NEXTAUTH_SECRET
         generateValue: true
       - key: TOKEN_ENCRYPTION_KEY
         generateValue: true
+      - key: REDIS_URL
+        sync: false
       # OAuth Providers (optional)
       - key: GOOGLE_CLIENT_ID
         sync: false
@@ -71,9 +68,9 @@ services:
   # Background Worker (BullMQ)
   - type: worker
     name: nexflow-worker
-    env: node
+    runtime: node
     region: oregon
-    plan: starter
+    plan: free
     buildCommand: pnpm install && pnpm db:generate && pnpm --filter @nexflow/worker build
     startCommand: pnpm --filter @nexflow/worker start
     envVars:
@@ -83,15 +80,12 @@ services:
         fromDatabase:
           name: nexflow-db
           property: connectionString
-      - key: REDIS_URL
-        fromService:
-          name: nexflow-redis
-          type: redis
-          property: connectionString
       - key: HEALTH_CHECK_PORT
         value: "9090"
       - key: TOKEN_ENCRYPTION_KEY
         generateValue: true
+      - key: REDIS_URL
+        sync: false
       - key: OPENAI_API_KEY
         sync: false
       - key: TWILIO_ACCOUNT_SID
@@ -109,11 +103,11 @@ services:
 
 databases:
   - name: nexflow-db
-    plan: starter
+    plan: free
     databaseName: nexflow
     user: nexflow
     region: oregon
 
-# Note: Redis requires a paid plan on Render
-# For free tier, use an external Redis provider like Upstash
-# and set REDIS_URL manually
+# Note: For Redis, use Upstash (free tier available)
+# 1. Create a free Redis at https://upstash.com
+# 2. Set REDIS_URL in Render dashboard after deployment
