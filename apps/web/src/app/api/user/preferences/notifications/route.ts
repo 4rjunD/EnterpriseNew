@@ -4,6 +4,8 @@ import { prisma } from '@nexflow/database'
 import { z } from 'zod'
 import { authOptions } from '@/lib/auth'
 
+export const dynamic = 'force-dynamic'
+
 // Schema for updating notification preferences
 const updatePreferencesSchema = z.object({
   emailEnabled: z.boolean().optional(),

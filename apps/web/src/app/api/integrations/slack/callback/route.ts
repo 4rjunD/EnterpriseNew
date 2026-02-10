@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { SlackClient } from '@nexflow/integrations'
 
+export const dynamic = 'force-dynamic'
+
 /**
  * GET /api/integrations/slack/callback
  * Handle Slack OAuth callback

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { Suspense, useState } from 'react'
 import { signIn } from 'next-auth/react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
@@ -9,8 +9,9 @@ import { Input } from '@nexflow/ui/input'
 import { Label } from '@nexflow/ui/label'
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@nexflow/ui/card'
 import { toast } from '@nexflow/ui/toast'
+import { Skeleton } from '@nexflow/ui/skeleton'
 
-export default function LoginPage() {
+function LoginForm() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const callbackUrl = searchParams.get('callbackUrl') || '/dashboard'
@@ -37,7 +38,7 @@ export default function LoginPage() {
       } else if (result?.ok) {
         router.push(callbackUrl)
       }
-    } catch (error) {
+    } catch {
       toast({ title: 'Login failed', description: 'An unexpected error occurred', variant: 'destructive' })
     } finally {
       setLoading(false)
@@ -144,12 +145,36 @@ export default function LoginPage() {
 
       <CardFooter className="flex justify-center">
         <p className="text-sm text-foreground-muted">
-          Don't have an account?{' '}
+          Don&apos;t have an account?{' '}
           <Link href="/signup" className="font-medium text-accent hover:underline">
             Sign up
           </Link>
         </p>
       </CardFooter>
     </Card>
+  )
+}
+
+function LoginSkeleton() {
+  return (
+    <Card>
+      <CardHeader className="text-center">
+        <Skeleton className="h-8 w-40 mx-auto" />
+        <Skeleton className="h-4 w-56 mx-auto mt-2" />
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <Skeleton className="h-10 w-full" />
+        <Skeleton className="h-10 w-full" />
+        <Skeleton className="h-10 w-full" />
+      </CardContent>
+    </Card>
+  )
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense fallback={<LoginSkeleton />}>
+      <LoginForm />
+    </Suspense>
   )
 }

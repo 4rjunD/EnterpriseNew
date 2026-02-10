@@ -5,6 +5,8 @@ import { TwilioClient } from '@nexflow/integrations'
 import { z } from 'zod'
 import { authOptions } from '@/lib/auth'
 
+export const dynamic = 'force-dynamic'
+
 const twilioClient = new TwilioClient()
 
 const confirmCodeSchema = z.object({

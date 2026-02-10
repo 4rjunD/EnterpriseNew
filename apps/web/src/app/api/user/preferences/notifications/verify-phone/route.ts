@@ -4,6 +4,8 @@ import { prisma } from '@nexflow/database'
 import { TwilioClient } from '@nexflow/integrations'
 import { authOptions } from '@/lib/auth'
 
+export const dynamic = 'force-dynamic'
+
 const twilioClient = new TwilioClient()
 
 /**
