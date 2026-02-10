@@ -38,7 +38,7 @@ export class BottleneckDetector {
 
     for (const pr of prs) {
       // Calculate severity
-      let severity = BottleneckSeverity.MEDIUM
+      let severity: BottleneckSeverity = BottleneckSeverity.MEDIUM
       const factors: string[] = []
 
       if (pr.lastActivityAt && pr.lastActivityAt < cutoffDate) {
@@ -55,12 +55,16 @@ export class BottleneckDetector {
 
       if (pr.unresolvedComments >= unresolvedCommentsThreshold) {
         factors.push(`${pr.unresolvedComments} unresolved comments`)
-        severity = Math.max(severity as number, BottleneckSeverity.HIGH as number) as BottleneckSeverity
+        if (severity !== BottleneckSeverity.CRITICAL) {
+          severity = BottleneckSeverity.HIGH
+        }
       }
 
       if (pr.ciStatus === CIStatus.FAILING) {
         factors.push('CI is failing')
-        severity = BottleneckSeverity.HIGH
+        if (severity !== BottleneckSeverity.CRITICAL) {
+          severity = BottleneckSeverity.HIGH
+        }
       }
 
       // Mark PR as stuck
@@ -139,12 +143,11 @@ export class BottleneckDetector {
         (Date.now() - task.updatedAt.getTime()) / (1000 * 60 * 60 * 24)
       )
 
-      let severity = BottleneckSeverity.MEDIUM
-      if (daysSinceUpdate > daysInProgress * 2) {
-        severity = BottleneckSeverity.HIGH
-      }
+      let severity: BottleneckSeverity = BottleneckSeverity.MEDIUM
       if (daysSinceUpdate > daysInProgress * 3) {
         severity = BottleneckSeverity.CRITICAL
+      } else if (daysSinceUpdate > daysInProgress * 2) {
+        severity = BottleneckSeverity.HIGH
       }
 
       // Mark task as stale
@@ -230,12 +233,11 @@ export class BottleneckDetector {
     for (const [taskId, { task, count }] of Object.entries(blockingCounts)) {
       if (count < blockedTasksThreshold) continue
 
-      let severity = BottleneckSeverity.MEDIUM
-      if (count >= blockedTasksThreshold * 2) {
-        severity = BottleneckSeverity.HIGH
-      }
+      let severity: BottleneckSeverity = BottleneckSeverity.MEDIUM
       if (count >= blockedTasksThreshold * 3) {
         severity = BottleneckSeverity.CRITICAL
+      } else if (count >= blockedTasksThreshold * 2) {
+        severity = BottleneckSeverity.HIGH
       }
 
       await prisma.bottleneck.upsert({

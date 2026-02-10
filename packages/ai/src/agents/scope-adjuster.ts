@@ -11,7 +11,7 @@ export class ScopeAdjusterAgent extends Agent {
 
   constructor(context: AgentContext) {
     super(context)
-    this.thresholds = context.thresholds as ScopeAdjusterThresholds
+    this.thresholds = context.thresholds as unknown as ScopeAdjusterThresholds
   }
 
   async evaluate(): Promise<AgentDecision[]> {

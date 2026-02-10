@@ -18,7 +18,7 @@ export class NudgeSenderAgent extends Agent {
 
   constructor(context: AgentContext) {
     super(context)
-    this.thresholds = context.thresholds as NudgeSenderThresholds
+    this.thresholds = context.thresholds as unknown as NudgeSenderThresholds
   }
 
   async evaluate(): Promise<AgentDecision[]> {

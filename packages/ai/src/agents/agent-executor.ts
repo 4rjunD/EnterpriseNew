@@ -6,10 +6,10 @@ import { ScopeAdjusterAgent } from './scope-adjuster'
 import { AGENT_DEFAULTS } from '@nexflow/config'
 
 export class AgentRegistry {
-  private static agents: Map<AgentType, new (context: AgentContext) => Agent> = new Map([
-    [AgentType.TASK_REASSIGNER, TaskReassignerAgent],
-    [AgentType.NUDGE_SENDER, NudgeSenderAgent],
-    [AgentType.SCOPE_ADJUSTER, ScopeAdjusterAgent],
+  private static agents = new Map<AgentType, new (context: AgentContext) => Agent>([
+    [AgentType.TASK_REASSIGNER, TaskReassignerAgent as any],
+    [AgentType.NUDGE_SENDER, NudgeSenderAgent as any],
+    [AgentType.SCOPE_ADJUSTER, ScopeAdjusterAgent as any],
   ])
 
   static getAgent(type: AgentType, context: AgentContext): Agent {
@@ -84,7 +84,7 @@ export class AgentExecutor {
           where: { id: action.id },
           data: {
             status: result.success ? AgentActionStatus.EXECUTED : AgentActionStatus.FAILED,
-            result,
+            result: result as any,
             executedAt: new Date(),
           },
         })

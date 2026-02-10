@@ -18,7 +18,7 @@ export class TaskReassignerAgent extends Agent {
 
   constructor(context: AgentContext) {
     super(context)
-    this.thresholds = context.thresholds as TaskReassignerThresholds
+    this.thresholds = context.thresholds as unknown as TaskReassignerThresholds
   }
 
   async evaluate(): Promise<AgentDecision[]> {

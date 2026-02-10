@@ -55,7 +55,7 @@ export class LinearClient implements IntegrationClient {
 
       for (const issue of issues.nodes) {
         try {
-          const unifiedTask = await this.mapToUnifiedTask(issue)
+          const unifiedTask = await this.mapToUnifiedTask(issue as any)
           await this.upsertTask(unifiedTask)
           itemsSynced++
         } catch (e) {

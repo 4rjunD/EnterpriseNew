@@ -86,7 +86,7 @@ export abstract class Agent {
           agentConfigId: this.context.agentConfigId,
           action: decision.action,
           reasoning: decision.reasoning,
-          suggestion: decision.suggestion,
+          suggestion: decision.suggestion as any,
           targetUserId: decision.targetUserId,
           bottleneckId: decision.bottleneckId,
           status: this.context.autoApprove
@@ -109,7 +109,7 @@ export abstract class Agent {
               status: result.success
                 ? AgentActionStatus.EXECUTED
                 : AgentActionStatus.FAILED,
-              result,
+              result: result as any,
               executedAt: new Date(),
             },
           })
