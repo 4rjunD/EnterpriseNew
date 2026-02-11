@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useRef, Suspense } from 'react'
+import { useState, useEffect, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { signOut } from 'next-auth/react'
 import { Button } from '@nexflow/ui/button'
@@ -50,7 +50,12 @@ function OnboardingContent() {
   ]
 
   const currentStepIndex = steps.findIndex((s) => s.key === currentStep)
-  const hasInitialized = useRef(false)
+
+  // Helper to change step and persist to localStorage
+  const goToStep = (step: Step) => {
+    setCurrentStep(step)
+    localStorage.setItem(ONBOARDING_STEP_KEY, step)
+  }
 
   // Handle OAuth redirects and restore step from localStorage
   useEffect(() => {
@@ -63,7 +68,6 @@ function OnboardingContent() {
       setCurrentStep('integrations')
       localStorage.setItem(ONBOARDING_STEP_KEY, 'integrations')
       window.history.replaceState({}, '', '/onboarding')
-      hasInitialized.current = true
       return
     }
 
@@ -72,7 +76,6 @@ function OnboardingContent() {
       setCurrentStep('integrations')
       localStorage.setItem(ONBOARDING_STEP_KEY, 'integrations')
       window.history.replaceState({}, '', '/onboarding')
-      hasInitialized.current = true
       return
     }
 
@@ -80,15 +83,7 @@ function OnboardingContent() {
     if (savedStep && steps.some(s => s.key === savedStep)) {
       setCurrentStep(savedStep)
     }
-    hasInitialized.current = true
   }, [searchParams])
-
-  // Persist current step to localStorage (skip until initialized)
-  useEffect(() => {
-    if (hasInitialized.current) {
-      localStorage.setItem(ONBOARDING_STEP_KEY, currentStep)
-    }
-  }, [currentStep])
 
   // Helper to check if an integration is connected
   const isIntegrationConnected = (type: string) => {
@@ -144,14 +139,14 @@ function OnboardingContent() {
         // Teams created successfully (or failed silently)
       })
     }
-    setCurrentStep('invite')
+    goToStep('invite')
   }
 
   const handleSendInvites = async () => {
     const validEmails = inviteEmails.filter((e) => e.trim() && e.includes('@'))
 
     if (validEmails.length === 0) {
-      setCurrentStep('integrations')
+      goToStep('integrations')
       return
     }
 
@@ -162,11 +157,11 @@ function OnboardingContent() {
       if (result.sent > 0) {
         toast({ title: `Sent ${result.sent} invitation${result.sent > 1 ? 's' : ''}` })
       }
-      setCurrentStep('integrations')
+      goToStep('integrations')
     } catch (error: any) {
       console.error('Failed to send invites:', error)
       toast({ title: 'Failed to send invitations', description: error?.message, variant: 'destructive' })
-      setCurrentStep('integrations')
+      goToStep('integrations')
     } finally {
       setIsLoading(false)
     }
@@ -299,7 +294,7 @@ function OnboardingContent() {
               </div>
 
               <Button
-                onClick={() => setCurrentStep('team')}
+                onClick={() => goToStep('team')}
                 className="w-full h-11 bg-foreground text-background hover:bg-foreground/90"
               >
                 Get started <ArrowRight className="w-4 h-4 ml-2" />
@@ -376,7 +371,7 @@ function OnboardingContent() {
               <div className="flex gap-3">
                 <Button
                   variant="ghost"
-                  onClick={() => setCurrentStep('invite')}
+                  onClick={() => goToStep('invite')}
                   className="flex-1 h-11 text-foreground-muted hover:text-foreground"
                 >
                   Skip for now
@@ -436,7 +431,7 @@ function OnboardingContent() {
               <div className="flex gap-3">
                 <Button
                   variant="ghost"
-                  onClick={() => setCurrentStep('integrations')}
+                  onClick={() => goToStep('integrations')}
                   className="flex-1 h-11 text-foreground-muted hover:text-foreground"
                 >
                   Skip for now
@@ -506,13 +501,13 @@ function OnboardingContent() {
               <div className="flex gap-3">
                 <Button
                   variant="ghost"
-                  onClick={() => setCurrentStep('agents')}
+                  onClick={() => goToStep('agents')}
                   className="flex-1 h-11 text-foreground-muted hover:text-foreground"
                 >
                   Skip for now
                 </Button>
                 <Button
-                  onClick={() => setCurrentStep('agents')}
+                  onClick={() => goToStep('agents')}
                   className="flex-1 h-11 bg-foreground text-background hover:bg-foreground/90"
                 >
                   Continue <ArrowRight className="w-4 h-4 ml-2" />
@@ -549,7 +544,7 @@ function OnboardingContent() {
               </p>
 
               <Button
-                onClick={() => setCurrentStep('complete')}
+                onClick={() => goToStep('complete')}
                 className="w-full h-11 bg-foreground text-background hover:bg-foreground/90"
               >
                 Continue <ArrowRight className="w-4 h-4 ml-2" />
