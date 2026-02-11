@@ -70,10 +70,48 @@ export class NudgeSenderAgent extends Agent {
         if (hoursSinceLastNudge < this.thresholds.reminderIntervalHours) continue
       }
 
+      const daysStuck = Math.floor(
+        (Date.now() - (pr.stuckAt?.getTime() || Date.now())) / (1000 * 60 * 60 * 24)
+      )
+
+      // Use AI to assess urgency and determine if nudge is appropriate
+      const analysis = await this.analyzeWithAI(
+        'Assess the urgency of this stuck PR. Is it blocking project goals or milestones? Should we send a nudge to the author?',
+        {
+          pr: {
+            number: pr.number,
+            title: pr.title,
+            description: pr.description,
+            daysStuck,
+            unresolvedComments: pr.unresolvedComments,
+            ciStatus: pr.ciStatus,
+            additions: pr.additions,
+            deletions: pr.deletions,
+            repository: pr.repository,
+          },
+          author: {
+            name: pr.author.name,
+          },
+          project: pr.project
+            ? {
+                name: pr.project.name,
+                targetDate: pr.project.targetDate,
+              }
+            : null,
+          existingNudges,
+          maxReminders: this.thresholds.maxReminders,
+        }
+      )
+
+      // Only send nudge if AI recommends it
+      if (!analysis.shouldAct || analysis.confidence < 0.5) {
+        continue
+      }
+
       decisions.push({
         shouldAct: true,
         action: 'nudge_pr',
-        reasoning: `PR #${pr.number} "${pr.title}" has been stuck for ${Math.floor((Date.now() - (pr.stuckAt?.getTime() || Date.now())) / (1000 * 60 * 60 * 24))} days. Sending reminder to author.`,
+        reasoning: analysis.reasoning,
         suggestion: {
           prId: pr.id,
           prNumber: pr.number,
@@ -82,10 +120,12 @@ export class NudgeSenderAgent extends Agent {
           authorId: pr.author.id,
           authorName: pr.author.name,
           reminderCount: existingNudges + 1,
+          aiConfidence: analysis.confidence,
+          aiRecommendation: analysis.recommendation,
         },
         targetUserId: pr.author.id,
         bottleneckId: pr.bottlenecks[0]?.id,
-        priority: existingNudges >= 2 ? 'high' : 'medium',
+        priority: analysis.priority || (existingNudges >= 2 ? 'high' : 'medium'),
       })
     }
 
@@ -119,10 +159,43 @@ export class NudgeSenderAgent extends Agent {
       // Build task URL
       const taskUrl = task.externalUrl || `${process.env.NEXTAUTH_URL}/dashboard/tasks/${task.id}`
 
+      // Use AI to assess if nudge is appropriate for this task
+      const analysis = await this.analyzeWithAI(
+        'Assess if this stale task needs a nudge. Consider if it might be blocked, if the assignee may need help, or if the task is critical to project goals.',
+        {
+          task: {
+            title: task.title,
+            description: task.description,
+            priority: task.priority,
+            labels: task.labels,
+            storyPoints: task.storyPoints,
+            dueDate: task.dueDate,
+            daysStale: BOTTLENECK_THRESHOLDS.staleTask.daysInProgress,
+            blockedByIds: task.blockedByIds,
+          },
+          assignee: {
+            name: task.assignee.name,
+          },
+          project: task.project
+            ? {
+                name: task.project.name,
+                targetDate: task.project.targetDate,
+              }
+            : null,
+          existingNudges,
+          maxReminders: this.thresholds.maxReminders,
+        }
+      )
+
+      // Only send nudge if AI recommends it
+      if (!analysis.shouldAct || analysis.confidence < 0.5) {
+        continue
+      }
+
       decisions.push({
         shouldAct: true,
         action: 'nudge_task',
-        reasoning: `Task "${task.title}" has been in progress for over ${BOTTLENECK_THRESHOLDS.staleTask.daysInProgress} days. Sending reminder to assignee.`,
+        reasoning: analysis.reasoning,
         suggestion: {
           taskId: task.id,
           taskTitle: task.title,
@@ -130,9 +203,11 @@ export class NudgeSenderAgent extends Agent {
           assigneeId: task.assignee.id,
           assigneeName: task.assignee.name,
           reminderCount: existingNudges + 1,
+          aiConfidence: analysis.confidence,
+          aiRecommendation: analysis.recommendation,
         },
         targetUserId: task.assignee.id,
-        priority: 'medium',
+        priority: analysis.priority || 'medium',
       })
     }
 

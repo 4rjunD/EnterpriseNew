@@ -6,10 +6,11 @@ import { signOut } from 'next-auth/react'
 import { Button } from '@nexflow/ui/button'
 import { Input } from '@nexflow/ui/input'
 import { trpc } from '@/lib/trpc'
-import { CheckCircle2, Users, Link2, Bot, ArrowRight, Plus, X, Loader2, Check, LogOut } from 'lucide-react'
+import { CheckCircle2, Users, Link2, Bot, ArrowRight, Plus, X, Loader2, Check, LogOut, Lightbulb } from 'lucide-react'
+import { Textarea } from '@nexflow/ui/textarea'
 import { toast } from '@nexflow/ui/toast'
 
-type Step = 'welcome' | 'team' | 'invite' | 'integrations' | 'agents' | 'complete'
+type Step = 'welcome' | 'team' | 'invite' | 'integrations' | 'project' | 'agents' | 'complete'
 
 const ONBOARDING_STEP_KEY = 'nexflow_onboarding_step'
 
@@ -34,10 +35,17 @@ function OnboardingContent() {
   const [inviteEmails, setInviteEmails] = useState<string[]>([''])
   const [isLoading, setIsLoading] = useState(false)
   const [invitesSent, setInvitesSent] = useState(0)
+  const [projectContext, setProjectContext] = useState({
+    buildingDescription: '',
+    milestones: [{ name: '', targetDate: '' }],
+    goals: [''],
+    techStack: [''],
+  })
 
   const createTeam = trpc.team.createTeam.useMutation()
   const completeOnboarding = trpc.onboarding.complete.useMutation()
   const sendInvites = trpc.invitations.sendBulk.useMutation()
+  const saveProjectContext = trpc.onboarding.saveProjectContext.useMutation()
   const { data: integrations } = trpc.integrations.list.useQuery()
 
   const steps = [
@@ -45,6 +53,7 @@ function OnboardingContent() {
     { key: 'team' as const, label: 'Teams' },
     { key: 'invite' as const, label: 'Invite' },
     { key: 'integrations' as const, label: 'Connect' },
+    { key: 'project' as const, label: 'Project' },
     { key: 'agents' as const, label: 'Agents' },
     { key: 'complete' as const, label: 'Done' },
   ]
@@ -162,6 +171,106 @@ function OnboardingContent() {
       console.error('Failed to send invites:', error)
       toast({ title: 'Failed to send invitations', description: error?.message, variant: 'destructive' })
       goToStep('integrations')
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  // Project context helpers
+  const updateProjectDescription = (value: string) => {
+    setProjectContext((prev) => ({ ...prev, buildingDescription: value }))
+  }
+
+  const addMilestone = () => {
+    setProjectContext((prev) => ({
+      ...prev,
+      milestones: [...prev.milestones, { name: '', targetDate: '' }],
+    }))
+  }
+
+  const updateMilestone = (index: number, field: 'name' | 'targetDate', value: string) => {
+    setProjectContext((prev) => ({
+      ...prev,
+      milestones: prev.milestones.map((m, i) => (i === index ? { ...m, [field]: value } : m)),
+    }))
+  }
+
+  const removeMilestone = (index: number) => {
+    if (projectContext.milestones.length > 1) {
+      setProjectContext((prev) => ({
+        ...prev,
+        milestones: prev.milestones.filter((_, i) => i !== index),
+      }))
+    }
+  }
+
+  const addGoal = () => {
+    setProjectContext((prev) => ({ ...prev, goals: [...prev.goals, ''] }))
+  }
+
+  const updateGoal = (index: number, value: string) => {
+    setProjectContext((prev) => ({
+      ...prev,
+      goals: prev.goals.map((g, i) => (i === index ? value : g)),
+    }))
+  }
+
+  const removeGoal = (index: number) => {
+    if (projectContext.goals.length > 1) {
+      setProjectContext((prev) => ({
+        ...prev,
+        goals: prev.goals.filter((_, i) => i !== index),
+      }))
+    }
+  }
+
+  const addTechStack = () => {
+    setProjectContext((prev) => ({ ...prev, techStack: [...prev.techStack, ''] }))
+  }
+
+  const updateTechStack = (index: number, value: string) => {
+    setProjectContext((prev) => ({
+      ...prev,
+      techStack: prev.techStack.map((t, i) => (i === index ? value : t)),
+    }))
+  }
+
+  const removeTechStack = (index: number) => {
+    if (projectContext.techStack.length > 1) {
+      setProjectContext((prev) => ({
+        ...prev,
+        techStack: prev.techStack.filter((_, i) => i !== index),
+      }))
+    }
+  }
+
+  const handleSaveProjectContext = async () => {
+    if (projectContext.buildingDescription.trim().length < 10) {
+      toast({
+        title: 'Please describe your project',
+        description: 'Add at least a few sentences about what you\'re building.',
+        variant: 'destructive',
+      })
+      return
+    }
+
+    setIsLoading(true)
+    try {
+      await saveProjectContext.mutateAsync({
+        buildingDescription: projectContext.buildingDescription,
+        milestones: projectContext.milestones.filter((m) => m.name.trim()),
+        goals: projectContext.goals.filter((g) => g.trim()),
+        techStack: projectContext.techStack.filter((t) => t.trim()),
+      })
+      toast({ title: 'Project context saved' })
+      goToStep('agents')
+    } catch (error: any) {
+      console.error('Failed to save project context:', error)
+      toast({
+        title: 'Failed to save project context',
+        description: error?.message,
+        variant: 'destructive',
+      })
     } finally {
       setIsLoading(false)
     }
@@ -501,16 +610,178 @@ function OnboardingContent() {
               <div className="flex gap-3">
                 <Button
                   variant="ghost"
+                  onClick={() => goToStep('project')}
+                  className="flex-1 h-11 text-foreground-muted hover:text-foreground"
+                >
+                  Skip for now
+                </Button>
+                <Button
+                  onClick={() => goToStep('project')}
+                  className="flex-1 h-11 bg-foreground text-background hover:bg-foreground/90"
+                >
+                  Continue <ArrowRight className="w-4 h-4 ml-2" />
+                </Button>
+              </div>
+            </div>
+          )}
+
+          {/* Project Context Step */}
+          {currentStep === 'project' && (
+            <div>
+              <h2 className="text-2xl font-semibold text-foreground mb-2">What are you building?</h2>
+              <p className="text-foreground-muted mb-6">
+                Help our AI understand your project to provide better insights and recommendations.
+              </p>
+
+              {/* Description */}
+              <div className="mb-6">
+                <label className="block text-sm font-medium text-foreground mb-2">
+                  Describe your project
+                </label>
+                <Textarea
+                  value={projectContext.buildingDescription}
+                  onChange={(e) => updateProjectDescription(e.target.value)}
+                  placeholder="We're building a SaaS platform for team collaboration. Our main goals are to improve async communication and reduce meeting overhead..."
+                  className="h-24 bg-background-secondary border-border resize-none"
+                />
+              </div>
+
+              {/* Milestones */}
+              <div className="mb-6">
+                <label className="block text-sm font-medium text-foreground mb-2">
+                  Key milestones <span className="text-foreground-muted font-normal">(optional)</span>
+                </label>
+                <div className="space-y-2">
+                  {projectContext.milestones.map((milestone, index) => (
+                    <div key={index} className="flex gap-2">
+                      <Input
+                        value={milestone.name}
+                        onChange={(e) => updateMilestone(index, 'name', e.target.value)}
+                        placeholder="Beta launch"
+                        className="flex-1 h-10 bg-background-secondary border-border"
+                      />
+                      <Input
+                        type="date"
+                        value={milestone.targetDate}
+                        onChange={(e) => updateMilestone(index, 'targetDate', e.target.value)}
+                        className="w-40 h-10 bg-background-secondary border-border"
+                      />
+                      {projectContext.milestones.length > 1 && (
+                        <button
+                          onClick={() => removeMilestone(index)}
+                          className="px-2 text-foreground-muted hover:text-red-500 transition-colors"
+                        >
+                          <X className="w-4 h-4" />
+                        </button>
+                      )}
+                    </div>
+                  ))}
+                </div>
+                <button
+                  onClick={addMilestone}
+                  className="mt-2 text-sm text-foreground-muted hover:text-foreground flex items-center gap-1"
+                >
+                  <Plus className="w-3 h-3" /> Add milestone
+                </button>
+              </div>
+
+              {/* Goals */}
+              <div className="mb-6">
+                <label className="block text-sm font-medium text-foreground mb-2">
+                  Project goals <span className="text-foreground-muted font-normal">(optional)</span>
+                </label>
+                <div className="space-y-2">
+                  {projectContext.goals.map((goal, index) => (
+                    <div key={index} className="flex gap-2">
+                      <Input
+                        value={goal}
+                        onChange={(e) => updateGoal(index, e.target.value)}
+                        placeholder="Launch MVP by Q2"
+                        className="flex-1 h-10 bg-background-secondary border-border"
+                      />
+                      {projectContext.goals.length > 1 && (
+                        <button
+                          onClick={() => removeGoal(index)}
+                          className="px-2 text-foreground-muted hover:text-red-500 transition-colors"
+                        >
+                          <X className="w-4 h-4" />
+                        </button>
+                      )}
+                    </div>
+                  ))}
+                </div>
+                <button
+                  onClick={addGoal}
+                  className="mt-2 text-sm text-foreground-muted hover:text-foreground flex items-center gap-1"
+                >
+                  <Plus className="w-3 h-3" /> Add goal
+                </button>
+              </div>
+
+              {/* Tech Stack */}
+              <div className="mb-8">
+                <label className="block text-sm font-medium text-foreground mb-2">
+                  Tech stack <span className="text-foreground-muted font-normal">(optional)</span>
+                </label>
+                <div className="flex flex-wrap gap-2">
+                  {projectContext.techStack.map((tech, index) => (
+                    <div
+                      key={index}
+                      className="flex items-center gap-1 bg-background-secondary border border-border rounded-lg px-3 py-1.5"
+                    >
+                      <Input
+                        value={tech}
+                        onChange={(e) => updateTechStack(index, e.target.value)}
+                        placeholder="React"
+                        className="w-24 h-6 p-0 border-0 bg-transparent text-sm"
+                      />
+                      {projectContext.techStack.length > 1 && (
+                        <button
+                          onClick={() => removeTechStack(index)}
+                          className="text-foreground-muted hover:text-red-500 transition-colors"
+                        >
+                          <X className="w-3 h-3" />
+                        </button>
+                      )}
+                    </div>
+                  ))}
+                  <button
+                    onClick={addTechStack}
+                    className="flex items-center gap-1 px-3 py-1.5 border border-dashed border-border rounded-lg text-sm text-foreground-muted hover:text-foreground hover:border-foreground/30 transition-colors"
+                  >
+                    <Plus className="w-3 h-3" /> Add
+                  </button>
+                </div>
+              </div>
+
+              <div className="p-4 bg-blue-500/10 border border-blue-500/20 rounded-lg mb-6">
+                <div className="flex items-start gap-3">
+                  <Lightbulb className="w-5 h-5 text-blue-500 flex-shrink-0 mt-0.5" />
+                  <p className="text-sm text-foreground-muted">
+                    This context helps AI agents make smarter decisions about task priorities,
+                    reassignments, and deadline predictions based on your project goals.
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex gap-3">
+                <Button
+                  variant="ghost"
                   onClick={() => goToStep('agents')}
                   className="flex-1 h-11 text-foreground-muted hover:text-foreground"
                 >
                   Skip for now
                 </Button>
                 <Button
-                  onClick={() => goToStep('agents')}
+                  onClick={handleSaveProjectContext}
+                  disabled={isLoading}
                   className="flex-1 h-11 bg-foreground text-background hover:bg-foreground/90"
                 >
-                  Continue <ArrowRight className="w-4 h-4 ml-2" />
+                  {isLoading ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <>Continue <ArrowRight className="w-4 h-4 ml-2" /></>
+                  )}
                 </Button>
               </div>
             </div>

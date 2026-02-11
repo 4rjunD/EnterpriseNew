@@ -1,5 +1,6 @@
 import { router, protectedProcedure } from '../trpc'
 import { prisma } from '@nexflow/database'
+import { z } from 'zod'
 
 export const onboardingRouter = router({
   // Get onboarding status
@@ -18,6 +19,57 @@ export const onboardingRouter = router({
       data: { onboardingCompleted: true },
     })
     return { success: true }
+  }),
+
+  // Save project context during onboarding
+  saveProjectContext: protectedProcedure
+    .input(
+      z.object({
+        buildingDescription: z.string().min(10, 'Please provide at least 10 characters'),
+        milestones: z
+          .array(
+            z.object({
+              name: z.string(),
+              targetDate: z.string(),
+              description: z.string().optional(),
+            })
+          )
+          .optional(),
+        goals: z.array(z.string()).optional(),
+        techStack: z.array(z.string()).optional(),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      // Filter out empty milestones and goals
+      const milestones = input.milestones?.filter((m) => m.name.trim()) || []
+      const goals = input.goals?.filter((g) => g.trim()) || []
+      const techStack = input.techStack?.filter((t) => t.trim()) || []
+
+      return prisma.projectContext.upsert({
+        where: {
+          organizationId: ctx.organizationId,
+        },
+        create: {
+          organizationId: ctx.organizationId,
+          buildingDescription: input.buildingDescription,
+          milestones: milestones.length > 0 ? milestones : undefined,
+          goals,
+          techStack,
+        },
+        update: {
+          buildingDescription: input.buildingDescription,
+          milestones: milestones.length > 0 ? milestones : undefined,
+          goals,
+          techStack,
+        },
+      })
+    }),
+
+  // Get existing project context
+  getProjectContext: protectedProcedure.query(async ({ ctx }) => {
+    return prisma.projectContext.findFirst({
+      where: { organizationId: ctx.organizationId },
+    })
   }),
 
   // Get setup progress for getting started checklist

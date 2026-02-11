@@ -13,7 +13,8 @@
     "push": "prisma db push",
     "migrate": "prisma migrate dev",
     "studio": "prisma studio",
-    "seed": "node seed-demo.js",
+    "seed": "echo 'Use seed:demo for demo data' && exit 1",
+    "seed:demo": "NODE_ENV=development node seed-demo.js",
     "lint": "eslint src/",
     "typecheck": "tsc --noEmit"
   },

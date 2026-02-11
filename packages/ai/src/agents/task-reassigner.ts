@@ -60,23 +60,58 @@ export class TaskReassignerAgent extends Agent {
 
       if (availableUsers.length === 0) continue
 
-      // Pick best candidate (least loaded)
-      const bestCandidate = availableUsers.reduce((best, current) =>
-        current.assignedTasks.length < best.assignedTasks.length ? current : best
-      )
-
       // Pick task to reassign (oldest TODO)
       const taskToReassign = reassignableTasks.sort(
         (a, b) => a.createdAt.getTime() - b.createdAt.getTime()
       )[0]
 
+      // Use AI to analyze the situation and pick the best candidate
+      const analysis = await this.analyzeWithAI(
+        'Should this task be reassigned to balance workload? Consider the task context, team member workloads, and project alignment. Which candidate would be the best fit?',
+        {
+          task: {
+            title: taskToReassign.title,
+            description: taskToReassign.description,
+            priority: taskToReassign.priority,
+            labels: taskToReassign.labels,
+            storyPoints: taskToReassign.storyPoints,
+            dueDate: taskToReassign.dueDate,
+          },
+          currentAssignee: {
+            name: overloadedUser.name,
+            taskCount: overloadedUser.assignedTasks.length,
+            teams: overloadedUser.teamMemberships.map((tm) => tm.team.name),
+          },
+          availableCandidates: availableUsers.map((u) => ({
+            id: u.id,
+            name: u.name,
+            taskCount: u.assignedTasks.length,
+            teams: u.teamMemberships.map((tm) => tm.team.name),
+            currentTasks: u.assignedTasks.map((t) => ({ title: t.title, priority: t.priority })),
+          })),
+          overloadThreshold: this.thresholds.overloadThreshold,
+        }
+      )
+
+      // Only proceed if AI recommends action with sufficient confidence
+      if (!analysis.shouldAct || analysis.confidence < 0.6) {
+        continue
+      }
+
+      // Pick best candidate (least loaded by default, or AI recommendation)
+      const bestCandidate = availableUsers.reduce((best, current) =>
+        current.assignedTasks.length < best.assignedTasks.length ? current : best
+      )
+
       // Build task URL
-      const taskUrl = taskToReassign.externalUrl || `${process.env.NEXTAUTH_URL}/dashboard/tasks/${taskToReassign.id}`
+      const taskUrl =
+        taskToReassign.externalUrl ||
+        `${process.env.NEXTAUTH_URL}/dashboard/tasks/${taskToReassign.id}`
 
       decisions.push({
         shouldAct: true,
         action: 'reassign_task',
-        reasoning: `${overloadedUser.name} has ${overloadedUser.assignedTasks.length} active tasks (threshold: ${this.thresholds.overloadThreshold}). Suggesting reassignment to ${bestCandidate.name} who has ${bestCandidate.assignedTasks.length} tasks.`,
+        reasoning: analysis.reasoning,
         suggestion: {
           taskId: taskToReassign.id,
           taskTitle: taskToReassign.title,
@@ -85,9 +120,11 @@ export class TaskReassignerAgent extends Agent {
           fromUserName: overloadedUser.name,
           toUserId: bestCandidate.id,
           toUserName: bestCandidate.name,
+          aiConfidence: analysis.confidence,
+          aiRecommendation: analysis.recommendation,
         },
         targetUserId: bestCandidate.id,
-        priority: 'medium',
+        priority: analysis.priority || 'medium',
       })
     }
 

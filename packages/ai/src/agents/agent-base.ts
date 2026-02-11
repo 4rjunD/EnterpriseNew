@@ -1,4 +1,5 @@
 import { prisma, AgentType, AgentActionStatus } from '@nexflow/database'
+import OpenAI from 'openai'
 
 export interface AgentContext {
   organizationId: string
@@ -7,6 +8,14 @@ export interface AgentContext {
   thresholds: Record<string, unknown>
   quietHours?: { start: number; end: number }
   autoApprove: boolean
+}
+
+export interface AIAnalysisResult {
+  shouldAct: boolean
+  reasoning: string
+  confidence: number
+  recommendation?: string
+  priority?: 'low' | 'medium' | 'high'
 }
 
 export interface AgentDecision {
@@ -27,13 +36,130 @@ export interface AgentResult {
 
 export abstract class Agent {
   protected context: AgentContext
+  protected openai: OpenAI
 
   constructor(context: AgentContext) {
     this.context = context
+    this.openai = new OpenAI({
+      apiKey: process.env.OPENAI_API_KEY,
+    })
   }
 
   abstract evaluate(): Promise<AgentDecision[]>
   abstract execute(decision: AgentDecision): Promise<AgentResult>
+
+  /**
+   * Get the project context for AI analysis
+   */
+  protected async getProjectContext(): Promise<string> {
+    const ctx = await prisma.projectContext.findFirst({
+      where: { organizationId: this.context.organizationId },
+    })
+
+    if (!ctx) {
+      return 'No project context available.'
+    }
+
+    const parts: string[] = []
+    parts.push(`Building: ${ctx.buildingDescription}`)
+
+    if (ctx.goals && ctx.goals.length > 0) {
+      parts.push(`Goals: ${ctx.goals.join(', ')}`)
+    }
+
+    if (ctx.milestones) {
+      const milestones = ctx.milestones as Array<{ name: string; targetDate: string }>
+      if (milestones.length > 0) {
+        parts.push(`Milestones: ${milestones.map((m) => `${m.name} (${m.targetDate})`).join(', ')}`)
+      }
+    }
+
+    if (ctx.techStack && ctx.techStack.length > 0) {
+      parts.push(`Tech Stack: ${ctx.techStack.join(', ')}`)
+    }
+
+    return parts.join('\n')
+  }
+
+  /**
+   * Analyze data using GPT to make AI-powered decisions
+   */
+  protected async analyzeWithAI(
+    prompt: string,
+    data: Record<string, unknown>
+  ): Promise<AIAnalysisResult> {
+    // Skip AI analysis if no API key is configured
+    if (!process.env.OPENAI_API_KEY) {
+      return {
+        shouldAct: false,
+        reasoning: 'AI analysis unavailable - no API key configured',
+        confidence: 0,
+      }
+    }
+
+    try {
+      const projectContext = await this.getProjectContext()
+
+      const response = await this.openai.chat.completions.create({
+        model: 'gpt-4-turbo-preview',
+        messages: [
+          {
+            role: 'system',
+            content: `You are an AI engineering manager assistant. Analyze the provided data in the context of the project and make recommendations.
+
+PROJECT CONTEXT:
+${projectContext}
+
+You must respond with valid JSON in this exact format:
+{
+  "shouldAct": boolean,
+  "reasoning": "string explaining your analysis",
+  "confidence": number between 0 and 1,
+  "recommendation": "optional specific recommendation",
+  "priority": "low" | "medium" | "high"
+}
+
+Be conservative - only recommend action when truly needed. Consider:
+- Project goals and milestones when assessing urgency
+- Team dynamics and workload balance
+- Risk vs reward of taking action`,
+          },
+          {
+            role: 'user',
+            content: `${prompt}\n\nData to analyze:\n${JSON.stringify(data, null, 2)}`,
+          },
+        ],
+        response_format: { type: 'json_object' },
+        max_tokens: 500,
+        temperature: 0.3,
+      })
+
+      const content = response.choices[0]?.message?.content
+      if (!content) {
+        return {
+          shouldAct: false,
+          reasoning: 'No response from AI',
+          confidence: 0,
+        }
+      }
+
+      const result = JSON.parse(content) as AIAnalysisResult
+      return {
+        shouldAct: result.shouldAct ?? false,
+        reasoning: result.reasoning ?? 'No reasoning provided',
+        confidence: Math.max(0, Math.min(1, result.confidence ?? 0)),
+        recommendation: result.recommendation,
+        priority: result.priority,
+      }
+    } catch (error) {
+      console.error('AI analysis failed:', error)
+      return {
+        shouldAct: false,
+        reasoning: `AI analysis failed: ${error}`,
+        confidence: 0,
+      }
+    }
+  }
 
   protected async preExecutionChecks(): Promise<boolean> {
     // Check quiet hours

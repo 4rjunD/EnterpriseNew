@@ -1,4 +1,4 @@
-export { Agent, type AgentContext, type AgentDecision, type AgentResult } from './agent-base'
+export { Agent, type AgentContext, type AgentDecision, type AgentResult, type AIAnalysisResult } from './agent-base'
 export { TaskReassignerAgent } from './task-reassigner'
 export { NudgeSenderAgent } from './nudge-sender'
 export { ScopeAdjusterAgent } from './scope-adjuster'

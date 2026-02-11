@@ -20,14 +20,37 @@ model Organization {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  users        User[]
-  teams        Team[]
-  projects     Project[]
-  integrations Integration[]
-  agents       AgentConfig[]
-  invitations  Invitation[]
+  users           User[]
+  teams           Team[]
+  projects        Project[]
+  integrations    Integration[]
+  agents          AgentConfig[]
+  invitations     Invitation[]
+  projectContexts ProjectContext[]
 
   @@map("organizations")
+}
+
+// Project context for AI agents - captures what the team is building
+model ProjectContext {
+  id String @id @default(cuid())
+
+  // What are you building
+  buildingDescription String   @db.Text
+  milestones          Json?    // [{ name, targetDate, description }]
+  goals               String[]
+  techStack           String[]
+
+  // Link to project or organization (one per org for org-level context)
+  projectId      String?       @unique
+  project        Project?      @relation(fields: [projectId], references: [id])
+  organizationId String?       @unique
+  organization   Organization? @relation(fields: [organizationId], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("project_contexts")
 }
 
 model User {
@@ -172,6 +195,7 @@ model Project {
   pullRequests PullRequest[]
   predictions  Prediction[]
   bottlenecks  Bottleneck[]
+  context      ProjectContext?
 
   @@unique([organizationId, key])
   @@index([organizationId])

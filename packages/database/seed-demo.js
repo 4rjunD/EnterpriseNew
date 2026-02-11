@@ -2,6 +2,55 @@ const { PrismaClient } = require('@prisma/client');
 const prisma = new PrismaClient();
 
 async function main() {
+  // ============================================================================
+  // Safety checks to prevent polluting real accounts
+  // ============================================================================
+
+  // Block in production
+  if (process.env.NODE_ENV === 'production') {
+    console.error('ERROR: Demo seed is blocked in production environment');
+    console.error('Set NODE_ENV=development to run demo seed');
+    process.exit(1);
+  }
+
+  // Check for real organizations (not demo-org)
+  const realOrganizations = await prisma.organization.count({
+    where: {
+      id: { not: 'demo-org' },
+    },
+  });
+
+  if (realOrganizations > 0) {
+    console.error('ERROR: Real organizations detected in database');
+    console.error(`Found ${realOrganizations} non-demo organization(s)`);
+    console.error('Demo seed is designed for empty databases or demo-only data');
+    console.error('');
+    console.error('To proceed anyway, set FORCE_DEMO_SEED=true');
+
+    if (process.env.FORCE_DEMO_SEED !== 'true') {
+      process.exit(1);
+    }
+
+    console.warn('WARNING: FORCE_DEMO_SEED=true - proceeding despite real data');
+  }
+
+  // Check for real integrations with actual tokens
+  const realIntegrations = await prisma.integration.count({
+    where: {
+      organizationId: { not: 'demo-org' },
+      accessToken: { not: null },
+      status: 'CONNECTED',
+    },
+  });
+
+  if (realIntegrations > 0) {
+    console.error('ERROR: Real connected integrations detected');
+    console.error('This suggests the database contains real user data');
+    console.error('Demo seed aborted to prevent data pollution');
+    process.exit(1);
+  }
+
+  console.log('Safety checks passed');
   console.log('Seeding comprehensive demo data...');
 
   // ============================================================================

@@ -58,9 +58,7 @@ export class ScopeAdjusterAgent extends Agent {
         const thresholdRank =
           priorityRank[this.thresholds.deferralPriorityThreshold as TaskPriority] || 2
 
-        return (
-          priorityRank[t.priority] <= thresholdRank && t.blocksIds.length === 0
-        )
+        return priorityRank[t.priority] <= thresholdRank && t.blocksIds.length === 0
       })
 
       if (deferrableTasks.length === 0) continue
@@ -69,6 +67,38 @@ export class ScopeAdjusterAgent extends Agent {
       const daysUntilDeadline = Math.ceil(
         (project.targetDate!.getTime() - Date.now()) / (1000 * 60 * 60 * 24)
       )
+
+      // Use AI to determine which tasks should be deferred based on project context
+      const analysis = await this.analyzeWithAI(
+        'Which tasks should be deferred to meet the deadline? Consider project milestones, goals, and which tasks are least critical to the core deliverables. Recommend specific tasks to defer.',
+        {
+          project: {
+            name: project.name,
+            description: project.description,
+            targetDate: project.targetDate,
+            daysUntilDeadline,
+          },
+          riskLevel: riskData.riskLevel,
+          riskReasoning: deadlineRisk.reasoning,
+          deferrableTasks: deferrableTasks.map((t) => ({
+            id: t.id,
+            title: t.title,
+            description: t.description,
+            priority: t.priority,
+            labels: t.labels,
+            storyPoints: t.storyPoints,
+          })),
+          totalRemainingTasks: project.tasks.length,
+          deferralPriorityThreshold: this.thresholds.deferralPriorityThreshold,
+        }
+      )
+
+      // Only proceed if AI recommends action with sufficient confidence
+      if (!analysis.shouldAct || analysis.confidence < 0.6) {
+        continue
+      }
+
+      // Calculate suggested deferrals based on AI recommendation
       const remainingTasks = project.tasks.length
       const suggestedDeferrals = Math.min(
         deferrableTasks.length,
@@ -82,7 +112,7 @@ export class ScopeAdjusterAgent extends Agent {
       decisions.push({
         shouldAct: true,
         action: 'suggest_scope_adjustment',
-        reasoning: `Project "${project.name}" has ${riskData.riskLevel} deadline risk. Suggesting deferral of ${suggestedDeferrals} lower-priority tasks to improve chances of meeting the ${project.targetDate?.toLocaleDateString()} deadline.`,
+        reasoning: analysis.reasoning,
         suggestion: {
           projectId: project.id,
           projectName: project.name,
@@ -94,8 +124,10 @@ export class ScopeAdjusterAgent extends Agent {
             title: t.title,
             priority: t.priority,
           })),
+          aiConfidence: analysis.confidence,
+          aiRecommendation: analysis.recommendation,
         },
-        priority: riskData.riskLevel === 'critical' ? 'high' : 'medium',
+        priority: analysis.priority || (riskData.riskLevel === 'critical' ? 'high' : 'medium'),
       })
     }
 

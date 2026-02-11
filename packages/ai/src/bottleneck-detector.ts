@@ -1,11 +1,24 @@
-import { prisma, BottleneckType, BottleneckSeverity, BottleneckStatus, TaskStatus, PRStatus, CIStatus } from '@nexflow/database'
+import {
+  prisma,
+  BottleneckType,
+  BottleneckSeverity,
+  BottleneckStatus,
+  TaskStatus,
+  PRStatus,
+  CIStatus,
+} from '@nexflow/database'
 import { BOTTLENECK_THRESHOLDS } from '@nexflow/config'
+import OpenAI from 'openai'
 
 export class BottleneckDetector {
   private organizationId: string
+  private openai: OpenAI
 
   constructor(organizationId: string) {
     this.organizationId = organizationId
+    this.openai = new OpenAI({
+      apiKey: process.env.OPENAI_API_KEY,
+    })
   }
 
   async runDetection(): Promise<void> {
@@ -14,6 +27,156 @@ export class BottleneckDetector {
       this.detectStaleTasks(),
       this.detectDependencyBlocks(),
     ])
+
+    // Generate AI insights after detection
+    await this.generateAIInsights()
+  }
+
+  /**
+   * Generate AI-powered insights about detected bottlenecks
+   */
+  private async generateAIInsights(): Promise<void> {
+    // Skip if no API key configured
+    if (!process.env.OPENAI_API_KEY) {
+      return
+    }
+
+    try {
+      // Get active bottlenecks and project context
+      const [bottlenecks, projectContext] = await Promise.all([
+        prisma.bottleneck.findMany({
+          where: {
+            status: BottleneckStatus.ACTIVE,
+            project: { organizationId: this.organizationId },
+          },
+          include: {
+            project: true,
+            task: { include: { assignee: true } },
+            pullRequest: { include: { author: true } },
+          },
+          take: 10, // Limit to avoid token overload
+        }),
+        prisma.projectContext.findFirst({
+          where: { organizationId: this.organizationId },
+        }),
+      ])
+
+      if (bottlenecks.length === 0) {
+        return
+      }
+
+      const response = await this.openai.chat.completions.create({
+        model: 'gpt-4-turbo-preview',
+        messages: [
+          {
+            role: 'system',
+            content: `You are an AI engineering manager analyzing bottlenecks.
+
+PROJECT CONTEXT:
+${projectContext ? `Building: ${projectContext.buildingDescription}\nGoals: ${projectContext.goals?.join(', ') || 'Not specified'}` : 'No project context available.'}
+
+Analyze the bottlenecks and provide actionable insights. Focus on:
+1. Which bottlenecks are most critical to project success
+2. Root cause patterns across bottlenecks
+3. Specific recommendations for the team
+
+Respond with JSON:
+{
+  "insights": [
+    {
+      "title": "string",
+      "description": "string",
+      "priority": "high" | "medium" | "low",
+      "affectedBottlenecks": ["bottleneck_id"],
+      "recommendation": "string"
+    }
+  ],
+  "overallRisk": "high" | "medium" | "low",
+  "summary": "string"
+}`,
+          },
+          {
+            role: 'user',
+            content: `Analyze these active bottlenecks:\n${JSON.stringify(
+              bottlenecks.map((b) => ({
+                id: b.id,
+                type: b.type,
+                severity: b.severity,
+                title: b.title,
+                description: b.description,
+                impact: b.impact,
+                project: b.project?.name,
+                task: b.task ? { title: b.task.title, assignee: b.task.assignee?.name } : null,
+                pr: b.pullRequest
+                  ? { title: b.pullRequest.title, author: b.pullRequest.author?.name }
+                  : null,
+              })),
+              null,
+              2
+            )}`,
+          },
+        ],
+        response_format: { type: 'json_object' },
+        max_tokens: 1000,
+        temperature: 0.3,
+      })
+
+      const content = response.choices[0]?.message?.content
+      if (!content) return
+
+      const analysis = JSON.parse(content) as {
+        insights: Array<{
+          title: string
+          description: string
+          priority: string
+          recommendation: string
+        }>
+        overallRisk: string
+        summary: string
+      }
+
+      // Store insights as predictions of type DEADLINE_RISK (or we could add a new type)
+      // For now, update the first active project's prediction or create a new one
+      const activeProject = await prisma.project.findFirst({
+        where: {
+          organizationId: this.organizationId,
+          status: 'ACTIVE',
+        },
+      })
+
+      if (activeProject && analysis.insights.length > 0) {
+        await prisma.prediction.upsert({
+          where: {
+            id: `ai-insights-${this.organizationId}`,
+          },
+          create: {
+            id: `ai-insights-${this.organizationId}`,
+            type: 'DEADLINE_RISK',
+            confidence: analysis.overallRisk === 'high' ? 0.9 : analysis.overallRisk === 'medium' ? 0.6 : 0.3,
+            value: {
+              title: 'AI-Generated Bottleneck Insights',
+              riskLevel: analysis.overallRisk,
+              insights: analysis.insights,
+            },
+            reasoning: analysis.summary,
+            isActive: true,
+            projectId: activeProject.id,
+          },
+          update: {
+            confidence: analysis.overallRisk === 'high' ? 0.9 : analysis.overallRisk === 'medium' ? 0.6 : 0.3,
+            value: {
+              title: 'AI-Generated Bottleneck Insights',
+              riskLevel: analysis.overallRisk,
+              insights: analysis.insights,
+            },
+            reasoning: analysis.summary,
+            updatedAt: new Date(),
+          },
+        })
+      }
+    } catch (error) {
+      console.error('Failed to generate AI insights:', error)
+    }
   }
 
   private async detectStuckPRs(): Promise<void> {
