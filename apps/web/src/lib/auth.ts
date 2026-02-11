@@ -68,7 +68,20 @@ export const authOptions: NextAuthOptions = {
     strategy: 'jwt',
   },
   callbacks: {
-    async jwt({ token, user, account }) {
+    async jwt({ token, user, account, trigger }) {
+      // For OAuth sign-ins or token refresh, fetch user from database
+      if (account || trigger === 'signIn' || trigger === 'update') {
+        const dbUser = await prisma.user.findUnique({
+          where: { email: token.email! },
+          select: { id: true, role: true, organizationId: true },
+        })
+        if (dbUser) {
+          token.id = dbUser.id
+          token.role = dbUser.role
+          token.organizationId = dbUser.organizationId
+        }
+      }
+      // For credentials sign-in, user object already has the data
       if (user) {
         token.id = user.id
         token.role = (user as unknown as { role: UserRole }).role
@@ -107,7 +120,17 @@ export const authOptions: NextAuthOptions = {
               image: user.image,
               role: UserRole.ADMIN,
               organizationId: org.id,
+              onboardingCompleted: false,
             },
+          })
+
+          // Create default agent configs for new organization
+          await prisma.agentConfig.createMany({
+            data: [
+              { type: 'TASK_REASSIGNER', organizationId: org.id, enabled: false },
+              { type: 'NUDGE_SENDER', organizationId: org.id, enabled: false },
+              { type: 'SCOPE_ADJUSTER', organizationId: org.id, enabled: false },
+            ],
           })
         }
       }

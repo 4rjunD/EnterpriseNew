@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { prisma, UserRole } from '@nexflow/database'
 import { z } from 'zod'
+import bcrypt from 'bcryptjs'
 
 const signupSchema = z.object({
   name: z.string().min(1),
@@ -60,13 +61,18 @@ export async function POST(req: NextRequest) {
       },
     })
 
+    // Hash password for NextAuth credentials login
+    const hashedPassword = await bcrypt.hash(password, 12)
+
     // Create user in database
     const user = await prisma.user.create({
       data: {
         email,
         name,
+        password: hashedPassword,
         role: UserRole.ADMIN,
         organizationId: organization.id,
+        onboardingCompleted: false,
       },
     })
 

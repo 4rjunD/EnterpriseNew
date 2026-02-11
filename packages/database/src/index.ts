@@ -17,6 +17,7 @@ export type {
   AgentAction,
   BehavioralMetric,
   Notification,
+  Invitation,
 } from '@prisma/client'
 
 export {
@@ -39,4 +40,5 @@ export {
   AgentActionStatus,
   MetricSource,
   NotificationType,
+  InvitationStatus,
 } from '@prisma/client'

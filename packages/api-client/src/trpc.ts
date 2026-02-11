@@ -3,7 +3,7 @@ import superjson from 'superjson'
 
 // Demo mode bypasses auth for UI development
 // Set to false in production with proper auth
-const DEMO_MODE = true
+const DEMO_MODE = false
 
 // Define UserRole locally to avoid Prisma dependency in demo mode
 enum UserRole {

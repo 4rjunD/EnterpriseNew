@@ -7,6 +7,8 @@ import { predictionsRouter } from './routers/predictions'
 import { integrationsRouter } from './routers/integrations'
 import { agentsRouter } from './routers/agents'
 import { projectsRouter } from './routers/projects'
+import { onboardingRouter } from './routers/onboarding'
+import { invitationsRouter } from './routers/invitations'
 
 export const appRouter = router({
   dashboard: dashboardRouter,
@@ -17,6 +19,8 @@ export const appRouter = router({
   integrations: integrationsRouter,
   agents: agentsRouter,
   projects: projectsRouter,
+  onboarding: onboardingRouter,
+  invitations: invitationsRouter,
 })
 
 export type AppRouter = typeof appRouter

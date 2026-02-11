@@ -4,7 +4,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 
 // Demo mode bypasses auth for UI development
-const DEMO_MODE = true
+const DEMO_MODE = false
 
 const handler = async (req: Request) => {
   let userId: string | undefined

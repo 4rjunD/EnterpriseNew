@@ -5,7 +5,7 @@ import { cn } from '@nexflow/ui/utils'
 import type { CardType } from '@/app/(dashboard)/dashboard/page'
 
 // Demo mode - show all tabs
-const DEMO_MODE = true
+const DEMO_MODE = false
 
 interface SummaryCardRowProps {
   activeCard: CardType

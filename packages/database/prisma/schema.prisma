@@ -25,6 +25,7 @@ model Organization {
   projects     Project[]
   integrations Integration[]
   agents       AgentConfig[]
+  invitations  Invitation[]
 
   @@map("organizations")
 }
@@ -38,6 +39,7 @@ model User {
   role           UserRole @default(IC)
   status         UserStatus @default(OFFLINE)
   timezone       String?
+  onboardingCompleted Boolean @default(false)
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 
@@ -53,6 +55,7 @@ model User {
   agentActions    AgentAction[]   @relation("targetUser")
   notifications   Notification[]
   notificationPreferences UserNotificationPreferences?
+  sentInvitations Invitation[]    @relation("inviter")
 
   @@index([organizationId])
   @@map("users")
@@ -114,9 +117,10 @@ model Team {
   organizationId String
   organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 
-  members  TeamMember[]
-  projects Project[]
-  tasks    Task[]
+  members     TeamMember[]
+  projects    Project[]
+  tasks       Task[]
+  invitations Invitation[]
 
   @@unique([organizationId, name])
   @@index([organizationId])
@@ -568,4 +572,40 @@ enum NotificationType {
   PR_REVIEW_REQUESTED
   DEADLINE_APPROACHING
   SYNC_ERROR
+}
+
+// ============================================================================
+// Team Invitations
+// ============================================================================
+
+model Invitation {
+  id        String           @id @default(cuid())
+  email     String
+  role      UserRole         @default(IC)
+  status    InvitationStatus @default(PENDING)
+  token     String           @unique @default(cuid())
+  expiresAt DateTime
+  createdAt DateTime         @default(now())
+  updatedAt DateTime         @updatedAt
+
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  teamId String?
+  team   Team?   @relation(fields: [teamId], references: [id])
+
+  invitedById String
+  invitedBy   User   @relation("inviter", fields: [invitedById], references: [id])
+
+  @@unique([organizationId, email])
+  @@index([token])
+  @@index([email])
+  @@map("invitations")
+}
+
+enum InvitationStatus {
+  PENDING
+  ACCEPTED
+  EXPIRED
+  CANCELLED
 }
