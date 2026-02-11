@@ -1,6 +1,7 @@
 import { z } from 'zod'
 import { router, protectedProcedure, adminProcedure, publicProcedure, TRPCError } from '../trpc'
 import { prisma, UserRole } from '@nexflow/database'
+import { sendInvitationEmail } from '@nexflow/integrations/email'
 
 export const invitationsRouter = router({
   // Send bulk invitations (admin only)
@@ -15,6 +16,12 @@ export const invitationsRouter = router({
     .mutation(async ({ ctx, input }) => {
       const expiresAt = new Date()
       expiresAt.setDate(expiresAt.getDate() + 7) // 7 days expiry
+
+      // Get inviter and organization details for email
+      const inviter = await prisma.user.findUnique({
+        where: { id: ctx.userId },
+        include: { organization: true },
+      })
 
       const results = await Promise.allSettled(
         input.emails.map(async (email) => {
@@ -50,8 +57,16 @@ export const invitationsRouter = router({
             },
           })
 
-          // In production, you would send an email here
-          // For now, we'll just return the invite link
+          // Send invitation email
+          if (inviter) {
+            await sendInvitationEmail({
+              to: email,
+              inviterName: inviter.name || inviter.email,
+              organizationName: inviter.organization.name,
+              inviteToken: invitation.token,
+            })
+          }
+
           return {
             email,
             status: 'sent' as const,
@@ -249,7 +264,7 @@ export const invitationsRouter = router({
       const expiresAt = new Date()
       expiresAt.setDate(expiresAt.getDate() + 7)
 
-      await prisma.invitation.update({
+      const updated = await prisma.invitation.update({
         where: { id: input.id },
         data: {
           status: 'PENDING',
@@ -258,7 +273,20 @@ export const invitationsRouter = router({
         },
       })
 
-      // In production, resend email here
+      // Resend invitation email
+      const inviter = await prisma.user.findUnique({
+        where: { id: ctx.userId },
+        include: { organization: true },
+      })
+
+      if (inviter) {
+        await sendInvitationEmail({
+          to: invitation.email,
+          inviterName: inviter.name || inviter.email,
+          organizationName: inviter.organization.name,
+          inviteToken: updated.token,
+        })
+      }
 
       return { success: true }
     }),

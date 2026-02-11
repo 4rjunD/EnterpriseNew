@@ -5,19 +5,20 @@ import { useRouter } from 'next/navigation'
 import { Button } from '@nexflow/ui/button'
 import { Input } from '@nexflow/ui/input'
 import { trpc } from '@/lib/trpc'
-import { CheckCircle2, Users, Link2, Bot, ArrowRight, Plus, X, Loader2 } from 'lucide-react'
+import { CheckCircle2, Users, Link2, Bot, ArrowRight, Plus, X, Loader2, Check } from 'lucide-react'
 
 type Step = 'welcome' | 'team' | 'invite' | 'integrations' | 'agents' | 'complete'
 
 const TEAM_COLORS = [
-  '#3B82F6', // Blue
-  '#10B981', // Green
-  '#F59E0B', // Yellow
-  '#EF4444', // Red
-  '#8B5CF6', // Purple
-  '#EC4899', // Pink
-  '#06B6D4', // Cyan
-  '#F97316', // Orange
+  '#3B82F6', '#10B981', '#F59E0B', '#EF4444',
+  '#8B5CF6', '#EC4899', '#06B6D4', '#F97316',
+]
+
+const TEAM_SUGGESTIONS = [
+  { name: 'Engineering', color: '#3B82F6' },
+  { name: 'Product', color: '#10B981' },
+  { name: 'Design', color: '#F59E0B' },
+  { name: 'Operations', color: '#8B5CF6' },
 ]
 
 export default function OnboardingPage() {
@@ -27,28 +28,34 @@ export default function OnboardingPage() {
   const [newTeamName, setNewTeamName] = useState('')
   const [inviteEmails, setInviteEmails] = useState<string[]>([''])
   const [isLoading, setIsLoading] = useState(false)
+  const [invitesSent, setInvitesSent] = useState(0)
 
-  const utils = trpc.useUtils()
   const createTeam = trpc.team.createTeam.useMutation()
   const completeOnboarding = trpc.onboarding.complete.useMutation()
   const sendInvites = trpc.invitations.sendBulk.useMutation()
 
-  const steps: { key: Step; title: string; icon: React.ReactNode }[] = [
-    { key: 'welcome', title: 'Welcome', icon: <CheckCircle2 className="w-5 h-5" /> },
-    { key: 'team', title: 'Create Teams', icon: <Users className="w-5 h-5" /> },
-    { key: 'invite', title: 'Invite Members', icon: <Users className="w-5 h-5" /> },
-    { key: 'integrations', title: 'Connect Tools', icon: <Link2 className="w-5 h-5" /> },
-    { key: 'agents', title: 'AI Agents', icon: <Bot className="w-5 h-5" /> },
-    { key: 'complete', title: 'Complete', icon: <CheckCircle2 className="w-5 h-5" /> },
+  const steps = [
+    { key: 'welcome' as const, label: 'Welcome' },
+    { key: 'team' as const, label: 'Teams' },
+    { key: 'invite' as const, label: 'Invite' },
+    { key: 'integrations' as const, label: 'Connect' },
+    { key: 'agents' as const, label: 'Agents' },
+    { key: 'complete' as const, label: 'Done' },
   ]
 
   const currentStepIndex = steps.findIndex((s) => s.key === currentStep)
 
   const addTeam = () => {
-    if (newTeamName.trim()) {
+    if (newTeamName.trim() && !teams.find(t => t.name.toLowerCase() === newTeamName.trim().toLowerCase())) {
       const colorIndex = teams.length % TEAM_COLORS.length
       setTeams([...teams, { name: newTeamName.trim(), color: TEAM_COLORS[colorIndex] }])
       setNewTeamName('')
+    }
+  }
+
+  const addSuggestedTeam = (suggestion: { name: string; color: string }) => {
+    if (!teams.find(t => t.name.toLowerCase() === suggestion.name.toLowerCase())) {
+      setTeams([...teams, suggestion])
     }
   }
 
@@ -73,6 +80,11 @@ export default function OnboardingPage() {
   }
 
   const handleCreateTeams = async () => {
+    if (teams.length === 0) {
+      setCurrentStep('invite')
+      return
+    }
+
     setIsLoading(true)
     try {
       for (const team of teams) {
@@ -87,15 +99,21 @@ export default function OnboardingPage() {
   }
 
   const handleSendInvites = async () => {
+    const validEmails = inviteEmails.filter((e) => e.trim() && e.includes('@'))
+
+    if (validEmails.length === 0) {
+      setCurrentStep('integrations')
+      return
+    }
+
     setIsLoading(true)
     try {
-      const validEmails = inviteEmails.filter((e) => e.trim() && e.includes('@'))
-      if (validEmails.length > 0) {
-        await sendInvites.mutateAsync({ emails: validEmails })
-      }
+      const result = await sendInvites.mutateAsync({ emails: validEmails })
+      setInvitesSent(result.sent)
       setCurrentStep('integrations')
     } catch (error) {
       console.error('Failed to send invites:', error)
+      setCurrentStep('integrations')
     } finally {
       setIsLoading(false)
     }
@@ -108,60 +126,115 @@ export default function OnboardingPage() {
       router.push('/dashboard')
     } catch (error) {
       console.error('Failed to complete onboarding:', error)
+      router.push('/dashboard')
     } finally {
       setIsLoading(false)
     }
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 flex items-center justify-center p-4">
-      <div className="w-full max-w-2xl">
-        {/* Progress indicator */}
-        <div className="mb-8">
-          <div className="flex items-center justify-between mb-2">
-            {steps.map((step, index) => (
-              <div
-                key={step.key}
-                className={`flex items-center ${index < steps.length - 1 ? 'flex-1' : ''}`}
-              >
-                <div
-                  className={`w-10 h-10 rounded-full flex items-center justify-center transition-colors ${
-                    index <= currentStepIndex
-                      ? 'bg-blue-600 text-white'
-                      : 'bg-slate-700 text-slate-400'
-                  }`}
-                >
-                  {step.icon}
-                </div>
-                {index < steps.length - 1 && (
-                  <div
-                    className={`flex-1 h-1 mx-2 transition-colors ${
-                      index < currentStepIndex ? 'bg-blue-600' : 'bg-slate-700'
-                    }`}
-                  />
-                )}
-              </div>
-            ))}
-          </div>
+    <div className="min-h-screen bg-background flex">
+      {/* Left sidebar - Progress */}
+      <div className="hidden lg:flex w-80 bg-background-secondary border-r border-border flex-col p-8">
+        <div className="mb-12">
+          <h1 className="text-xl font-semibold text-foreground">NexFlow</h1>
+          <p className="text-sm text-foreground-muted mt-1">Setup your workspace</p>
         </div>
 
-        {/* Card */}
-        <div className="bg-slate-800/50 backdrop-blur-sm rounded-2xl border border-slate-700 p-8">
+        <nav className="space-y-1">
+          {steps.map((step, index) => (
+            <div
+              key={step.key}
+              className={`flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors ${
+                index === currentStepIndex
+                  ? 'bg-background text-foreground'
+                  : index < currentStepIndex
+                  ? 'text-foreground-muted'
+                  : 'text-foreground-muted/50'
+              }`}
+            >
+              <div
+                className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-medium ${
+                  index < currentStepIndex
+                    ? 'bg-emerald-500 text-white'
+                    : index === currentStepIndex
+                    ? 'bg-foreground text-background'
+                    : 'bg-border text-foreground-muted'
+                }`}
+              >
+                {index < currentStepIndex ? <Check className="w-3.5 h-3.5" /> : index + 1}
+              </div>
+              <span className="text-sm font-medium">{step.label}</span>
+            </div>
+          ))}
+        </nav>
+      </div>
+
+      {/* Main content */}
+      <div className="flex-1 flex items-center justify-center p-8">
+        <div className="w-full max-w-lg">
+          {/* Mobile progress */}
+          <div className="lg:hidden mb-8">
+            <div className="flex items-center justify-between mb-4">
+              <span className="text-sm text-foreground-muted">
+                Step {currentStepIndex + 1} of {steps.length}
+              </span>
+              <span className="text-sm font-medium text-foreground">{steps[currentStepIndex].label}</span>
+            </div>
+            <div className="h-1 bg-border rounded-full overflow-hidden">
+              <div
+                className="h-full bg-foreground transition-all duration-300"
+                style={{ width: `${((currentStepIndex + 1) / steps.length) * 100}%` }}
+              />
+            </div>
+          </div>
+
           {/* Welcome Step */}
           {currentStep === 'welcome' && (
-            <div className="text-center">
-              <div className="w-20 h-20 bg-gradient-to-br from-blue-500 to-purple-600 rounded-2xl flex items-center justify-center mx-auto mb-6">
-                <span className="text-4xl">N</span>
-              </div>
-              <h1 className="text-3xl font-bold text-white mb-4">Welcome to NexFlow</h1>
-              <p className="text-slate-400 mb-8 max-w-md mx-auto">
-                Let&apos;s get your workspace set up. This will only take a few minutes.
+            <div>
+              <h2 className="text-3xl font-semibold text-foreground mb-3">
+                Welcome to NexFlow
+              </h2>
+              <p className="text-foreground-muted mb-8 text-lg">
+                AI-powered engineering management that helps your team ship faster.
+                Let&apos;s get your workspace configured in a few quick steps.
               </p>
+
+              <div className="space-y-4 mb-8">
+                <div className="flex items-start gap-4 p-4 bg-background-secondary rounded-lg border border-border">
+                  <div className="w-10 h-10 rounded-lg bg-blue-500/10 flex items-center justify-center flex-shrink-0">
+                    <Users className="w-5 h-5 text-blue-500" />
+                  </div>
+                  <div>
+                    <h3 className="font-medium text-foreground">Detect bottlenecks</h3>
+                    <p className="text-sm text-foreground-muted">Automatically identify stuck PRs, stale tasks, and blockers</p>
+                  </div>
+                </div>
+                <div className="flex items-start gap-4 p-4 bg-background-secondary rounded-lg border border-border">
+                  <div className="w-10 h-10 rounded-lg bg-emerald-500/10 flex items-center justify-center flex-shrink-0">
+                    <Bot className="w-5 h-5 text-emerald-500" />
+                  </div>
+                  <div>
+                    <h3 className="font-medium text-foreground">AI-powered actions</h3>
+                    <p className="text-sm text-foreground-muted">Smart nudges, task reassignment, and scope adjustments</p>
+                  </div>
+                </div>
+                <div className="flex items-start gap-4 p-4 bg-background-secondary rounded-lg border border-border">
+                  <div className="w-10 h-10 rounded-lg bg-purple-500/10 flex items-center justify-center flex-shrink-0">
+                    <Link2 className="w-5 h-5 text-purple-500" />
+                  </div>
+                  <div>
+                    <h3 className="font-medium text-foreground">Connect your tools</h3>
+                    <p className="text-sm text-foreground-muted">Sync with Linear, GitHub, Slack, and more</p>
+                  </div>
+                </div>
+              </div>
+
               <Button
                 onClick={() => setCurrentStep('team')}
-                className="bg-blue-600 hover:bg-blue-700 text-white px-8 py-3 rounded-lg font-medium"
+                className="w-full h-11 bg-foreground text-background hover:bg-foreground/90"
               >
-                Get Started <ArrowRight className="w-4 h-4 ml-2 inline" />
+                Get started <ArrowRight className="w-4 h-4 ml-2" />
               </Button>
             </div>
           )}
@@ -169,68 +242,86 @@ export default function OnboardingPage() {
           {/* Create Teams Step */}
           {currentStep === 'team' && (
             <div>
-              <h2 className="text-2xl font-bold text-white mb-2">Create Your Teams</h2>
-              <p className="text-slate-400 mb-6">
-                Organize your workspace by creating teams (e.g., Frontend, Backend, DevOps)
+              <h2 className="text-2xl font-semibold text-foreground mb-2">Create your teams</h2>
+              <p className="text-foreground-muted mb-6">
+                Organize your workspace by creating teams. You can add more later.
               </p>
 
-              <div className="space-y-3 mb-6">
-                {teams.map((team, index) => (
-                  <div
-                    key={index}
-                    className="flex items-center gap-3 bg-slate-700/50 rounded-lg px-4 py-3"
-                  >
-                    <div
-                      className="w-4 h-4 rounded-full"
-                      style={{ backgroundColor: team.color }}
-                    />
-                    <span className="text-white flex-1">{team.name}</span>
-                    <button
-                      onClick={() => removeTeam(index)}
-                      className="text-slate-400 hover:text-red-400"
-                    >
-                      <X className="w-4 h-4" />
-                    </button>
+              {/* Suggestions */}
+              {teams.length === 0 && (
+                <div className="mb-6">
+                  <p className="text-sm text-foreground-muted mb-3">Quick add:</p>
+                  <div className="flex flex-wrap gap-2">
+                    {TEAM_SUGGESTIONS.map((suggestion) => (
+                      <button
+                        key={suggestion.name}
+                        onClick={() => addSuggestedTeam(suggestion)}
+                        className="inline-flex items-center gap-2 px-3 py-1.5 bg-background-secondary border border-border rounded-full text-sm text-foreground hover:border-foreground/30 transition-colors"
+                      >
+                        <div className="w-2 h-2 rounded-full" style={{ backgroundColor: suggestion.color }} />
+                        {suggestion.name}
+                      </button>
+                    ))}
                   </div>
-                ))}
-              </div>
+                </div>
+              )}
 
-              <div className="flex gap-2 mb-6">
+              {/* Added teams */}
+              {teams.length > 0 && (
+                <div className="space-y-2 mb-6">
+                  {teams.map((team, index) => (
+                    <div
+                      key={index}
+                      className="flex items-center gap-3 bg-background-secondary border border-border rounded-lg px-4 py-3"
+                    >
+                      <div className="w-3 h-3 rounded-full" style={{ backgroundColor: team.color }} />
+                      <span className="text-foreground flex-1">{team.name}</span>
+                      <button
+                        onClick={() => removeTeam(index)}
+                        className="text-foreground-muted hover:text-red-500 transition-colors"
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* Add team input */}
+              <div className="flex gap-2 mb-8">
                 <Input
                   value={newTeamName}
                   onChange={(e) => setNewTeamName(e.target.value)}
-                  placeholder="Team name..."
-                  className="flex-1 bg-slate-700 border-slate-600 text-white"
+                  placeholder="Enter team name..."
+                  className="flex-1 h-11 bg-background-secondary border-border"
                   onKeyDown={(e) => e.key === 'Enter' && addTeam()}
                 />
                 <Button
                   onClick={addTeam}
                   variant="outline"
-                  className="border-slate-600 text-white hover:bg-slate-700"
+                  className="h-11 px-4 border-border hover:bg-background-secondary"
                 >
                   <Plus className="w-4 h-4" />
                 </Button>
               </div>
 
-              <div className="flex justify-between">
+              <div className="flex gap-3">
                 <Button
                   variant="ghost"
                   onClick={() => setCurrentStep('invite')}
-                  className="text-slate-400 hover:text-white"
+                  className="flex-1 h-11 text-foreground-muted hover:text-foreground"
                 >
                   Skip for now
                 </Button>
                 <Button
                   onClick={handleCreateTeams}
-                  disabled={teams.length === 0 || isLoading}
-                  className="bg-blue-600 hover:bg-blue-700 text-white"
+                  disabled={isLoading}
+                  className="flex-1 h-11 bg-foreground text-background hover:bg-foreground/90"
                 >
                   {isLoading ? (
                     <Loader2 className="w-4 h-4 animate-spin" />
                   ) : (
-                    <>
-                      Continue <ArrowRight className="w-4 h-4 ml-2" />
-                    </>
+                    <>Continue <ArrowRight className="w-4 h-4 ml-2" /></>
                   )}
                 </Button>
               </div>
@@ -240,12 +331,12 @@ export default function OnboardingPage() {
           {/* Invite Members Step */}
           {currentStep === 'invite' && (
             <div>
-              <h2 className="text-2xl font-bold text-white mb-2">Invite Your Team</h2>
-              <p className="text-slate-400 mb-6">
-                Add team members by email. They&apos;ll receive an invitation to join.
+              <h2 className="text-2xl font-semibold text-foreground mb-2">Invite your team</h2>
+              <p className="text-foreground-muted mb-6">
+                Add team members by email. They&apos;ll receive an invitation to join your workspace.
               </p>
 
-              <div className="space-y-3 mb-6">
+              <div className="space-y-3 mb-4">
                 {inviteEmails.map((email, index) => (
                   <div key={index} className="flex gap-2">
                     <Input
@@ -253,12 +344,12 @@ export default function OnboardingPage() {
                       value={email}
                       onChange={(e) => updateEmail(index, e.target.value)}
                       placeholder="colleague@company.com"
-                      className="flex-1 bg-slate-700 border-slate-600 text-white"
+                      className="flex-1 h-11 bg-background-secondary border-border"
                     />
                     {inviteEmails.length > 1 && (
                       <button
                         onClick={() => removeEmail(index)}
-                        className="text-slate-400 hover:text-red-400 px-2"
+                        className="px-3 text-foreground-muted hover:text-red-500 transition-colors"
                       >
                         <X className="w-4 h-4" />
                       </button>
@@ -267,33 +358,30 @@ export default function OnboardingPage() {
                 ))}
               </div>
 
-              <Button
+              <button
                 onClick={addEmailField}
-                variant="outline"
-                className="w-full mb-6 border-slate-600 border-dashed text-slate-400 hover:text-white hover:bg-slate-700"
+                className="w-full mb-8 py-3 border border-dashed border-border rounded-lg text-sm text-foreground-muted hover:text-foreground hover:border-foreground/30 transition-colors flex items-center justify-center gap-2"
               >
-                <Plus className="w-4 h-4 mr-2" /> Add another email
-              </Button>
+                <Plus className="w-4 h-4" /> Add another
+              </button>
 
-              <div className="flex justify-between">
+              <div className="flex gap-3">
                 <Button
                   variant="ghost"
                   onClick={() => setCurrentStep('integrations')}
-                  className="text-slate-400 hover:text-white"
+                  className="flex-1 h-11 text-foreground-muted hover:text-foreground"
                 >
                   Skip for now
                 </Button>
                 <Button
                   onClick={handleSendInvites}
                   disabled={isLoading}
-                  className="bg-blue-600 hover:bg-blue-700 text-white"
+                  className="flex-1 h-11 bg-foreground text-background hover:bg-foreground/90"
                 >
                   {isLoading ? (
                     <Loader2 className="w-4 h-4 animate-spin" />
                   ) : (
-                    <>
-                      Send Invites <ArrowRight className="w-4 h-4 ml-2" />
-                    </>
+                    <>Send invites <ArrowRight className="w-4 h-4 ml-2" /></>
                   )}
                 </Button>
               </div>
@@ -303,53 +391,57 @@ export default function OnboardingPage() {
           {/* Integrations Step */}
           {currentStep === 'integrations' && (
             <div>
-              <h2 className="text-2xl font-bold text-white mb-2">Connect Your Tools</h2>
-              <p className="text-slate-400 mb-6">
-                Connect your project management and code tools to enable AI-powered insights.
+              <h2 className="text-2xl font-semibold text-foreground mb-2">Connect your tools</h2>
+              <p className="text-foreground-muted mb-6">
+                Connect your project management and development tools to enable AI-powered insights.
               </p>
 
-              <div className="grid grid-cols-2 gap-4 mb-6">
+              <div className="grid grid-cols-2 gap-3 mb-8">
                 <IntegrationCard
                   name="Linear"
-                  description="Sync issues and projects"
+                  description="Issue tracking"
                   icon="L"
                   color="#5E6AD2"
                   href="/api/integrations/linear/authorize"
                 />
                 <IntegrationCard
                   name="GitHub"
-                  description="Track pull requests"
+                  description="Code & PRs"
                   icon="G"
                   color="#24292F"
                   href="/api/integrations/github/authorize"
                 />
                 <IntegrationCard
                   name="Slack"
-                  description="Team notifications"
+                  description="Notifications"
                   icon="S"
                   color="#4A154B"
                   href="/api/integrations/slack/authorize"
                 />
                 <IntegrationCard
                   name="Discord"
-                  description="Team notifications"
+                  description="Notifications"
                   icon="D"
                   color="#5865F2"
                   href="/api/integrations/discord/authorize"
                 />
               </div>
 
-              <div className="flex justify-between">
+              <p className="text-sm text-foreground-muted mb-6 text-center">
+                You can connect more integrations from Settings later.
+              </p>
+
+              <div className="flex gap-3">
                 <Button
                   variant="ghost"
                   onClick={() => setCurrentStep('agents')}
-                  className="text-slate-400 hover:text-white"
+                  className="flex-1 h-11 text-foreground-muted hover:text-foreground"
                 >
                   Skip for now
                 </Button>
                 <Button
                   onClick={() => setCurrentStep('agents')}
-                  className="bg-blue-600 hover:bg-blue-700 text-white"
+                  className="flex-1 h-11 bg-foreground text-background hover:bg-foreground/90"
                 >
                   Continue <ArrowRight className="w-4 h-4 ml-2" />
                 </Button>
@@ -360,63 +452,65 @@ export default function OnboardingPage() {
           {/* Agents Step */}
           {currentStep === 'agents' && (
             <div>
-              <h2 className="text-2xl font-bold text-white mb-2">AI Agents</h2>
-              <p className="text-slate-400 mb-6">
-                NexFlow uses AI agents to help manage your team automatically.
+              <h2 className="text-2xl font-semibold text-foreground mb-2">AI Agents</h2>
+              <p className="text-foreground-muted mb-6">
+                NexFlow includes AI agents that help manage your engineering workflow automatically.
               </p>
 
-              <div className="space-y-4 mb-6">
+              <div className="space-y-3 mb-8">
                 <AgentCard
                   name="Task Reassigner"
-                  description="Automatically suggests reassigning overdue or blocked tasks to available team members"
-                  icon="T"
+                  description="Suggests reassigning overdue or blocked tasks to available team members based on workload and skills."
                 />
                 <AgentCard
                   name="Nudge Sender"
-                  description="Sends gentle reminders for stale tasks and PRs awaiting review"
-                  icon="N"
+                  description="Sends gentle reminders for stale tasks and PRs awaiting review, respecting quiet hours."
                 />
                 <AgentCard
                   name="Scope Adjuster"
-                  description="Identifies scope creep and suggests adjustments to keep projects on track"
-                  icon="S"
+                  description="Identifies scope creep and suggests adjustments to keep projects on track for deadlines."
                 />
               </div>
 
-              <p className="text-sm text-slate-500 mb-6">
-                You can configure these agents in Settings after setup.
+              <p className="text-sm text-foreground-muted mb-6 text-center">
+                Agents are disabled by default. Enable them in Settings when you&apos;re ready.
               </p>
 
-              <div className="flex justify-end">
-                <Button
-                  onClick={() => setCurrentStep('complete')}
-                  className="bg-blue-600 hover:bg-blue-700 text-white"
-                >
-                  Continue <ArrowRight className="w-4 h-4 ml-2" />
-                </Button>
-              </div>
+              <Button
+                onClick={() => setCurrentStep('complete')}
+                className="w-full h-11 bg-foreground text-background hover:bg-foreground/90"
+              >
+                Continue <ArrowRight className="w-4 h-4 ml-2" />
+              </Button>
             </div>
           )}
 
           {/* Complete Step */}
           {currentStep === 'complete' && (
             <div className="text-center">
-              <div className="w-20 h-20 bg-gradient-to-br from-green-500 to-emerald-600 rounded-full flex items-center justify-center mx-auto mb-6">
-                <CheckCircle2 className="w-10 h-10 text-white" />
+              <div className="w-16 h-16 bg-emerald-500/10 rounded-full flex items-center justify-center mx-auto mb-6">
+                <CheckCircle2 className="w-8 h-8 text-emerald-500" />
               </div>
-              <h2 className="text-2xl font-bold text-white mb-2">You&apos;re All Set!</h2>
-              <p className="text-slate-400 mb-8 max-w-md mx-auto">
-                Your workspace is ready. Connect integrations and run your first AI analysis to get started.
+              <h2 className="text-2xl font-semibold text-foreground mb-2">You&apos;re all set</h2>
+              <p className="text-foreground-muted mb-8">
+                Your workspace is ready. Connect your integrations and run your first analysis to start detecting bottlenecks.
               </p>
+
+              {invitesSent > 0 && (
+                <p className="text-sm text-foreground-muted mb-6">
+                  {invitesSent} invitation{invitesSent > 1 ? 's' : ''} sent to your team.
+                </p>
+              )}
+
               <Button
                 onClick={handleComplete}
                 disabled={isLoading}
-                className="bg-blue-600 hover:bg-blue-700 text-white px-8 py-3 rounded-lg font-medium"
+                className="w-full h-11 bg-foreground text-background hover:bg-foreground/90"
               >
                 {isLoading ? (
                   <Loader2 className="w-4 h-4 animate-spin" />
                 ) : (
-                  <>Go to Dashboard</>
+                  'Go to Dashboard'
                 )}
               </Button>
             </div>
@@ -443,18 +537,18 @@ function IntegrationCard({
   return (
     <a
       href={href}
-      className="block bg-slate-700/50 rounded-lg p-4 hover:bg-slate-700 transition-colors border border-slate-600 hover:border-slate-500"
+      className="flex items-center gap-3 p-4 bg-background-secondary border border-border rounded-lg hover:border-foreground/20 transition-colors"
     >
-      <div className="flex items-center gap-3 mb-2">
-        <div
-          className="w-10 h-10 rounded-lg flex items-center justify-center text-white font-bold"
-          style={{ backgroundColor: color }}
-        >
-          {icon}
-        </div>
-        <span className="text-white font-medium">{name}</span>
+      <div
+        className="w-10 h-10 rounded-lg flex items-center justify-center text-white font-semibold text-sm"
+        style={{ backgroundColor: color }}
+      >
+        {icon}
       </div>
-      <p className="text-sm text-slate-400">{description}</p>
+      <div>
+        <p className="font-medium text-foreground text-sm">{name}</p>
+        <p className="text-xs text-foreground-muted">{description}</p>
+      </div>
     </a>
   )
 }
@@ -462,21 +556,19 @@ function IntegrationCard({
 function AgentCard({
   name,
   description,
-  icon,
 }: {
   name: string
   description: string
-  icon: string
 }) {
   return (
-    <div className="bg-slate-700/50 rounded-lg p-4 border border-slate-600">
+    <div className="p-4 bg-background-secondary border border-border rounded-lg">
       <div className="flex items-center gap-3 mb-2">
-        <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center text-white font-bold">
-          {icon}
+        <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-blue-500 to-purple-500 flex items-center justify-center">
+          <Bot className="w-4 h-4 text-white" />
         </div>
-        <span className="text-white font-medium">{name}</span>
+        <span className="font-medium text-foreground text-sm">{name}</span>
       </div>
-      <p className="text-sm text-slate-400">{description}</p>
+      <p className="text-sm text-foreground-muted pl-11">{description}</p>
     </div>
   )
 }
