@@ -6,6 +6,7 @@ import { Button } from '@nexflow/ui/button'
 import { Input } from '@nexflow/ui/input'
 import { trpc } from '@/lib/trpc'
 import { CheckCircle2, Users, Link2, Bot, ArrowRight, Plus, X, Loader2, Check } from 'lucide-react'
+import { toast } from '@nexflow/ui/toast'
 
 type Step = 'welcome' | 'team' | 'invite' | 'integrations' | 'agents' | 'complete'
 
@@ -90,9 +91,13 @@ export default function OnboardingPage() {
       for (const team of teams) {
         await createTeam.mutateAsync({ name: team.name, color: team.color })
       }
+      toast.success(`Created ${teams.length} team${teams.length > 1 ? 's' : ''}`)
       setCurrentStep('invite')
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to create teams:', error)
+      toast.error(error?.message || 'Failed to create teams. Please try again.')
+      // Still allow moving forward even if team creation failed
+      setCurrentStep('invite')
     } finally {
       setIsLoading(false)
     }
@@ -110,9 +115,13 @@ export default function OnboardingPage() {
     try {
       const result = await sendInvites.mutateAsync({ emails: validEmails })
       setInvitesSent(result.sent)
+      if (result.sent > 0) {
+        toast.success(`Sent ${result.sent} invitation${result.sent > 1 ? 's' : ''}`)
+      }
       setCurrentStep('integrations')
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to send invites:', error)
+      toast.error(error?.message || 'Failed to send invitations')
       setCurrentStep('integrations')
     } finally {
       setIsLoading(false)
@@ -124,8 +133,10 @@ export default function OnboardingPage() {
     try {
       await completeOnboarding.mutateAsync()
       router.push('/dashboard')
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to complete onboarding:', error)
+      // Still redirect to dashboard even if marking complete failed
+      // The user can still use the app
       router.push('/dashboard')
     } finally {
       setIsLoading(false)
