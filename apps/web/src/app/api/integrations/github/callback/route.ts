@@ -11,17 +11,30 @@ export async function GET(req: NextRequest) {
   const baseUrl = getBaseUrl()
   const searchParams = req.nextUrl.searchParams
   const code = searchParams.get('code')
-  const state = searchParams.get('state') // Contains organizationId
+  const state = searchParams.get('state')
 
   if (!code || !state) {
-    return NextResponse.redirect(`${baseUrl}/dashboard?error=missing_params`)
+    return NextResponse.redirect(`${baseUrl}/onboarding?error=missing_params`)
   }
 
+  let organizationId: string
+  let returnTo = 'onboarding'
+
   try {
-    await GitHubClient.handleOAuthCallback(code, state)
-    return NextResponse.redirect(`${baseUrl}/dashboard?card=integrations&success=github_connected`)
+    const stateData = JSON.parse(Buffer.from(state, 'base64url').toString())
+    organizationId = stateData.organizationId
+    returnTo = stateData.returnTo || 'onboarding'
+  } catch {
+    organizationId = state
+  }
+
+  const redirectPath = returnTo === 'onboarding' ? '/onboarding' : '/dashboard?card=integrations'
+
+  try {
+    await GitHubClient.handleOAuthCallback(code, organizationId)
+    return NextResponse.redirect(`${baseUrl}${redirectPath}&success=github_connected`)
   } catch (error) {
     console.error('GitHub OAuth error:', error)
-    return NextResponse.redirect(`${baseUrl}/dashboard?card=integrations&error=github_failed`)
+    return NextResponse.redirect(`${baseUrl}${redirectPath}&error=github_failed`)
   }
 }

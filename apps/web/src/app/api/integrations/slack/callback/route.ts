@@ -7,10 +7,6 @@ const getBaseUrl = () => {
   return process.env.NEXTAUTH_URL || 'https://nexflow-web-rse3.onrender.com'
 }
 
-/**
- * GET /api/integrations/slack/callback
- * Handle Slack OAuth callback
- */
 export async function GET(request: NextRequest) {
   const baseUrl = getBaseUrl()
 
@@ -20,54 +16,46 @@ export async function GET(request: NextRequest) {
     const state = searchParams.get('state')
     const error = searchParams.get('error')
 
+    // Decode state to get returnTo
+    let stateData: { organizationId: string; timestamp: number; returnTo?: string } | null = null
+    let returnTo = 'onboarding'
+
+    if (state) {
+      try {
+        stateData = JSON.parse(Buffer.from(state, 'base64url').toString())
+        returnTo = stateData?.returnTo || 'onboarding'
+      } catch {
+        // Invalid state
+      }
+    }
+
+    const redirectPath = returnTo === 'onboarding' ? '/onboarding' : '/dashboard?card=integrations'
+
     // Handle OAuth errors
     if (error) {
       console.error('Slack OAuth error:', error)
-      return NextResponse.redirect(
-        `${baseUrl}/dashboard/settings/integrations?error=${encodeURIComponent('Slack authorization was cancelled or failed')}`
-      )
+      return NextResponse.redirect(`${baseUrl}${redirectPath}&error=slack_cancelled`)
     }
 
-    if (!code || !state) {
-      return NextResponse.redirect(
-        `${baseUrl}/dashboard/settings/integrations?error=${encodeURIComponent('Invalid OAuth callback parameters')}`
-      )
-    }
-
-    // Decode and validate state
-    let stateData: { organizationId: string; timestamp: number }
-    try {
-      stateData = JSON.parse(Buffer.from(state, 'base64url').toString())
-    } catch {
-      return NextResponse.redirect(
-        `${baseUrl}/dashboard/settings/integrations?error=${encodeURIComponent('Invalid OAuth state')}`
-      )
+    if (!code || !state || !stateData) {
+      return NextResponse.redirect(`${baseUrl}${redirectPath}&error=invalid_params`)
     }
 
     // Check state timestamp (10 minute expiry)
     if (Date.now() - stateData.timestamp > 10 * 60 * 1000) {
-      return NextResponse.redirect(
-        `${baseUrl}/dashboard/settings/integrations?error=${encodeURIComponent('OAuth session expired. Please try again.')}`
-      )
+      return NextResponse.redirect(`${baseUrl}${redirectPath}&error=session_expired`)
     }
 
     // Exchange code for token
     const result = await SlackClient.handleOAuthCallback(code, stateData.organizationId)
 
     if (!result.success) {
-      return NextResponse.redirect(
-        `${baseUrl}/dashboard/settings/integrations?error=${encodeURIComponent(result.error || 'Failed to connect Slack')}`
-      )
+      return NextResponse.redirect(`${baseUrl}${redirectPath}&error=slack_failed`)
     }
 
-    // Success! Redirect back to integrations page
-    return NextResponse.redirect(
-      `${baseUrl}/dashboard/settings/integrations?success=${encodeURIComponent(`Connected to Slack workspace: ${result.teamName}`)}`
-    )
+    return NextResponse.redirect(`${baseUrl}${redirectPath}&success=slack_connected`)
   } catch (error) {
     console.error('Error handling Slack OAuth callback:', error)
-    return NextResponse.redirect(
-      `${baseUrl}/dashboard/settings/integrations?error=${encodeURIComponent('An unexpected error occurred')}`
-    )
+    return NextResponse.redirect(`${baseUrl}/onboarding?error=slack_error`)
   }
 }

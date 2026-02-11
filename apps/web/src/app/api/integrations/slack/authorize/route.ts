@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 
@@ -8,24 +8,28 @@ const getBaseUrl = () => {
   return process.env.NEXTAUTH_URL || 'https://nexflow-web-rse3.onrender.com'
 }
 
-export async function GET() {
+export async function GET(req: NextRequest) {
   const session = await getServerSession(authOptions)
+  const baseUrl = getBaseUrl()
 
   if (!session?.user?.organizationId) {
-    return NextResponse.redirect(`${getBaseUrl()}/login`)
+    return NextResponse.redirect(`${baseUrl}/login`)
   }
 
   const clientId = process.env.SLACK_CLIENT_ID
   if (!clientId) {
-    return NextResponse.redirect(`${getBaseUrl()}/dashboard?error=slack_not_configured`)
+    return NextResponse.redirect(`${baseUrl}/onboarding?error=slack_not_configured`)
   }
 
-  const redirectUri = `${getBaseUrl()}/api/integrations/slack/callback`
+  const referer = req.headers.get('referer') || ''
+  const returnTo = referer.includes('/onboarding') ? 'onboarding' : 'dashboard'
 
-  // Encode state with org ID and timestamp
+  const redirectUri = `${baseUrl}/api/integrations/slack/callback`
+
   const stateData = {
     organizationId: session.user.organizationId,
     timestamp: Date.now(),
+    returnTo,
   }
   const state = Buffer.from(JSON.stringify(stateData)).toString('base64url')
 

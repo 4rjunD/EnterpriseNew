@@ -8,25 +8,35 @@ const getBaseUrl = () => {
 }
 
 export async function GET(req: NextRequest) {
+  const baseUrl = getBaseUrl()
   const searchParams = req.nextUrl.searchParams
   const code = searchParams.get('code')
-  const state = searchParams.get('state') // Contains organizationId
+  const state = searchParams.get('state')
 
   if (!code || !state) {
-    return NextResponse.redirect(
-      `${getBaseUrl()}/dashboard?error=missing_params`
-    )
+    return NextResponse.redirect(`${baseUrl}/onboarding?error=missing_params`)
   }
 
+  // Decode state to get organizationId and returnTo
+  let organizationId: string
+  let returnTo = 'onboarding'
+
   try {
-    await LinearClient.handleOAuthCallback(code, state)
-    return NextResponse.redirect(
-      `${getBaseUrl()}/dashboard?card=integrations&success=linear_connected`
-    )
+    const stateData = JSON.parse(Buffer.from(state, 'base64url').toString())
+    organizationId = stateData.organizationId
+    returnTo = stateData.returnTo || 'onboarding'
+  } catch {
+    // Fallback: state might be just the organizationId (old format)
+    organizationId = state
+  }
+
+  const redirectPath = returnTo === 'onboarding' ? '/onboarding' : '/dashboard?card=integrations'
+
+  try {
+    await LinearClient.handleOAuthCallback(code, organizationId)
+    return NextResponse.redirect(`${baseUrl}${redirectPath}&success=linear_connected`)
   } catch (error) {
     console.error('Linear OAuth error:', error)
-    return NextResponse.redirect(
-      `${getBaseUrl()}/dashboard?card=integrations&error=linear_failed`
-    )
+    return NextResponse.redirect(`${baseUrl}${redirectPath}&error=linear_failed`)
   }
 }
