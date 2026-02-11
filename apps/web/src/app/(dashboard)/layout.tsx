@@ -4,7 +4,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 
 // Demo mode - bypass auth for UI development
-const DEMO_MODE = true
+const DEMO_MODE = false
 
 // Demo user for when no session exists
 const demoUser = {

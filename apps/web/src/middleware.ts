@@ -2,7 +2,7 @@ import { withAuth } from 'next-auth/middleware'
 import { NextResponse, type NextRequest } from 'next/server'
 
 // Demo mode - bypass auth for UI development
-const DEMO_MODE = true
+const DEMO_MODE = false
 
 function demoMiddleware(req: NextRequest) {
   return NextResponse.next()
