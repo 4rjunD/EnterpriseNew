@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
+import { prisma } from '@nexflow/database'
 
 export const dynamic = 'force-dynamic'
 
@@ -12,8 +13,23 @@ export async function GET(req: NextRequest) {
   const session = await getServerSession(authOptions)
   const baseUrl = getBaseUrl()
 
-  if (!session?.user?.organizationId) {
+  // Check if user is logged in at all
+  if (!session?.user?.email) {
     return NextResponse.redirect(`${baseUrl}/login`)
+  }
+
+  // Get organizationId - try session first, then DB
+  let organizationId = session.user.organizationId
+  if (!organizationId) {
+    const dbUser = await prisma.user.findUnique({
+      where: { email: session.user.email },
+      select: { organizationId: true },
+    })
+    organizationId = dbUser?.organizationId || null
+  }
+
+  if (!organizationId) {
+    return NextResponse.redirect(`${baseUrl}/login?error=no_organization`)
   }
 
   const clientId = process.env.GITHUB_CLIENT_ID
@@ -27,7 +43,7 @@ export async function GET(req: NextRequest) {
   const redirectUri = `${baseUrl}/api/integrations/github/callback`
 
   const stateData = {
-    organizationId: session.user.organizationId,
+    organizationId,
     returnTo,
   }
   const state = Buffer.from(JSON.stringify(stateData)).toString('base64url')
