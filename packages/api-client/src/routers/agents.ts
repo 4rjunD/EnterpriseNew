@@ -151,6 +151,48 @@ export const agentsRouter = router({
       return { success: true }
     }),
 
+  // Get activity feed for AI activity widget
+  getActivityFeed: managerProcedure
+    .input(z.object({ limit: z.number().default(10) }).optional().default({}))
+    .query(async ({ ctx, input }) => {
+      const actions = await prisma.agentAction.findMany({
+        where: {
+          agentConfig: { organizationId: ctx.organizationId },
+        },
+        include: {
+          agentConfig: { select: { type: true } },
+          targetUser: { select: { name: true } },
+          bottleneck: { select: { title: true } },
+        },
+        orderBy: { createdAt: 'desc' },
+        take: input.limit,
+      })
+
+      return actions.map((action) => {
+        const suggestion = action.suggestion as Record<string, string> | null
+        let description = action.reasoning || action.action
+
+        if (action.action === 'reassign' && suggestion?.taskTitle) {
+          description = `Reassigned "${suggestion.taskTitle}"`
+        } else if (action.action === 'nudge') {
+          description = `Sent reminder for ${action.bottleneck?.title || 'blocked item'}`
+        } else if (action.action === 'scope_adjust') {
+          description = `Suggested scope adjustment`
+        }
+
+        return {
+          id: action.id,
+          agentType: action.agentConfig.type,
+          action: action.action,
+          status: action.status,
+          description,
+          targetUser: action.targetUser?.name,
+          createdAt: action.createdAt,
+          executedAt: action.executedAt,
+        }
+      })
+    }),
+
   getStats: managerProcedure.query(async ({ ctx }) => {
     const [allActions, executedActions, byAgent] = await Promise.all([
       prisma.agentAction.count({

@@ -5,6 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@nexflow/ui/card'
 import { Badge } from '@nexflow/ui/badge'
 import { Button } from '@nexflow/ui/button'
 import { Skeleton } from '@nexflow/ui/skeleton'
+import { EmptyState, emptyStateConfigs } from '../shared/empty-state'
 import {
   AlertTriangle,
   TrendingUp,
@@ -62,9 +63,7 @@ export function PredictionsDetail() {
       <div className="space-y-4">
         <h3 className="text-sm font-medium text-foreground-muted uppercase tracking-wide">Active Predictions</h3>
         {predictionsList.length === 0 ? (
-          <div className="flex h-40 items-center justify-center text-sm text-foreground-muted">
-            No active predictions
-          </div>
+          <EmptyState config={emptyStateConfigs.predictions} />
         ) : (
           <div className="grid gap-4 md:grid-cols-2">
             {predictionsList.map((prediction) => (

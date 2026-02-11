@@ -3,6 +3,7 @@
 import { AvatarWithStatus } from '@nexflow/ui/avatar'
 import { Badge } from '@nexflow/ui/badge'
 import { Card } from '@nexflow/ui/card'
+import { EmptyState, emptyStateConfigs } from '../shared/empty-state'
 
 interface Member {
   id: string
@@ -25,11 +26,7 @@ interface AvatarGridProps {
 
 export function AvatarGrid({ members, onMemberClick }: AvatarGridProps) {
   if (!members || !Array.isArray(members) || members.length === 0) {
-    return (
-      <div className="flex h-40 items-center justify-center text-foreground-muted">
-        No team members found
-      </div>
-    )
+    return <EmptyState config={emptyStateConfigs.team} />
   }
 
   return (

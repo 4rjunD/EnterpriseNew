@@ -243,6 +243,239 @@ export const dashboardRouter = router({
       },
     }
   }),
+
+  // Get smart prompts based on setup state
+  getSmartPrompts: protectedProcedure.query(async ({ ctx }) => {
+    const [
+      integrations,
+      teamMembers,
+      agentConfigs,
+      projects,
+    ] = await Promise.all([
+      prisma.integration.count({
+        where: { organizationId: ctx.organizationId, status: 'CONNECTED' },
+      }),
+      prisma.user.count({
+        where: { organizationId: ctx.organizationId },
+      }),
+      prisma.agentConfig.findMany({
+        where: { organizationId: ctx.organizationId, enabled: true },
+        select: { id: true },
+      }),
+      prisma.project.count({
+        where: { organizationId: ctx.organizationId },
+      }),
+    ])
+
+    const prompts: Array<{
+      id: string
+      message: string
+      cta: string
+      ctaHref: string
+      location: string
+      priority: number
+    }> = []
+
+    if (integrations === 0) {
+      prompts.push({
+        id: 'no-integrations',
+        message: 'Connect your tools to start monitoring your team\'s workflow',
+        cta: 'Connect Integration',
+        ctaHref: '/integrations',
+        location: 'dashboard',
+        priority: 1,
+      })
+    }
+
+    if (teamMembers <= 1) {
+      prompts.push({
+        id: 'empty-team',
+        message: 'Invite colleagues to unlock workload analysis and AI recommendations',
+        cta: 'Invite Team',
+        ctaHref: '/team',
+        location: 'team',
+        priority: 2,
+      })
+    }
+
+    if (agentConfigs.length === 0) {
+      prompts.push({
+        id: 'no-agents',
+        message: 'Enable AI agents to automate task management and send smart reminders',
+        cta: 'Enable Agents',
+        ctaHref: '/insights',
+        location: 'insights',
+        priority: 3,
+      })
+    }
+
+    if (projects === 0) {
+      prompts.push({
+        id: 'no-projects',
+        message: 'Create a project to track deadlines and detect delivery risks',
+        cta: 'Create Project',
+        ctaHref: '/projects',
+        location: 'projects',
+        priority: 4,
+      })
+    }
+
+    return prompts.sort((a, b) => a.priority - b.priority)
+  }),
+
+  // Get NexFlow-specific activity feed (AI-focused)
+  getNexFlowActivity: protectedProcedure
+    .input(z.object({ limit: z.number().default(20) }).optional().default({}))
+    .query(async ({ ctx, input }) => {
+      const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)
+
+      const [agentActions, bottlenecks, predictions, syncLogs] = await Promise.all([
+        // Agent actions (executed or pending)
+        prisma.agentAction.findMany({
+          where: {
+            agentConfig: { organizationId: ctx.organizationId },
+            status: { in: ['EXECUTED', 'PENDING', 'APPROVED'] },
+            createdAt: { gte: sevenDaysAgo },
+          },
+          include: {
+            agentConfig: { select: { type: true } },
+            targetUser: { select: { name: true } },
+          },
+          orderBy: { createdAt: 'desc' },
+          take: input.limit,
+        }),
+        // Recent bottleneck detections
+        prisma.bottleneck.findMany({
+          where: {
+            project: { organizationId: ctx.organizationId },
+            detectedAt: { gte: sevenDaysAgo },
+          },
+          include: {
+            project: { select: { name: true, key: true } },
+          },
+          orderBy: { detectedAt: 'desc' },
+          take: input.limit,
+        }),
+        // Recent predictions
+        prisma.prediction.findMany({
+          where: {
+            project: { organizationId: ctx.organizationId },
+            createdAt: { gte: sevenDaysAgo },
+            isActive: true,
+          },
+          include: {
+            project: { select: { name: true, key: true } },
+          },
+          orderBy: { createdAt: 'desc' },
+          take: input.limit,
+        }),
+        // Integration syncs (from integration table lastSyncAt)
+        prisma.integration.findMany({
+          where: {
+            organizationId: ctx.organizationId,
+            status: 'CONNECTED',
+            lastSyncAt: { gte: sevenDaysAgo },
+          },
+          select: {
+            id: true,
+            type: true,
+            lastSyncAt: true,
+          },
+          orderBy: { lastSyncAt: 'desc' },
+          take: 5,
+        }),
+      ])
+
+      const activities: Array<{
+        id: string
+        type: 'agent_action' | 'bottleneck' | 'prediction' | 'sync'
+        title: string
+        description: string
+        timestamp: Date
+        icon: string
+        status?: string
+      }> = []
+
+      // Format agent actions
+      agentActions.forEach((action) => {
+        const agentLabels: Record<string, string> = {
+          TASK_REASSIGNER: 'Task Reassigner',
+          NUDGE_SENDER: 'Nudge Sender',
+          SCOPE_ADJUSTER: 'Scope Adjuster',
+        }
+        const agentName = agentLabels[action.agentConfig.type] || action.agentConfig.type
+        const suggestion = action.suggestion as Record<string, string> | null
+
+        const title = `${agentName} ${action.status === 'EXECUTED' ? 'executed' : action.status === 'PENDING' ? 'proposed' : 'approved'}`
+        let description = action.reasoning || action.action
+
+        if (action.action === 'reassign' && suggestion?.taskTitle) {
+          description = `Reassign "${suggestion.taskTitle}" to ${action.targetUser?.name || suggestion.toUser || 'team member'}`
+        } else if (action.action === 'nudge') {
+          description = `Send reminder to ${action.targetUser?.name || 'team member'}`
+        }
+
+        activities.push({
+          id: `action-${action.id}`,
+          type: 'agent_action',
+          title,
+          description,
+          timestamp: action.createdAt,
+          icon: 'bot',
+          status: action.status,
+        })
+      })
+
+      // Format bottleneck detections
+      bottlenecks.forEach((bottleneck) => {
+        activities.push({
+          id: `bottleneck-${bottleneck.id}`,
+          type: 'bottleneck',
+          title: 'Bottleneck detected',
+          description: `${bottleneck.title}${bottleneck.project ? ` in ${bottleneck.project.key}` : ''}`,
+          timestamp: bottleneck.detectedAt,
+          icon: 'alert',
+          status: bottleneck.status,
+        })
+      })
+
+      // Format predictions
+      predictions.forEach((prediction) => {
+        const predictionLabels: Record<string, string> = {
+          DEADLINE_RISK: 'Deadline risk predicted',
+          BURNOUT_INDICATOR: 'Burnout risk detected',
+          VELOCITY_FORECAST: 'Velocity forecast updated',
+          SCOPE_CREEP: 'Scope creep detected',
+        }
+        activities.push({
+          id: `prediction-${prediction.id}`,
+          type: 'prediction',
+          title: predictionLabels[prediction.type] || 'New prediction',
+          description: prediction.reasoning || `${prediction.project?.name || 'Project'} - ${Math.round(prediction.confidence * 100)}% confidence`,
+          timestamp: prediction.createdAt,
+          icon: 'trending',
+        })
+      })
+
+      // Format sync events
+      syncLogs.forEach((sync) => {
+        if (sync.lastSyncAt) {
+          activities.push({
+            id: `sync-${sync.id}`,
+            type: 'sync',
+            title: 'Data synced',
+            description: `Synced from ${sync.type}`,
+            timestamp: sync.lastSyncAt,
+            icon: 'refresh',
+          })
+        }
+      })
+
+      // Sort by timestamp and limit
+      return activities
+        .sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime())
+        .slice(0, input.limit)
+    }),
 })
 
 export type DashboardRouter = typeof dashboardRouter

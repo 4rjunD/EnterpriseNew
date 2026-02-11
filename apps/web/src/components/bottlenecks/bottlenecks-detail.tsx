@@ -22,6 +22,7 @@ import {
 } from '@nexflow/ui/select'
 import { Label } from '@nexflow/ui/label'
 import { toast } from '@nexflow/ui/toast'
+import { EmptyState, emptyStateConfigs } from '../shared/empty-state'
 import {
   AlertTriangle,
   GitPullRequest,
@@ -191,9 +192,7 @@ export function BottlenecksDetail() {
       {/* Bottleneck List */}
       <div className="space-y-3">
         {bottlenecksList.length === 0 ? (
-          <div className="flex h-40 items-center justify-center text-sm text-foreground-muted">
-            No active bottlenecks
-          </div>
+          <EmptyState config={emptyStateConfigs.bottlenecks} />
         ) : (
           bottlenecksList.map((bottleneck) => (
             <BottleneckItem

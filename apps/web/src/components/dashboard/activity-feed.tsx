@@ -8,6 +8,7 @@ import {
   User,
 } from 'lucide-react'
 import { cn } from '@nexflow/ui/utils'
+import { EmptyState, emptyStateConfigs } from '../shared/empty-state'
 
 interface Activity {
   id: string
@@ -25,11 +26,7 @@ interface ActivityFeedProps {
 export function ActivityFeed({ activities }: ActivityFeedProps) {
   // Defensive check: ensure activities is a valid array
   if (!activities || !Array.isArray(activities) || activities.length === 0) {
-    return (
-      <div className="flex h-40 items-center justify-center text-foreground-muted">
-        No recent activity
-      </div>
-    )
+    return <EmptyState config={emptyStateConfigs.activity} />
   }
 
   return (
