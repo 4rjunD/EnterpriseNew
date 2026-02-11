@@ -3,11 +3,17 @@ import { SlackClient } from '@nexflow/integrations'
 
 export const dynamic = 'force-dynamic'
 
+const getBaseUrl = () => {
+  return process.env.NEXTAUTH_URL || 'https://nexflow-web-rse3.onrender.com'
+}
+
 /**
  * GET /api/integrations/slack/callback
  * Handle Slack OAuth callback
  */
 export async function GET(request: NextRequest) {
+  const baseUrl = getBaseUrl()
+
   try {
     const searchParams = request.nextUrl.searchParams
     const code = searchParams.get('code')
@@ -18,19 +24,13 @@ export async function GET(request: NextRequest) {
     if (error) {
       console.error('Slack OAuth error:', error)
       return NextResponse.redirect(
-        new URL(
-          `/dashboard/settings/integrations?error=${encodeURIComponent('Slack authorization was cancelled or failed')}`,
-          request.url
-        )
+        `${baseUrl}/dashboard/settings/integrations?error=${encodeURIComponent('Slack authorization was cancelled or failed')}`
       )
     }
 
     if (!code || !state) {
       return NextResponse.redirect(
-        new URL(
-          `/dashboard/settings/integrations?error=${encodeURIComponent('Invalid OAuth callback parameters')}`,
-          request.url
-        )
+        `${baseUrl}/dashboard/settings/integrations?error=${encodeURIComponent('Invalid OAuth callback parameters')}`
       )
     }
 
@@ -40,20 +40,14 @@ export async function GET(request: NextRequest) {
       stateData = JSON.parse(Buffer.from(state, 'base64url').toString())
     } catch {
       return NextResponse.redirect(
-        new URL(
-          `/dashboard/settings/integrations?error=${encodeURIComponent('Invalid OAuth state')}`,
-          request.url
-        )
+        `${baseUrl}/dashboard/settings/integrations?error=${encodeURIComponent('Invalid OAuth state')}`
       )
     }
 
     // Check state timestamp (10 minute expiry)
     if (Date.now() - stateData.timestamp > 10 * 60 * 1000) {
       return NextResponse.redirect(
-        new URL(
-          `/dashboard/settings/integrations?error=${encodeURIComponent('OAuth session expired. Please try again.')}`,
-          request.url
-        )
+        `${baseUrl}/dashboard/settings/integrations?error=${encodeURIComponent('OAuth session expired. Please try again.')}`
       )
     }
 
@@ -62,27 +56,18 @@ export async function GET(request: NextRequest) {
 
     if (!result.success) {
       return NextResponse.redirect(
-        new URL(
-          `/dashboard/settings/integrations?error=${encodeURIComponent(result.error || 'Failed to connect Slack')}`,
-          request.url
-        )
+        `${baseUrl}/dashboard/settings/integrations?error=${encodeURIComponent(result.error || 'Failed to connect Slack')}`
       )
     }
 
     // Success! Redirect back to integrations page
     return NextResponse.redirect(
-      new URL(
-        `/dashboard/settings/integrations?success=${encodeURIComponent(`Connected to Slack workspace: ${result.teamName}`)}`,
-        request.url
-      )
+      `${baseUrl}/dashboard/settings/integrations?success=${encodeURIComponent(`Connected to Slack workspace: ${result.teamName}`)}`
     )
   } catch (error) {
     console.error('Error handling Slack OAuth callback:', error)
     return NextResponse.redirect(
-      new URL(
-        `/dashboard/settings/integrations?error=${encodeURIComponent('An unexpected error occurred')}`,
-        request.url
-      )
+      `${baseUrl}/dashboard/settings/integrations?error=${encodeURIComponent('An unexpected error occurred')}`
     )
   }
 }
