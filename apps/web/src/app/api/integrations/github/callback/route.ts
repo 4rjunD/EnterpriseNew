@@ -29,12 +29,13 @@ export async function GET(req: NextRequest) {
   }
 
   const redirectPath = returnTo === 'onboarding' ? '/onboarding' : '/dashboard?card=integrations'
+  const separator = returnTo === 'onboarding' ? '?' : '&'
 
   try {
     await GitHubClient.handleOAuthCallback(code, organizationId)
-    return NextResponse.redirect(`${baseUrl}${redirectPath}&success=github_connected`)
+    return NextResponse.redirect(`${baseUrl}${redirectPath}${separator}success=github_connected`)
   } catch (error) {
     console.error('GitHub OAuth error:', error)
-    return NextResponse.redirect(`${baseUrl}${redirectPath}&error=github_failed`)
+    return NextResponse.redirect(`${baseUrl}${redirectPath}${separator}error=github_failed`)
   }
 }

@@ -31,12 +31,13 @@ export async function GET(req: NextRequest) {
   }
 
   const redirectPath = returnTo === 'onboarding' ? '/onboarding' : '/dashboard?card=integrations'
+  const separator = returnTo === 'onboarding' ? '?' : '&'
 
   try {
     await LinearClient.handleOAuthCallback(code, organizationId)
-    return NextResponse.redirect(`${baseUrl}${redirectPath}&success=linear_connected`)
+    return NextResponse.redirect(`${baseUrl}${redirectPath}${separator}success=linear_connected`)
   } catch (error) {
     console.error('Linear OAuth error:', error)
-    return NextResponse.redirect(`${baseUrl}${redirectPath}&error=linear_failed`)
+    return NextResponse.redirect(`${baseUrl}${redirectPath}${separator}error=linear_failed`)
   }
 }
