@@ -2,10 +2,11 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { signOut } from 'next-auth/react'
 import { Button } from '@nexflow/ui/button'
 import { Input } from '@nexflow/ui/input'
 import { trpc } from '@/lib/trpc'
-import { CheckCircle2, Users, Link2, Bot, ArrowRight, Plus, X, Loader2, Check } from 'lucide-react'
+import { CheckCircle2, Users, Link2, Bot, ArrowRight, Plus, X, Loader2, Check, LogOut } from 'lucide-react'
 import { toast } from '@nexflow/ui/toast'
 
 type Step = 'welcome' | 'team' | 'invite' | 'integrations' | 'agents' | 'complete'
@@ -81,26 +82,19 @@ export default function OnboardingPage() {
   }
 
   const handleCreateTeams = async () => {
-    if (teams.length === 0) {
-      setCurrentStep('invite')
-      return
+    // Always move forward - teams can be created later from dashboard
+    // Try to create teams in background but don't block
+    if (teams.length > 0) {
+      // Fire and forget - don't wait for this
+      Promise.all(
+        teams.map((team) =>
+          createTeam.mutateAsync({ name: team.name, color: team.color }).catch(() => {})
+        )
+      ).then(() => {
+        // Teams created successfully (or failed silently)
+      })
     }
-
-    setIsLoading(true)
-    try {
-      for (const team of teams) {
-        await createTeam.mutateAsync({ name: team.name, color: team.color })
-      }
-      toast.success(`Created ${teams.length} team${teams.length > 1 ? 's' : ''}`)
-      setCurrentStep('invite')
-    } catch (error: any) {
-      console.error('Failed to create teams:', error)
-      toast.error(error?.message || 'Failed to create teams. Please try again.')
-      // Still allow moving forward even if team creation failed
-      setCurrentStep('invite')
-    } finally {
-      setIsLoading(false)
-    }
+    setCurrentStep('invite')
   }
 
   const handleSendInvites = async () => {
@@ -179,6 +173,17 @@ export default function OnboardingPage() {
             </div>
           ))}
         </nav>
+
+        {/* Sign out link */}
+        <div className="mt-auto pt-8">
+          <button
+            onClick={() => signOut({ callbackUrl: '/login' })}
+            className="flex items-center gap-2 text-sm text-foreground-muted hover:text-foreground transition-colors"
+          >
+            <LogOut className="w-4 h-4" />
+            Sign out
+          </button>
+        </div>
       </div>
 
       {/* Main content */}
