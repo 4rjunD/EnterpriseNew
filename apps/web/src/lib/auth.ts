@@ -68,11 +68,11 @@ export const authOptions: NextAuthOptions = {
     strategy: 'jwt',
   },
   callbacks: {
-    async jwt({ token, user, account, trigger }) {
-      // For OAuth sign-ins or token refresh, fetch user from database
-      if (account || trigger === 'signIn' || trigger === 'update') {
+    async jwt({ token, user, account }) {
+      // On initial sign-in, fetch user data from database
+      if (account && token.email) {
         const dbUser = await prisma.user.findUnique({
-          where: { email: token.email! },
+          where: { email: token.email },
           select: { id: true, role: true, organizationId: true },
         })
         if (dbUser) {
@@ -81,12 +81,13 @@ export const authOptions: NextAuthOptions = {
           token.organizationId = dbUser.organizationId
         }
       }
-      // For credentials sign-in, user object already has the data
+      // For credentials sign-in, user object has the data
       if (user) {
         token.id = user.id
         token.role = (user as unknown as { role: UserRole }).role
         token.organizationId = (user as unknown as { organizationId: string }).organizationId
       }
+      // Ensure token always has these fields (they persist in JWT)
       return token
     },
     async session({ session, token }) {
