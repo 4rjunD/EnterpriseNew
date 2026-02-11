@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, Suspense } from 'react'
+import { useState, useEffect, useRef, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { signOut } from 'next-auth/react'
 import { Button } from '@nexflow/ui/button'
@@ -50,6 +50,7 @@ function OnboardingContent() {
   ]
 
   const currentStepIndex = steps.findIndex((s) => s.key === currentStep)
+  const hasInitialized = useRef(false)
 
   // Handle OAuth redirects and restore step from localStorage
   useEffect(() => {
@@ -62,6 +63,7 @@ function OnboardingContent() {
       setCurrentStep('integrations')
       localStorage.setItem(ONBOARDING_STEP_KEY, 'integrations')
       window.history.replaceState({}, '', '/onboarding')
+      hasInitialized.current = true
       return
     }
 
@@ -70,6 +72,7 @@ function OnboardingContent() {
       setCurrentStep('integrations')
       localStorage.setItem(ONBOARDING_STEP_KEY, 'integrations')
       window.history.replaceState({}, '', '/onboarding')
+      hasInitialized.current = true
       return
     }
 
@@ -77,11 +80,14 @@ function OnboardingContent() {
     if (savedStep && steps.some(s => s.key === savedStep)) {
       setCurrentStep(savedStep)
     }
+    hasInitialized.current = true
   }, [searchParams])
 
-  // Persist current step to localStorage
+  // Persist current step to localStorage (skip until initialized)
   useEffect(() => {
-    localStorage.setItem(ONBOARDING_STEP_KEY, currentStep)
+    if (hasInitialized.current) {
+      localStorage.setItem(ONBOARDING_STEP_KEY, currentStep)
+    }
   }, [currentStep])
 
   // Helper to check if an integration is connected
