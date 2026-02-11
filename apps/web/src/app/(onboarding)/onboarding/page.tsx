@@ -1,7 +1,7 @@
 'use client'
 
-import { useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useState, useEffect, Suspense } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { signOut } from 'next-auth/react'
 import { Button } from '@nexflow/ui/button'
 import { Input } from '@nexflow/ui/input'
@@ -10,6 +10,8 @@ import { CheckCircle2, Users, Link2, Bot, ArrowRight, Plus, X, Loader2, Check, L
 import { toast } from '@nexflow/ui/toast'
 
 type Step = 'welcome' | 'team' | 'invite' | 'integrations' | 'agents' | 'complete'
+
+const ONBOARDING_STEP_KEY = 'nexflow_onboarding_step'
 
 const TEAM_COLORS = [
   '#3B82F6', '#10B981', '#F59E0B', '#EF4444',
@@ -23,8 +25,9 @@ const TEAM_SUGGESTIONS = [
   { name: 'Operations', color: '#8B5CF6' },
 ]
 
-export default function OnboardingPage() {
+function OnboardingContent() {
   const router = useRouter()
+  const searchParams = useSearchParams()
   const [currentStep, setCurrentStep] = useState<Step>('welcome')
   const [teams, setTeams] = useState<{ name: string; color: string }[]>([])
   const [newTeamName, setNewTeamName] = useState('')
@@ -35,6 +38,7 @@ export default function OnboardingPage() {
   const createTeam = trpc.team.createTeam.useMutation()
   const completeOnboarding = trpc.onboarding.complete.useMutation()
   const sendInvites = trpc.invitations.sendBulk.useMutation()
+  const { data: integrations } = trpc.integrations.list.useQuery()
 
   const steps = [
     { key: 'welcome' as const, label: 'Welcome' },
@@ -46,6 +50,46 @@ export default function OnboardingPage() {
   ]
 
   const currentStepIndex = steps.findIndex((s) => s.key === currentStep)
+
+  // Handle OAuth redirects and restore step from localStorage
+  useEffect(() => {
+    const success = searchParams.get('success')
+    const error = searchParams.get('error')
+
+    if (success) {
+      const name = success.replace('_connected', '').replace('_', ' ')
+      toast({ title: `${name.charAt(0).toUpperCase() + name.slice(1)} connected!` })
+      setCurrentStep('integrations')
+      localStorage.setItem(ONBOARDING_STEP_KEY, 'integrations')
+      window.history.replaceState({}, '', '/onboarding')
+      return
+    }
+
+    if (error) {
+      toast({ title: 'Connection failed', description: 'Please try again.', variant: 'destructive' })
+      setCurrentStep('integrations')
+      localStorage.setItem(ONBOARDING_STEP_KEY, 'integrations')
+      window.history.replaceState({}, '', '/onboarding')
+      return
+    }
+
+    const savedStep = localStorage.getItem(ONBOARDING_STEP_KEY) as Step | null
+    if (savedStep && steps.some(s => s.key === savedStep)) {
+      setCurrentStep(savedStep)
+    }
+  }, [searchParams])
+
+  // Persist current step to localStorage
+  useEffect(() => {
+    localStorage.setItem(ONBOARDING_STEP_KEY, currentStep)
+  }, [currentStep])
+
+  // Helper to check if an integration is connected
+  const isIntegrationConnected = (type: string) => {
+    return integrations?.connected?.some(
+      (i) => i.type.toUpperCase() === type.toUpperCase()
+    ) ?? false
+  }
 
   const addTeam = () => {
     if (newTeamName.trim() && !teams.find(t => t.name.toLowerCase() === newTeamName.trim().toLowerCase())) {
@@ -110,12 +154,12 @@ export default function OnboardingPage() {
       const result = await sendInvites.mutateAsync({ emails: validEmails })
       setInvitesSent(result.sent)
       if (result.sent > 0) {
-        toast.success(`Sent ${result.sent} invitation${result.sent > 1 ? 's' : ''}`)
+        toast({ title: `Sent ${result.sent} invitation${result.sent > 1 ? 's' : ''}` })
       }
       setCurrentStep('integrations')
     } catch (error: any) {
       console.error('Failed to send invites:', error)
-      toast.error(error?.message || 'Failed to send invitations')
+      toast({ title: 'Failed to send invitations', description: error?.message, variant: 'destructive' })
       setCurrentStep('integrations')
     } finally {
       setIsLoading(false)
@@ -126,11 +170,13 @@ export default function OnboardingPage() {
     setIsLoading(true)
     try {
       await completeOnboarding.mutateAsync()
+      localStorage.removeItem(ONBOARDING_STEP_KEY)
       router.push('/dashboard')
     } catch (error: any) {
       console.error('Failed to complete onboarding:', error)
       // Still redirect to dashboard even if marking complete failed
       // The user can still use the app
+      localStorage.removeItem(ONBOARDING_STEP_KEY)
       router.push('/dashboard')
     } finally {
       setIsLoading(false)
@@ -419,6 +465,7 @@ export default function OnboardingPage() {
                   icon="L"
                   color="#5E6AD2"
                   href="/api/integrations/linear/authorize"
+                  connected={isIntegrationConnected('LINEAR')}
                 />
                 <IntegrationCard
                   name="GitHub"
@@ -426,6 +473,7 @@ export default function OnboardingPage() {
                   icon="G"
                   color="#24292F"
                   href="/api/integrations/github/authorize"
+                  connected={isIntegrationConnected('GITHUB')}
                 />
                 <IntegrationCard
                   name="Slack"
@@ -433,6 +481,7 @@ export default function OnboardingPage() {
                   icon="S"
                   color="#4A154B"
                   href="/api/integrations/slack/authorize"
+                  connected={isIntegrationConnected('SLACK')}
                 />
                 <IntegrationCard
                   name="Discord"
@@ -440,6 +489,7 @@ export default function OnboardingPage() {
                   icon="D"
                   color="#5865F2"
                   href="/api/integrations/discord/authorize"
+                  connected={isIntegrationConnected('DISCORD')}
                 />
               </div>
 
@@ -543,13 +593,35 @@ function IntegrationCard({
   icon,
   color,
   href,
+  connected,
 }: {
   name: string
   description: string
   icon: string
   color: string
   href: string
+  connected: boolean
 }) {
+  if (connected) {
+    return (
+      <div className="flex items-center gap-3 p-4 bg-background-secondary border border-emerald-500/30 rounded-lg">
+        <div
+          className="w-10 h-10 rounded-lg flex items-center justify-center text-white font-semibold text-sm"
+          style={{ backgroundColor: color }}
+        >
+          {icon}
+        </div>
+        <div className="flex-1 min-w-0">
+          <p className="font-medium text-foreground text-sm">{name}</p>
+          <div className="flex items-center gap-1.5 mt-0.5">
+            <Check className="w-3 h-3 text-emerald-500" />
+            <span className="text-xs font-medium text-emerald-500">Connected</span>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <a
       href={href}
@@ -586,5 +658,29 @@ function AgentCard({
       </div>
       <p className="text-sm text-foreground-muted pl-11">{description}</p>
     </div>
+  )
+}
+
+function OnboardingSkeleton() {
+  return (
+    <div className="min-h-screen bg-background flex items-center justify-center">
+      <div className="w-full max-w-lg p-8">
+        <div className="h-8 w-48 bg-background-secondary rounded animate-pulse mb-4" />
+        <div className="h-4 w-72 bg-background-secondary rounded animate-pulse mb-8" />
+        <div className="space-y-4">
+          {[1, 2, 3].map((i) => (
+            <div key={i} className="h-20 bg-background-secondary rounded-lg animate-pulse" />
+          ))}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+export default function OnboardingPage() {
+  return (
+    <Suspense fallback={<OnboardingSkeleton />}>
+      <OnboardingContent />
+    </Suspense>
   )
 }
