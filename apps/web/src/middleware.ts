@@ -1,28 +1,22 @@
-import { withAuth } from 'next-auth/middleware'
+import { getToken } from 'next-auth/jwt'
 import { NextResponse, type NextRequest } from 'next/server'
 
-// Demo mode - bypass auth for UI development
-const DEMO_MODE = false
+export async function middleware(req: NextRequest) {
+  const path = req.nextUrl.pathname
 
-function demoMiddleware(req: NextRequest) {
-  return NextResponse.next()
-}
+  // Skip middleware for public routes and API routes
+  const publicRoutes = ['/login', '/signup', '/api/auth', '/api/health', '/api/integrations']
+  if (publicRoutes.some((route) => path.startsWith(route)) || path === '/') {
+    return NextResponse.next()
+  }
 
-const authMiddleware = withAuth(
-  function middleware(req) {
-    const token = req.nextauth.token
-    const path = req.nextUrl.pathname
+  // Get token from request
+  const token = await getToken({ req, secret: process.env.NEXTAUTH_SECRET })
 
-    // Public routes
-    if (path === '/login' || path === '/signup' || path.startsWith('/api/auth')) {
-      return NextResponse.next()
-    }
-
-    // Protect dashboard routes
-    if (path.startsWith('/dashboard')) {
-      if (!token) {
-        return NextResponse.redirect(new URL('/login', req.url))
-      }
+  // Protect dashboard routes
+  if (path.startsWith('/dashboard')) {
+    if (!token) {
+      return NextResponse.redirect(new URL('/login', req.url))
     }
 
     // Admin-only routes
@@ -45,29 +39,14 @@ const authMiddleware = withAuth(
         return NextResponse.redirect(new URL('/dashboard', req.url))
       }
     }
-
-    return NextResponse.next()
-  },
-  {
-    callbacks: {
-      authorized: ({ token, req }) => {
-        const path = req.nextUrl.pathname
-
-        // Allow public routes
-        if (path === '/login' || path === '/signup' || path.startsWith('/api/auth')) {
-          return true
-        }
-
-        // All other routes require authentication
-        return !!token
-      },
-    },
   }
-)
 
-// In demo mode, skip withAuth entirely to avoid NextAuth configuration errors
-export default DEMO_MODE ? demoMiddleware : authMiddleware
+  return NextResponse.next()
+}
 
 export const config = {
-  matcher: ['/((?!_next/static|_next/image|favicon.ico|fonts|images).*)'],
+  matcher: [
+    // Match all paths except static files
+    '/((?!_next/static|_next/image|favicon.ico|fonts|images).*)',
+  ],
 }
