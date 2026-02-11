@@ -2,16 +2,13 @@
 
 import { trpc } from '@/lib/trpc'
 import { HealthScoreRing } from './health-score-ring'
-import { VelocityChart } from './velocity-chart'
 import { ActivityFeed } from './activity-feed'
 import { Card, CardContent, CardHeader, CardTitle } from '@nexflow/ui/card'
 import { Skeleton } from '@nexflow/ui/skeleton'
 
 export function DashboardDetail() {
-  const { data: healthData, isLoading: healthLoading, error: healthError } =
+  const { data: healthData, isLoading: healthLoading } =
     trpc.dashboard.getHealthScore.useQuery()
-  const { data: velocityData, isLoading: velocityLoading } =
-    trpc.dashboard.getVelocityTrends.useQuery({ days: 30 })
   const { data: activityData, isLoading: activityLoading } =
     trpc.dashboard.getActivityFeed.useQuery({ limit: 10 })
 
@@ -20,11 +17,11 @@ export function DashboardDetail() {
   }
 
   return (
-    <div className="grid gap-6 lg:grid-cols-3">
-      {/* Health Score */}
-      <Card className="lg:row-span-2">
+    <div className="grid gap-6 lg:grid-cols-2">
+      {/* Team Performance */}
+      <Card>
         <CardHeader>
-          <CardTitle className="text-base">Health Score</CardTitle>
+          <CardTitle className="text-base">Team Performance</CardTitle>
         </CardHeader>
         <CardContent className="flex flex-col items-center">
           <HealthScoreRing
@@ -61,22 +58,8 @@ export function DashboardDetail() {
         </CardContent>
       </Card>
 
-      {/* Velocity Trend */}
-      <Card className="lg:col-span-2">
-        <CardHeader>
-          <CardTitle className="text-base">Velocity Trend</CardTitle>
-        </CardHeader>
-        <CardContent>
-          {velocityLoading || !velocityData ? (
-            <Skeleton className="h-[200px] w-full" />
-          ) : (
-            <VelocityChart data={Array.isArray(velocityData) ? velocityData : []} />
-          )}
-        </CardContent>
-      </Card>
-
       {/* Activity Feed */}
-      <Card className="lg:col-span-2">
+      <Card>
         <CardHeader>
           <CardTitle className="text-base">Recent Activity</CardTitle>
         </CardHeader>
@@ -130,10 +113,10 @@ function MetricRow({
 
 function DashboardSkeleton() {
   return (
-    <div className="grid gap-6 lg:grid-cols-3">
-      <Card className="lg:row-span-2">
+    <div className="grid gap-6 lg:grid-cols-2">
+      <Card>
         <CardHeader>
-          <Skeleton className="h-6 w-24" />
+          <Skeleton className="h-6 w-32" />
         </CardHeader>
         <CardContent className="flex flex-col items-center">
           <Skeleton className="h-40 w-40 rounded-full" />
@@ -144,15 +127,7 @@ function DashboardSkeleton() {
           </div>
         </CardContent>
       </Card>
-      <Card className="lg:col-span-2">
-        <CardHeader>
-          <Skeleton className="h-6 w-32" />
-        </CardHeader>
-        <CardContent>
-          <Skeleton className="h-[200px] w-full" />
-        </CardContent>
-      </Card>
-      <Card className="lg:col-span-2">
+      <Card>
         <CardHeader>
           <Skeleton className="h-6 w-32" />
         </CardHeader>
