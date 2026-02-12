@@ -355,31 +355,100 @@ async function main() {
   console.log('Agent actions created:', agentActions.length);
 
   // ============================================================================
-  // Behavioral Metrics (56 records - 14 days for 4 key users)
+  // Behavioral Metrics (168 records - 14 days for ALL 12 team members)
   // ============================================================================
   await prisma.behavioralMetric.deleteMany({ where: { user: { organizationId: 'demo-org' } } });
-  const metricsUsers = ['u1', 'u2', 'u3', 'u9'];
+
+  // Define user behavior profiles for realistic variation
+  const userProfiles = {
+    'u1': { name: 'Sarah', baseActivity: 45, workStyle: 'high-performer', burnoutRisk: 'low' },
+    'u2': { name: 'Mike', baseActivity: 65, workStyle: 'overworked', burnoutRisk: 'high' },
+    'u3': { name: 'Alex', baseActivity: 35, workStyle: 'steady', burnoutRisk: 'medium' },
+    'u4': { name: 'Jordan', baseActivity: 40, workStyle: 'manager', burnoutRisk: 'low' },
+    'u5': { name: 'Emily', baseActivity: 25, workStyle: 'away', burnoutRisk: 'low' },
+    'u6': { name: 'Chris', baseActivity: 50, workStyle: 'high-performer', burnoutRisk: 'low' },
+    'u7': { name: 'Taylor', baseActivity: 20, workStyle: 'offline', burnoutRisk: 'low' },
+    'u8': { name: 'Morgan', baseActivity: 42, workStyle: 'steady', burnoutRisk: 'low' },
+    'u9': { name: 'Casey', baseActivity: 48, workStyle: 'manager', burnoutRisk: 'medium' },
+    'u10': { name: 'Jamie', baseActivity: 55, workStyle: 'busy', burnoutRisk: 'medium' },
+    'u11': { name: 'Riley', baseActivity: 38, workStyle: 'steady', burnoutRisk: 'low' },
+    'u12': { name: 'Quinn', baseActivity: 30, workStyle: 'away', burnoutRisk: 'low' },
+  };
+
   const metricsData = [];
 
-  for (const userId of metricsUsers) {
+  for (const userId of Object.keys(userProfiles)) {
+    const profile = userProfiles[userId];
+
     for (let dayOffset = 0; dayOffset < 14; dayOffset++) {
       const date = new Date(now.getTime() - dayOffset * 24 * 60 * 60 * 1000);
       date.setHours(0, 0, 0, 0);
 
       const isWeekend = date.getDay() === 0 || date.getDay() === 6;
-      const isMike = userId === 'u2';
+      const dayVariation = Math.floor(Math.random() * 20) - 10;
+
+      // Calculate metrics based on work style
+      let messageCount = profile.baseActivity + dayVariation;
+      let activeHoursEnd = 18;
+      let weekendActivity = false;
+      let collaborationScore = 75 + Math.floor(Math.random() * 20);
+      let communicationHealth = 80 + Math.floor(Math.random() * 15);
+
+      switch (profile.workStyle) {
+        case 'overworked':
+          messageCount += 20;
+          activeHoursEnd = isWeekend ? 16 : 22;
+          weekendActivity = isWeekend && Math.random() > 0.3;
+          collaborationScore = 60 + Math.floor(Math.random() * 15);
+          communicationHealth = 55 + Math.floor(Math.random() * 20);
+          break;
+        case 'high-performer':
+          activeHoursEnd = 19;
+          collaborationScore = 85 + Math.floor(Math.random() * 10);
+          communicationHealth = 88 + Math.floor(Math.random() * 10);
+          break;
+        case 'manager':
+          messageCount += 10;
+          activeHoursEnd = 19;
+          collaborationScore = 90 + Math.floor(Math.random() * 8);
+          break;
+        case 'busy':
+          messageCount += 15;
+          activeHoursEnd = 20;
+          weekendActivity = isWeekend && Math.random() > 0.5;
+          communicationHealth = 70 + Math.floor(Math.random() * 15);
+          break;
+        case 'away':
+          messageCount = Math.max(5, messageCount - 15);
+          activeHoursEnd = 17;
+          collaborationScore = 50 + Math.floor(Math.random() * 20);
+          break;
+        case 'offline':
+          messageCount = Math.max(0, messageCount - 20);
+          activeHoursEnd = 17;
+          collaborationScore = 40 + Math.floor(Math.random() * 25);
+          communicationHealth = 60 + Math.floor(Math.random() * 20);
+          break;
+        default: // steady
+          break;
+      }
+
+      // Reduce activity on weekends for most users
+      if (isWeekend && profile.workStyle !== 'overworked') {
+        messageCount = Math.floor(messageCount * 0.3);
+      }
 
       metricsData.push({
         userId,
         date,
-        source: 'SLACK',
-        messageCount: Math.floor(Math.random() * 30) + (isMike ? 40 : 20),
+        source: Math.random() > 0.7 ? 'DISCORD' : 'SLACK',
+        messageCount: Math.max(0, messageCount),
         avgResponseTimeMs: Math.floor(Math.random() * 60000) + 30000,
         activeHoursStart: 9,
-        activeHoursEnd: isMike && !isWeekend ? 22 : 18,
-        weekendActivity: isWeekend && (isMike || Math.random() > 0.7),
-        collaborationScore: Math.floor(Math.random() * 20) + 70,
-        communicationHealth: Math.floor(Math.random() * 15) + 75,
+        activeHoursEnd,
+        weekendActivity,
+        collaborationScore: Math.min(100, Math.max(0, collaborationScore)),
+        communicationHealth: Math.min(100, Math.max(0, communicationHealth)),
       });
     }
   }
@@ -402,7 +471,7 @@ async function main() {
   console.log('  - 4 Integrations');
   console.log('  - 3 Agent Configs');
   console.log('  - 5 Agent Actions');
-  console.log('  - 56 Behavioral Metrics');
+  console.log('  - 168 Behavioral Metrics (14 days x 12 users)');
 }
 
 main()
