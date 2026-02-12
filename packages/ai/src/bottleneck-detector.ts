@@ -30,6 +30,113 @@ export class BottleneckDetector {
 
     // Generate AI insights after detection
     await this.generateAIInsights()
+
+    // Ensure baseline insights exist
+    await this.ensureBaselineInsights()
+  }
+
+  /**
+   * Create baseline insights when there's little to no data
+   */
+  private async ensureBaselineInsights(): Promise<void> {
+    // Check if any bottlenecks exist
+    const existingBottlenecks = await prisma.bottleneck.count({
+      where: {
+        project: { organizationId: this.organizationId },
+        status: BottleneckStatus.ACTIVE,
+      },
+    })
+
+    if (existingBottlenecks > 0) return
+
+    // Get data state
+    const [tasks, prs, integrations, projectContext] = await Promise.all([
+      prisma.task.count({
+        where: { project: { organizationId: this.organizationId } },
+      }),
+      prisma.pullRequest.count({
+        where: { project: { organizationId: this.organizationId } },
+      }),
+      prisma.integration.findMany({
+        where: { organizationId: this.organizationId, status: 'CONNECTED' },
+        select: { type: true },
+      }),
+      prisma.projectContext.findFirst({
+        where: { organizationId: this.organizationId },
+      }),
+    ])
+
+    // Get or create a default project for insights
+    let project = await prisma.project.findFirst({
+      where: { organizationId: this.organizationId },
+    })
+
+    if (!project) {
+      // Create a default project for insights
+      project = await prisma.project.create({
+        data: {
+          name: 'Workspace Overview',
+          key: 'WO',
+          description: 'Default project for workspace-level insights',
+          organizationId: this.organizationId,
+          status: 'ACTIVE',
+        },
+      })
+    }
+
+    const suggestions: string[] = []
+
+    // Check for missing integrations
+    const connectedTypes = integrations.map((i) => i.type)
+    if (!connectedTypes.includes('GITHUB') && !connectedTypes.includes('LINEAR')) {
+      suggestions.push('Connect GitHub or Linear to track tasks and pull requests')
+    }
+    if (!connectedTypes.includes('SLACK') && !connectedTypes.includes('DISCORD')) {
+      suggestions.push('Connect Slack or Discord for AI-powered notifications')
+    }
+    if (!projectContext) {
+      suggestions.push('Add project context in onboarding for smarter AI recommendations')
+    }
+
+    // Create setup recommendation bottleneck if integrations are missing
+    if (suggestions.length > 0) {
+      await prisma.bottleneck.upsert({
+        where: { id: `setup-${this.organizationId}` },
+        create: {
+          id: `setup-${this.organizationId}`,
+          type: BottleneckType.REVIEW_DELAY,
+          severity: BottleneckSeverity.LOW,
+          title: 'Complete setup to unlock AI insights',
+          description: suggestions.join('. ') + '.',
+          impact: 'Limited data available for AI analysis',
+          status: BottleneckStatus.ACTIVE,
+          projectId: project.id,
+        },
+        update: {
+          description: suggestions.join('. ') + '.',
+        },
+      })
+    }
+
+    // If we have some data, create a positive status bottleneck
+    if (tasks > 0 || prs > 0) {
+      await prisma.bottleneck.upsert({
+        where: { id: `status-${this.organizationId}` },
+        create: {
+          id: `status-${this.organizationId}`,
+          type: BottleneckType.REVIEW_DELAY,
+          severity: BottleneckSeverity.LOW,
+          title: 'Monitoring active',
+          description: `Tracking ${tasks} task(s) and ${prs} PR(s). No critical bottlenecks detected.`,
+          impact: 'System is healthy',
+          status: BottleneckStatus.ACTIVE,
+          projectId: project.id,
+        },
+        update: {
+          description: `Tracking ${tasks} task(s) and ${prs} PR(s). No critical bottlenecks detected.`,
+        },
+      })
+    }
   }
 
   /**

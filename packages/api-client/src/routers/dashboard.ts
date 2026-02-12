@@ -1,6 +1,7 @@
 import { z } from 'zod'
 import { router, protectedProcedure } from '../trpc'
 import { prisma } from '@nexflow/database'
+import { BottleneckDetector, PredictionEngine } from '@nexflow/ai'
 
 export const dashboardRouter = router({
   getHealthScore: protectedProcedure.query(async ({ ctx }) => {
@@ -172,6 +173,48 @@ export const dashboardRouter = router({
     }),
 
   getSummaryStats: protectedProcedure.query(async ({ ctx }) => {
+    // Check if we need to auto-run analysis (no predictions exist)
+    const existingPredictions = await prisma.prediction.count({
+      where: { project: { organizationId: ctx.organizationId }, isActive: true },
+    })
+
+    // Auto-trigger analysis if no predictions exist
+    if (existingPredictions === 0) {
+      try {
+        // Run detection and predictions in background (don't await fully)
+        const detector = new BottleneckDetector(ctx.organizationId)
+        const engine = new PredictionEngine({ organizationId: ctx.organizationId })
+
+        // Run detection
+        await detector.runDetection()
+
+        // Run org-level predictions
+        await engine.forecastVelocity()
+        await engine.detectBurnoutIndicators()
+
+        // Run for active projects
+        const projects = await prisma.project.findMany({
+          where: { organizationId: ctx.organizationId, status: 'ACTIVE' },
+          select: { id: true },
+        })
+
+        for (const project of projects) {
+          const projectEngine = new PredictionEngine({
+            organizationId: ctx.organizationId,
+            projectId: project.id,
+          })
+          await projectEngine.runAllPredictions()
+        }
+
+        // If still no predictions, create baseline
+        if (projects.length === 0) {
+          await engine.runAllPredictions()
+        }
+      } catch (e) {
+        console.error('Auto-analysis failed:', e)
+      }
+    }
+
     const [
       healthData,
       activeBottlenecks,

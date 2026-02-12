@@ -92,6 +92,124 @@ export class PredictionEngine {
       this.forecastVelocity(),
       this.detectScopeCreep(),
     ])
+
+    // Generate baseline predictions if none exist
+    await this.ensureBaselinePredictions()
+  }
+
+  /**
+   * Ensure there are always some baseline predictions even with limited data
+   */
+  private async ensureBaselinePredictions(): Promise<void> {
+    const { organizationId, projectId } = this.context
+
+    // Check if any predictions exist
+    const existingPredictions = await prisma.prediction.count({
+      where: {
+        isActive: true,
+        ...(projectId ? { projectId } : { project: { organizationId } }),
+      },
+    })
+
+    if (existingPredictions > 0) return
+
+    // Get basic data for context
+    const [tasks, prs, users, projects, projectContext] = await Promise.all([
+      prisma.task.count({
+        where: projectId ? { projectId } : { project: { organizationId } },
+      }),
+      prisma.pullRequest.count({
+        where: projectId ? { projectId } : { project: { organizationId } },
+      }),
+      prisma.user.count({ where: { organizationId } }),
+      prisma.project.findMany({
+        where: { organizationId, status: 'ACTIVE' },
+        take: 1,
+      }),
+      prisma.projectContext.findFirst({ where: { organizationId } }),
+    ])
+
+    const targetProject = projectId
+      ? await prisma.project.findUnique({ where: { id: projectId } })
+      : projects[0]
+
+    // Generate initial health assessment
+    const healthScore = this.calculateInitialHealthScore(tasks, prs, users)
+
+    // Create velocity forecast
+    await this.storePrediction(
+      PredictionType.VELOCITY_FORECAST,
+      0.5,
+      {
+        title: 'Initial Velocity Assessment',
+        predictedVelocity: Math.max(1, Math.round(tasks / 4)),
+        confidenceInterval: { low: 0, high: Math.round(tasks / 2) },
+        trend: tasks > 0 ? 'stable' : 'increasing',
+        dataPoints: tasks,
+      },
+      tasks > 0
+        ? `Based on ${tasks} task(s) in the system, initial velocity is estimated. Connect more data sources for accurate predictions.`
+        : `No tasks synced yet. Connect GitHub or Linear to start tracking velocity.`
+    )
+
+    // Create initial deadline risk if project has target date
+    if (targetProject?.targetDate) {
+      const daysUntilDeadline = Math.ceil(
+        (targetProject.targetDate.getTime() - Date.now()) / (1000 * 60 * 60 * 24)
+      )
+
+      await this.storePrediction(
+        PredictionType.DEADLINE_RISK,
+        0.4,
+        {
+          title: `${targetProject.name} Timeline Assessment`,
+          riskLevel: daysUntilDeadline < 14 ? 'medium' : 'low',
+          probability: daysUntilDeadline < 14 ? 0.4 : 0.2,
+          estimatedDelay: 0,
+          factors: [`${daysUntilDeadline} days until deadline`, `${tasks} tasks tracked`],
+          recommendations: tasks === 0
+            ? ['Sync tasks from Linear or GitHub to enable accurate predictions']
+            : ['Continue monitoring progress'],
+        },
+        `Project "${targetProject.name}" has ${daysUntilDeadline} days until the target date. ${
+          tasks === 0
+            ? 'Connect your project management tools to enable detailed risk analysis.'
+            : 'Risk assessment will improve as more data is collected.'
+        }`
+      )
+    }
+
+    // Create workspace health insight
+    await this.storePrediction(
+      PredictionType.BURNOUT_INDICATOR,
+      0.3,
+      {
+        title: 'Team Health Overview',
+        userId: null,
+        riskLevel: 'low',
+        factors: [
+          `${users} team member(s)`,
+          `${tasks} active task(s)`,
+          `${prs} pull request(s)`,
+        ],
+        recommendations: [
+          prs === 0 ? 'Connect GitHub to track code review patterns' : 'PR tracking active',
+          tasks === 0 ? 'Connect Linear to monitor task workload' : 'Task tracking active',
+        ],
+        isOverview: true,
+      },
+      projectContext
+        ? `Monitoring team health for your project: "${projectContext.buildingDescription.slice(0, 100)}...". More insights will appear as activity data is collected.`
+        : `Workspace has ${users} member(s). Add project context in settings to get AI-powered recommendations tailored to your goals.`
+    )
+  }
+
+  private calculateInitialHealthScore(tasks: number, prs: number, users: number): number {
+    let score = 70 // Base score
+    if (tasks > 0) score += 10
+    if (prs > 0) score += 10
+    if (users > 1) score += 10
+    return Math.min(100, score)
   }
 
   async predictDeadlineRisk(): Promise<void> {
