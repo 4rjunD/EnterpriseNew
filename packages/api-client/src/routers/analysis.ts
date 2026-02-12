@@ -488,6 +488,8 @@ async function createProgressSnapshots(organizationId: string, projectId: string
   const today = new Date()
   today.setHours(0, 0, 0, 0)
 
+  const totalScope = 100 // Total points in the sprint/project
+
   // Create snapshots for the last 14 days to show some history
   for (let i = 14; i >= 0; i--) {
     const date = new Date(today)
@@ -504,11 +506,15 @@ async function createProgressSnapshots(organizationId: string, projectId: string
     })
 
     if (!existing) {
-      // Calculate simulated progress
+      // Simulate realistic burndown progress
+      // Day 0 = 0% complete, Day 14 = ~70% complete (realistic sprint)
       const daysPassed = 14 - i
-      const totalScope = 100
-      const plannedPoints = Math.round(totalScope - (totalScope / 14) * daysPassed)
-      const completedPoints = Math.round(Math.max(0, daysPassed * 5 + Math.random() * 10))
+      const progressPercentage = Math.min(70, daysPassed * 5) // 5% per day, max 70%
+      const completedPoints = Math.round((progressPercentage / 100) * totalScope)
+
+      // Planned points = what SHOULD be remaining (ideal line)
+      // At day 0: 100 remaining, At day 14: 0 remaining
+      const idealRemaining = Math.round(totalScope - (totalScope / 14) * daysPassed)
 
       try {
         await prisma.progressSnapshot.create({
@@ -517,9 +523,9 @@ async function createProgressSnapshots(organizationId: string, projectId: string
             projectId,
             date: dateOnly,
             totalScope,
-            plannedPoints,
-            completedPoints,
-            plannedTasks: Math.round(plannedPoints / 5),
+            plannedPoints: idealRemaining, // This is the IDEAL remaining (for reference)
+            completedPoints: completedPoints, // This is ACTUAL completed
+            plannedTasks: Math.round(idealRemaining / 5),
             completedTasks: Math.round(completedPoints / 5),
           },
         })

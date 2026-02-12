@@ -10,6 +10,8 @@ import {
   ResponsiveContainer,
   ReferenceLine,
   Legend,
+  Area,
+  ComposedChart,
 } from 'recharts'
 import { format, parseISO } from 'date-fns'
 
@@ -43,21 +45,35 @@ export function BurndownChart({ data }: BurndownChartProps) {
     )
   }
 
-  // Format data for chart
-  const chartData = data.dataPoints.map((point) => ({
-    ...point,
-    date: format(parseISO(point.date), 'MMM d'),
-    remaining: Math.max(0, data.summary.totalPoints - point.actual),
-  }))
+  const totalPoints = data.summary.totalPoints || 100
+
+  // Format data for a proper burndown chart
+  // Burndown shows REMAINING work decreasing over time
+  const chartData = data.dataPoints.map((point, index) => {
+    const completed = point.actual || 0
+    const remaining = Math.max(0, totalPoints - completed)
+
+    return {
+      date: format(parseISO(point.date), 'MMM d'),
+      remaining: remaining,
+      ideal: point.ideal,
+      completed: completed,
+    }
+  })
 
   const todayIndex = chartData.findIndex(
     (d) => d.date === format(new Date(), 'MMM d')
   )
 
+  // Determine if on track
+  const latestData = chartData[chartData.length - 1]
+  const isAhead = latestData && latestData.remaining < latestData.ideal
+  const statusColor = isAhead ? 'hsl(var(--green-400))' : 'hsl(var(--amber-400))'
+
   return (
     <div className="h-64">
       <ResponsiveContainer width="100%" height="100%">
-        <LineChart data={chartData} margin={{ top: 5, right: 20, left: 0, bottom: 5 }}>
+        <ComposedChart data={chartData} margin={{ top: 5, right: 20, left: 0, bottom: 5 }}>
           <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
           <XAxis
             dataKey="date"
@@ -70,7 +86,13 @@ export function BurndownChart({ data }: BurndownChartProps) {
             tick={{ fill: 'hsl(var(--foreground-muted))', fontSize: 11 }}
             tickLine={{ stroke: 'hsl(var(--border))' }}
             axisLine={{ stroke: 'hsl(var(--border))' }}
-            domain={[0, 'dataMax']}
+            domain={[0, totalPoints]}
+            label={{
+              value: 'Points',
+              angle: -90,
+              position: 'insideLeft',
+              style: { fill: 'hsl(var(--foreground-muted))', fontSize: 10 }
+            }}
           />
           <Tooltip
             contentStyle={{
@@ -82,11 +104,10 @@ export function BurndownChart({ data }: BurndownChartProps) {
             labelStyle={{ color: 'hsl(var(--foreground))' }}
             formatter={(value: number, name: string) => {
               const labels: Record<string, string> = {
-                ideal: 'Ideal',
-                remaining: 'Remaining',
-                actual: 'Completed',
+                ideal: 'Target Remaining',
+                remaining: 'Actual Remaining',
               }
-              return [value, labels[name] || name]
+              return [`${value} pts`, labels[name] || name]
             }}
           />
           <Legend
@@ -94,9 +115,8 @@ export function BurndownChart({ data }: BurndownChartProps) {
             height={36}
             formatter={(value: string) => {
               const labels: Record<string, string> = {
-                ideal: 'Ideal Burndown',
+                ideal: 'Target (Ideal)',
                 remaining: 'Actual Remaining',
-                actual: 'Completed',
               }
               return <span style={{ color: 'hsl(var(--foreground-muted))', fontSize: '12px' }}>{labels[value] || value}</span>
             }}
@@ -117,37 +137,38 @@ export function BurndownChart({ data }: BurndownChartProps) {
             />
           )}
 
-          {/* Ideal burndown line */}
+          {/* Ideal burndown line (target) - dashed gray line going down */}
           <Line
             type="monotone"
             dataKey="ideal"
             stroke="hsl(var(--foreground-muted))"
             strokeDasharray="5 5"
             dot={false}
-            strokeWidth={1.5}
+            strokeWidth={2}
+            name="ideal"
           />
 
-          {/* Actual remaining line */}
+          {/* Actual remaining work - solid blue line (should go down) */}
           <Line
             type="monotone"
             dataKey="remaining"
-            stroke="hsl(var(--blue-400))"
-            strokeWidth={2}
-            dot={{ fill: 'hsl(var(--blue-400))', strokeWidth: 0, r: 3 }}
-            activeDot={{ r: 5, fill: 'hsl(var(--blue-400))' }}
+            stroke={statusColor}
+            strokeWidth={3}
+            dot={{ fill: statusColor, strokeWidth: 0, r: 4 }}
+            activeDot={{ r: 6, fill: statusColor }}
+            name="remaining"
           />
-
-          {/* Completed line */}
-          <Line
-            type="monotone"
-            dataKey="actual"
-            stroke="hsl(var(--green-400))"
-            strokeWidth={2}
-            dot={{ fill: 'hsl(var(--green-400))', strokeWidth: 0, r: 3 }}
-            activeDot={{ r: 5, fill: 'hsl(var(--green-400))' }}
-          />
-        </LineChart>
+        </ComposedChart>
       </ResponsiveContainer>
+
+      {/* Status indicator */}
+      <div className="mt-2 text-center">
+        {isAhead ? (
+          <span className="text-xs text-green-400">✓ Ahead of schedule</span>
+        ) : (
+          <span className="text-xs text-amber-400">⚠ Behind schedule</span>
+        )}
+      </div>
     </div>
   )
 }
