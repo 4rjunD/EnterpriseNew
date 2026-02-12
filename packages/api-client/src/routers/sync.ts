@@ -31,15 +31,33 @@ export const syncRouter = router({
       }
     }
 
-    // Check if any sync is in progress
-    const inProgressSync = recentLogs.find((log) => log.status === 'IN_PROGRESS')
+    // Check if any sync is in progress (but timeout after 5 minutes)
+    const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000)
+    const inProgressSync = recentLogs.find(
+      (log) => log.status === 'IN_PROGRESS' && log.startedAt > fiveMinutesAgo
+    )
+
+    // Also check integration status for SYNCING
+    const syncingIntegration = integrations.find((int) => int.status === 'SYNCING')
+
+    // Clean up stale IN_PROGRESS logs (older than 5 min)
+    const staleLogs = recentLogs.filter(
+      (log) => log.status === 'IN_PROGRESS' && log.startedAt <= fiveMinutesAgo
+    )
+    if (staleLogs.length > 0) {
+      // Mark stale syncs as failed (fire and forget)
+      prisma.syncLog.updateMany({
+        where: { id: { in: staleLogs.map((l) => l.id) } },
+        data: { status: 'FAILED', error: 'Sync timed out', completedAt: new Date() },
+      }).catch(() => {})
+    }
 
     return {
       integrations: integrations.map((int) => ({
         ...int,
         lastSync: lastSyncByType.get(int.type) || null,
       })),
-      inProgress: inProgressSync || null,
+      inProgress: inProgressSync || (syncingIntegration ? { type: syncingIntegration.type } : null),
       recentLogs: recentLogs.slice(0, 5),
     }
   }),
@@ -86,12 +104,36 @@ export const syncRouter = router({
         }
       }
 
-      // Get tasks from projects in this organization
+      // Get tasks - either from projects in this org OR synced tasks without projects
+      // First get projects in this org
+      const orgProjects = await prisma.project.findMany({
+        where: { organizationId: ctx.organizationId },
+        select: { id: true },
+      })
+      const projectIds = orgProjects.map((p) => p.id)
+
+      // Get synced tasks (tasks from integrations may not have projects)
+      // Also get org users to filter tasks by assignee
+      const orgUsers = await prisma.user.findMany({
+        where: { organizationId: ctx.organizationId },
+        select: { id: true },
+      })
+      const userIds = orgUsers.map((u) => u.id)
+
       const tasks = await prisma.task.findMany({
         where: {
-          project: {
-            organizationId: ctx.organizationId,
-          },
+          OR: [
+            // Tasks with projects in this org
+            { projectId: { in: projectIds } },
+            // Tasks assigned to users in this org (synced from integrations)
+            { assigneeId: { in: userIds } },
+            // Tasks synced from external sources (Linear, etc.)
+            {
+              source: { in: ['LINEAR', 'GITHUB', 'JIRA'] },
+              // At least make sure they're recent/active
+              lastSyncedAt: { gte: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000) }, // Last 30 days
+            },
+          ],
           status: {
             in: [TaskStatus.TODO, TaskStatus.IN_PROGRESS, TaskStatus.IN_REVIEW],
           },

@@ -22,7 +22,7 @@ const integrationIcons: Record<string, React.ReactNode> = {
 
 export function SyncStatusBar() {
   const { data: syncStatus, isLoading } = trpc.sync.getStatus.useQuery(undefined, {
-    refetchInterval: 10000, // Poll every 10 seconds
+    refetchInterval: 5000, // Poll every 5 seconds
   })
 
   if (isLoading) {
@@ -38,9 +38,13 @@ export function SyncStatusBar() {
     return null
   }
 
-  const inProgress = syncStatus.inProgress
-  const connectedIntegrations = syncStatus.integrations.filter((i) => i.status === 'CONNECTED')
-  const hasErrors = syncStatus.integrations.some((i) => i.syncError)
+  // Check for SYNCING status in integrations (more reliable than SyncLog)
+  const syncingIntegration = syncStatus.integrations.find((i) => i.status === 'SYNCING')
+  const inProgress = syncingIntegration || syncStatus.inProgress
+  const connectedIntegrations = syncStatus.integrations.filter((i) =>
+    i.status === 'CONNECTED' || i.status === 'SYNCING'
+  )
+  const hasErrors = syncStatus.integrations.some((i) => i.syncError || i.status === 'ERROR')
 
   return (
     <div

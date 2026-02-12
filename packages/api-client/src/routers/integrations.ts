@@ -128,6 +128,7 @@ export const integrationsRouter = router({
   triggerSync: adminProcedure
     .input(z.object({ type: z.string() }))
     .mutation(async ({ ctx, input }) => {
+      // Set to SYNCING
       await prisma.integration.update({
         where: {
           organizationId_type: {
@@ -137,7 +138,6 @@ export const integrationsRouter = router({
         },
         data: {
           status: 'SYNCING',
-          lastSyncAt: new Date(),
         },
       })
 
@@ -163,7 +163,36 @@ export const integrationsRouter = router({
           default:
             // For integrations without sync (Slack, Notion, etc.), just mark as synced
             result = { success: true, itemsSynced: 0 }
+            // Update status to CONNECTED for non-sync integrations
+            await prisma.integration.update({
+              where: {
+                organizationId_type: {
+                  organizationId: ctx.organizationId,
+                  type: input.type as IntegrationType,
+                },
+              },
+              data: {
+                status: 'CONNECTED',
+                lastSyncAt: new Date(),
+                syncError: null,
+              },
+            })
         }
+
+        // Sync clients update status themselves, but ensure it's set
+        await prisma.integration.update({
+          where: {
+            organizationId_type: {
+              organizationId: ctx.organizationId,
+              type: input.type as IntegrationType,
+            },
+          },
+          data: {
+            status: 'CONNECTED',
+            lastSyncAt: new Date(),
+            syncError: null,
+          },
+        })
 
         return { success: result.success, itemsSynced: result.itemsSynced }
       } catch (e) {
@@ -188,10 +217,11 @@ export const integrationsRouter = router({
 
   // Sync all connected integrations at once
   syncAll: protectedProcedure.mutation(async ({ ctx }) => {
+    // Get all connected or syncing integrations (include SYNCING to fix stuck ones)
     const integrations = await prisma.integration.findMany({
       where: {
         organizationId: ctx.organizationId,
-        status: 'CONNECTED',
+        status: { in: ['CONNECTED', 'SYNCING', 'ERROR'] },
       },
     })
 
@@ -218,9 +248,36 @@ export const integrationsRouter = router({
             break
           }
           default:
-            // Skip integrations without sync capability
+            // Skip integrations without sync capability but mark as connected
             result = { success: true, itemsSynced: 0 }
+            await prisma.integration.update({
+              where: {
+                organizationId_type: {
+                  organizationId: ctx.organizationId,
+                  type: integration.type,
+                },
+              },
+              data: {
+                status: 'CONNECTED',
+                syncError: null,
+              },
+            })
         }
+
+        // Ensure status is CONNECTED after successful sync
+        await prisma.integration.update({
+          where: {
+            organizationId_type: {
+              organizationId: ctx.organizationId,
+              type: integration.type,
+            },
+          },
+          data: {
+            status: 'CONNECTED',
+            lastSyncAt: new Date(),
+            syncError: null,
+          },
+        })
 
         results.push({
           type: integration.type,
@@ -228,6 +285,20 @@ export const integrationsRouter = router({
           itemsSynced: result.itemsSynced,
         })
       } catch (e) {
+        // Mark as error but continue with other integrations
+        await prisma.integration.update({
+          where: {
+            organizationId_type: {
+              organizationId: ctx.organizationId,
+              type: integration.type,
+            },
+          },
+          data: {
+            status: 'ERROR',
+            syncError: String(e),
+          },
+        })
+
         results.push({
           type: integration.type,
           success: false,
