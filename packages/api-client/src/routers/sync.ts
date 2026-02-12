@@ -104,36 +104,10 @@ export const syncRouter = router({
         }
       }
 
-      // Get tasks - either from projects in this org OR synced tasks without projects
-      // First get projects in this org
-      const orgProjects = await prisma.project.findMany({
-        where: { organizationId: ctx.organizationId },
-        select: { id: true },
-      })
-      const projectIds = orgProjects.map((p) => p.id)
-
-      // Get synced tasks (tasks from integrations may not have projects)
-      // Also get org users to filter tasks by assignee
-      const orgUsers = await prisma.user.findMany({
-        where: { organizationId: ctx.organizationId },
-        select: { id: true },
-      })
-      const userIds = orgUsers.map((u) => u.id)
-
+      // Get tasks for this organization - simple and direct
       const tasks = await prisma.task.findMany({
         where: {
-          OR: [
-            // Tasks with projects in this org
-            { projectId: { in: projectIds } },
-            // Tasks assigned to users in this org (synced from integrations)
-            { assigneeId: { in: userIds } },
-            // Tasks synced from external sources (Linear, etc.)
-            {
-              source: { in: ['LINEAR', 'GITHUB', 'JIRA'] },
-              // At least make sure they're recent/active
-              lastSyncedAt: { gte: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000) }, // Last 30 days
-            },
-          ],
+          organizationId: ctx.organizationId,
           status: {
             in: [TaskStatus.TODO, TaskStatus.IN_PROGRESS, TaskStatus.IN_REVIEW],
           },

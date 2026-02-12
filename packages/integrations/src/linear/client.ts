@@ -300,6 +300,7 @@ export class LinearClient implements IntegrationClient {
         storyPoints: task.storyPoints,
         externalUrl: task.externalUrl,
         lastSyncedAt: new Date(),
+        organizationId: this.organizationId, // Link to organization
       },
       update: {
         title: task.title,
@@ -311,6 +312,7 @@ export class LinearClient implements IntegrationClient {
         dueDate: task.dueDate,
         storyPoints: task.storyPoints,
         lastSyncedAt: new Date(),
+        organizationId: this.organizationId, // Ensure org link on update too
       },
     })
   }

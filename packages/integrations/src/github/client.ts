@@ -240,6 +240,7 @@ export class GitHubClient implements IntegrationClient {
         closedAt: pr.closedAt,
         lastSyncedAt: new Date(),
         lastActivityAt: new Date(),
+        organizationId: this.organizationId, // Link to organization
       },
       update: {
         title: pr.title,
@@ -251,6 +252,7 @@ export class GitHubClient implements IntegrationClient {
         mergedAt: pr.mergedAt,
         closedAt: pr.closedAt,
         lastSyncedAt: new Date(),
+        organizationId: this.organizationId, // Ensure org link on update too
       },
     })
   }

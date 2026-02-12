@@ -19,7 +19,7 @@ export const tasksRouter = router({
     .query(async ({ ctx, input }) => {
       const tasks = await prisma.task.findMany({
         where: {
-          project: { organizationId: ctx.organizationId },
+          organizationId: ctx.organizationId,
           ...(input.projectId && { projectId: input.projectId }),
           ...(input.teamId && { teamId: input.teamId }),
           ...(input.assigneeId && { assigneeId: input.assigneeId }),
@@ -58,7 +58,7 @@ export const tasksRouter = router({
       return prisma.task.findFirst({
         where: {
           id: input.id,
-          project: { organizationId: ctx.organizationId },
+          organizationId: ctx.organizationId,
         },
         include: {
           assignee: { select: { id: true, name: true, image: true } },
@@ -98,6 +98,7 @@ export const tasksRouter = router({
           creatorId: ctx.userId,
           blockedByIds: input.blockedByIds || [],
           source: TaskSource.INTERNAL,
+          organizationId: ctx.organizationId, // Link to organization
         },
         include: {
           assignee: { select: { id: true, name: true, image: true } },

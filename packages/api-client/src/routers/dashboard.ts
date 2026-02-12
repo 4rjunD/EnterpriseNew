@@ -14,11 +14,11 @@ export const dashboardRouter = router({
       activeBottlenecks,
       criticalBottlenecks,
     ] = await Promise.all([
-      prisma.task.count({ where: { project: { organizationId: ctx.organizationId } } }),
-      prisma.task.count({ where: { project: { organizationId: ctx.organizationId }, status: 'DONE' } }),
-      prisma.task.count({ where: { project: { organizationId: ctx.organizationId }, status: 'IN_PROGRESS' } }),
-      prisma.pullRequest.count({ where: { project: { organizationId: ctx.organizationId }, status: 'OPEN' } }),
-      prisma.pullRequest.count({ where: { project: { organizationId: ctx.organizationId }, status: 'MERGED' } }),
+      prisma.task.count({ where: { organizationId: ctx.organizationId } }),
+      prisma.task.count({ where: { organizationId: ctx.organizationId, status: 'DONE' } }),
+      prisma.task.count({ where: { organizationId: ctx.organizationId, status: 'IN_PROGRESS' } }),
+      prisma.pullRequest.count({ where: { organizationId: ctx.organizationId, status: 'OPEN' } }),
+      prisma.pullRequest.count({ where: { organizationId: ctx.organizationId, status: 'MERGED' } }),
       prisma.bottleneck.count({ where: { project: { organizationId: ctx.organizationId }, status: 'ACTIVE' } }),
       prisma.bottleneck.count({ where: { project: { organizationId: ctx.organizationId }, status: 'ACTIVE', severity: 'CRITICAL' } }),
     ])
@@ -60,7 +60,7 @@ export const dashboardRouter = router({
       const [tasks, prs] = await Promise.all([
         prisma.task.findMany({
           where: {
-            project: { organizationId: ctx.organizationId },
+            organizationId: ctx.organizationId,
             status: 'DONE',
             updatedAt: { gte: startDate },
           },
@@ -68,7 +68,7 @@ export const dashboardRouter = router({
         }),
         prisma.pullRequest.findMany({
           where: {
-            project: { organizationId: ctx.organizationId },
+            organizationId: ctx.organizationId,
             status: 'MERGED',
             mergedAt: { gte: startDate },
           },
@@ -116,7 +116,7 @@ export const dashboardRouter = router({
       const [recentTasks, recentPRs, recentBottlenecks] = await Promise.all([
         prisma.task.findMany({
           where: {
-            project: { organizationId: ctx.organizationId },
+            organizationId: ctx.organizationId,
             status: { in: ['DONE', 'IN_PROGRESS'] },
           },
           orderBy: { updatedAt: 'desc' },
@@ -126,7 +126,7 @@ export const dashboardRouter = router({
           },
         }),
         prisma.pullRequest.findMany({
-          where: { project: { organizationId: ctx.organizationId } },
+          where: { organizationId: ctx.organizationId },
           orderBy: { updatedAt: 'desc' },
           take: input.limit,
           include: {
@@ -231,13 +231,13 @@ export const dashboardRouter = router({
       agentActions,
     ] = await Promise.all([
       // Health score components
-      prisma.task.count({ where: { project: { organizationId: ctx.organizationId }, status: 'DONE' } }),
+      prisma.task.count({ where: { organizationId: ctx.organizationId, status: 'DONE' } }),
       prisma.bottleneck.count({ where: { project: { organizationId: ctx.organizationId }, status: 'ACTIVE' } }),
       prisma.bottleneck.count({ where: { project: { organizationId: ctx.organizationId }, status: 'ACTIVE', severity: 'CRITICAL' } }),
       prisma.user.count({ where: { organizationId: ctx.organizationId } }),
       prisma.user.count({ where: { organizationId: ctx.organizationId, status: 'ONLINE' } }),
-      prisma.task.count({ where: { project: { organizationId: ctx.organizationId } } }),
-      prisma.task.count({ where: { project: { organizationId: ctx.organizationId }, status: 'IN_PROGRESS' } }),
+      prisma.task.count({ where: { organizationId: ctx.organizationId } }),
+      prisma.task.count({ where: { organizationId: ctx.organizationId, status: 'IN_PROGRESS' } }),
       prisma.prediction.count({ where: { project: { organizationId: ctx.organizationId }, isActive: true } }),
       prisma.prediction.count({ where: { project: { organizationId: ctx.organizationId }, isActive: true, confidence: { gte: 0.7 } } }),
       prisma.project.count({ where: { organizationId: ctx.organizationId, status: 'ACTIVE' } }),

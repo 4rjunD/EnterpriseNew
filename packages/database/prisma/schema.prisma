@@ -32,6 +32,8 @@ model Organization {
   agentMemory         AgentMemory[]
   agentConversations  AgentConversation[]
   heartbeatConfig     HeartbeatConfig?
+  tasks               Task[]
+  pullRequests        PullRequest[]
 
   @@map("organizations")
 }
@@ -241,6 +243,10 @@ model Task {
   externalUrl  String?
   lastSyncedAt DateTime?
 
+  // Organization for synced tasks (required for proper filtering)
+  organizationId String?
+  organization   Organization? @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
   projectId String?
   project   Project? @relation(fields: [projectId], references: [id])
   teamId    String?
@@ -259,6 +265,7 @@ model Task {
   bottlenecks  Bottleneck[]
 
   @@unique([source, externalId])
+  @@index([organizationId])
   @@index([projectId])
   @@index([assigneeId])
   @@index([status])
@@ -321,6 +328,10 @@ model PullRequest {
   unresolvedComments Int     @default(0)
   ciStatus          CIStatus @default(UNKNOWN)
 
+  // Organization for synced PRs (required for proper filtering)
+  organizationId String?
+  organization   Organization? @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
   authorId String?
   author   User?   @relation("author", fields: [authorId], references: [id])
 
@@ -335,6 +346,7 @@ model PullRequest {
 
   bottlenecks Bottleneck[]
 
+  @@index([organizationId])
   @@index([projectId])
   @@index([authorId])
   @@index([status])
