@@ -44,10 +44,14 @@ async function main() {
   });
 
   if (realIntegrations > 0) {
-    console.error('ERROR: Real connected integrations detected');
-    console.error('This suggests the database contains real user data');
-    console.error('Demo seed aborted to prevent data pollution');
-    process.exit(1);
+    console.warn('WARNING: Real connected integrations detected');
+    console.warn('This suggests the database contains real user data');
+    if (process.env.FORCE_DEMO_SEED !== 'true') {
+      console.error('Demo seed aborted to prevent data pollution');
+      console.error('Set FORCE_DEMO_SEED=true to proceed');
+      process.exit(1);
+    }
+    console.warn('FORCE_DEMO_SEED=true - proceeding anyway (demo-org data only)');
   }
 
   console.log('Safety checks passed');
@@ -224,11 +228,11 @@ async function main() {
     { title: 'Add password policies', status: 'BACKLOG', priority: 'MEDIUM', projectId: 'p7', storyPoints: 3, labels: ['auth', 'security'] },
   ];
 
-  // Clear existing tasks and create new ones
-  await prisma.task.deleteMany({});
+  // Clear existing demo tasks and create new ones
+  await prisma.task.deleteMany({ where: { organizationId: 'demo-org' } });
   for (const task of tasks) {
     await prisma.task.create({
-      data: { ...task, source: 'INTERNAL', creatorId: 'u1' },
+      data: { ...task, source: 'INTERNAL', creatorId: 'u1', organizationId: org.id },
     });
   }
   console.log('Tasks created:', tasks.length);
@@ -236,27 +240,30 @@ async function main() {
   // ============================================================================
   // Pull Requests (8 PRs)
   // ============================================================================
-  await prisma.pullRequest.deleteMany({});
   const prs = [
-    { title: 'feat: Add user dashboard', number: 142, status: 'OPEN', projectId: 'p1', authorId: 'u1', url: 'https://github.com/nexflow/app/pull/142', externalId: 'gh-142', repository: 'nexflow/app', baseBranch: 'main', headBranch: 'feature/dashboard', isStuck: true, stuckAt: new Date(now.getTime() - 5 * 24 * 60 * 60 * 1000), unresolvedComments: 3, additions: 450, deletions: 120 },
-    { title: 'fix: Resolve memory leak in worker', number: 143, status: 'OPEN', projectId: 'p2', authorId: 'u2', url: 'https://github.com/nexflow/api/pull/143', externalId: 'gh-143', repository: 'nexflow/api', baseBranch: 'main', headBranch: 'fix/memory-leak', additions: 85, deletions: 42 },
-    { title: 'refactor: Optimize bundle size', number: 156, status: 'OPEN', projectId: 'p1', authorId: 'u3', url: 'https://github.com/nexflow/app/pull/156', externalId: 'gh-156', repository: 'nexflow/app', baseBranch: 'main', headBranch: 'refactor/bundle', unresolvedComments: 8, additions: 220, deletions: 380 },
-    { title: 'feat: Add login form', number: 140, status: 'MERGED', projectId: 'p1', authorId: 'u1', url: 'https://github.com/nexflow/app/pull/140', mergedAt: new Date(now.getTime() - 2 * 24 * 60 * 60 * 1000), externalId: 'gh-140', repository: 'nexflow/app', baseBranch: 'main', headBranch: 'feature/login', additions: 320, deletions: 45 },
-    { title: 'chore: Update dependencies', number: 138, status: 'MERGED', projectId: 'p3', authorId: 'u4', url: 'https://github.com/nexflow/infra/pull/138', mergedAt: new Date(now.getTime() - 1 * 24 * 60 * 60 * 1000), externalId: 'gh-138', repository: 'nexflow/infra', baseBranch: 'main', headBranch: 'chore/deps', additions: 150, deletions: 120 },
-    { title: 'feat: Add rate limiting', number: 158, status: 'OPEN', projectId: 'p2', authorId: 'u9', url: 'https://github.com/nexflow/api/pull/158', externalId: 'gh-158', repository: 'nexflow/api', baseBranch: 'main', headBranch: 'feature/rate-limit', ciStatus: 'FAILING', additions: 180, deletions: 20 },
-    { title: 'fix: Auth token refresh', number: 159, status: 'OPEN', projectId: 'p7', authorId: 'u7', url: 'https://github.com/nexflow/auth/pull/159', externalId: 'gh-159', repository: 'nexflow/auth', baseBranch: 'main', headBranch: 'fix/token-refresh', additions: 65, deletions: 30 },
-    { title: 'docs: Update API reference', number: 160, status: 'MERGED', projectId: 'p2', authorId: 'u5', url: 'https://github.com/nexflow/api/pull/160', mergedAt: new Date(now.getTime() - 3 * 24 * 60 * 60 * 1000), externalId: 'gh-160', repository: 'nexflow/api', baseBranch: 'main', headBranch: 'docs/api-ref', additions: 420, deletions: 180 },
+    { title: 'feat: Add user dashboard', number: 142, status: 'OPEN', projectId: 'p1', authorId: 'u1', url: 'https://github.com/nexflow/app/pull/142', externalId: 'demo-gh-142', repository: 'nexflow/app', baseBranch: 'main', headBranch: 'feature/dashboard', isStuck: true, stuckAt: new Date(now.getTime() - 5 * 24 * 60 * 60 * 1000), unresolvedComments: 3, additions: 450, deletions: 120 },
+    { title: 'fix: Resolve memory leak in worker', number: 143, status: 'OPEN', projectId: 'p2', authorId: 'u2', url: 'https://github.com/nexflow/api/pull/143', externalId: 'demo-gh-143', repository: 'nexflow/api', baseBranch: 'main', headBranch: 'fix/memory-leak', additions: 85, deletions: 42 },
+    { title: 'refactor: Optimize bundle size', number: 156, status: 'OPEN', projectId: 'p1', authorId: 'u3', url: 'https://github.com/nexflow/app/pull/156', externalId: 'demo-gh-156', repository: 'nexflow/app', baseBranch: 'main', headBranch: 'refactor/bundle', unresolvedComments: 8, additions: 220, deletions: 380 },
+    { title: 'feat: Add login form', number: 140, status: 'MERGED', projectId: 'p1', authorId: 'u1', url: 'https://github.com/nexflow/app/pull/140', mergedAt: new Date(now.getTime() - 2 * 24 * 60 * 60 * 1000), externalId: 'demo-gh-140', repository: 'nexflow/app', baseBranch: 'main', headBranch: 'feature/login', additions: 320, deletions: 45 },
+    { title: 'chore: Update dependencies', number: 138, status: 'MERGED', projectId: 'p3', authorId: 'u4', url: 'https://github.com/nexflow/infra/pull/138', mergedAt: new Date(now.getTime() - 1 * 24 * 60 * 60 * 1000), externalId: 'demo-gh-138', repository: 'nexflow/infra', baseBranch: 'main', headBranch: 'chore/deps', additions: 150, deletions: 120 },
+    { title: 'feat: Add rate limiting', number: 158, status: 'OPEN', projectId: 'p2', authorId: 'u9', url: 'https://github.com/nexflow/api/pull/158', externalId: 'demo-gh-158', repository: 'nexflow/api', baseBranch: 'main', headBranch: 'feature/rate-limit', ciStatus: 'FAILING', additions: 180, deletions: 20 },
+    { title: 'fix: Auth token refresh', number: 159, status: 'OPEN', projectId: 'p7', authorId: 'u7', url: 'https://github.com/nexflow/auth/pull/159', externalId: 'demo-gh-159', repository: 'nexflow/auth', baseBranch: 'main', headBranch: 'fix/token-refresh', additions: 65, deletions: 30 },
+    { title: 'docs: Update API reference', number: 160, status: 'MERGED', projectId: 'p2', authorId: 'u5', url: 'https://github.com/nexflow/api/pull/160', mergedAt: new Date(now.getTime() - 3 * 24 * 60 * 60 * 1000), externalId: 'demo-gh-160', repository: 'nexflow/api', baseBranch: 'main', headBranch: 'docs/api-ref', additions: 420, deletions: 180 },
   ];
 
   for (const pr of prs) {
-    await prisma.pullRequest.create({ data: pr });
+    await prisma.pullRequest.upsert({
+      where: { externalId: pr.externalId },
+      update: { ...pr, organizationId: org.id },
+      create: { ...pr, organizationId: org.id },
+    });
   }
   console.log('PRs created:', prs.length);
 
   // ============================================================================
   // Bottlenecks (6 bottlenecks with varied types and severities)
   // ============================================================================
-  await prisma.bottleneck.deleteMany({});
+  await prisma.bottleneck.deleteMany({ where: { project: { organizationId: 'demo-org' } } });
   const bottlenecks = [
     { title: 'PR #142 stuck in review for 5 days', type: 'STUCK_PR', severity: 'CRITICAL', status: 'ACTIVE', projectId: 'p1', description: 'No reviewer activity since Monday', impact: 'High: Blocks release' },
     { title: 'Task "API Integration" in progress for 12 days', type: 'STALE_TASK', severity: 'HIGH', status: 'ACTIVE', projectId: 'p2', description: 'No commits linked in the last 7 days', impact: 'Medium: Delays sprint goal' },
@@ -274,7 +281,7 @@ async function main() {
   // ============================================================================
   // Predictions (8 predictions with varied types)
   // ============================================================================
-  await prisma.prediction.deleteMany({});
+  await prisma.prediction.deleteMany({ where: { project: { organizationId: 'demo-org' } } });
   const predictions = [
     { type: 'DEADLINE_RISK', confidence: 0.78, value: { title: 'Sprint 23 at risk', riskLevel: 'high', estimatedDelay: 3, factors: ['High velocity gap', '2 critical bottlenecks'], recommendations: ['Consider scope reduction', 'Add resources'] }, reasoning: 'Based on current velocity of 28 points/sprint vs required 42 points, there is a 78% probability of missing the Feb 15 deadline by approximately 3 days.', isActive: true, projectId: 'p1' },
     { type: 'BURNOUT_INDICATOR', confidence: 0.72, value: { title: 'Mike showing burnout signals', userId: 'u2', riskLevel: 'medium', factors: ['12 active tasks', 'Weekend activity detected', 'Late commits'], recommendations: ['Redistribute workload', 'Schedule 1:1'] }, reasoning: 'Mike Johnson has been working extended hours with 12 active tasks assigned. Weekend activity was detected on 3 of the last 4 weekends.', isActive: true, projectId: 'p2' },
@@ -333,7 +340,7 @@ async function main() {
   // ============================================================================
   // Agent Actions (5 actions with varied statuses)
   // ============================================================================
-  await prisma.agentAction.deleteMany({});
+  await prisma.agentAction.deleteMany({ where: { agentConfig: { organizationId: 'demo-org' } } });
   const agentActions = [
     { agentConfigId: createdAgentConfigs['TASK_REASSIGNER'], status: 'PENDING', action: 'reassign', reasoning: 'Mike is overloaded with 12 active tasks', suggestion: { fromUser: 'u2', toUser: 'u5', taskTitle: 'API Integration' }, targetUserId: 'u2' },
     { agentConfigId: createdAgentConfigs['TASK_REASSIGNER'], status: 'PENDING', action: 'reassign', reasoning: 'Alex is on PTO next week', suggestion: { fromUser: 'u3', toUser: 'u6', taskTitle: 'Fix navigation bug' }, targetUserId: 'u3' },
@@ -350,7 +357,7 @@ async function main() {
   // ============================================================================
   // Behavioral Metrics (56 records - 14 days for 4 key users)
   // ============================================================================
-  await prisma.behavioralMetric.deleteMany({});
+  await prisma.behavioralMetric.deleteMany({ where: { user: { organizationId: 'demo-org' } } });
   const metricsUsers = ['u1', 'u2', 'u3', 'u9'];
   const metricsData = [];
 
