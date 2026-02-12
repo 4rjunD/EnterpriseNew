@@ -1,20 +1,78 @@
 'use client'
 
+import { useEffect, useState } from 'react'
 import { trpc } from '@/lib/trpc'
 import { HealthScoreRing } from './health-score-ring'
 import { NexFlowActivityFeed } from './nexflow-activity-feed'
 import { GettingStartedChecklist } from './getting-started-checklist'
 import { AIActivityWidget } from './ai-activity-widget'
 import { ImpactBanner } from './impact-banner'
+import { ProjectContextCard } from './project-context-card'
 import { SmartPrompt } from '../shared/smart-prompt'
 import { Card, CardContent, CardHeader, CardTitle } from '@nexflow/ui/card'
 import { Skeleton } from '@nexflow/ui/skeleton'
+import { toast } from '@nexflow/ui/toast'
+import { RefreshCw } from 'lucide-react'
 
 export function DashboardDetail() {
+  const [isSyncing, setIsSyncing] = useState(false)
+  const [hasAutoSynced, setHasAutoSynced] = useState(false)
+
   const { data: healthData, isLoading: healthLoading } =
     trpc.dashboard.getHealthScore.useQuery()
   const { data: setupProgress } = trpc.onboarding.getSetupProgress.useQuery()
   const { data: smartPrompts } = trpc.dashboard.getSmartPrompts.useQuery()
+  const { data: summaryStats } = trpc.dashboard.getSummaryStats.useQuery()
+
+  const runAnalysis = trpc.agents.runAnalysis.useMutation()
+  const utils = trpc.useUtils()
+
+  // Auto-sync on first load if no data exists
+  useEffect(() => {
+    const shouldAutoSync =
+      !hasAutoSynced &&
+      summaryStats &&
+      summaryStats.tasks.total === 0 &&
+      summaryStats.integrations.connected > 0
+
+    if (shouldAutoSync) {
+      setHasAutoSynced(true)
+      handleSync(true)
+    }
+  }, [summaryStats, hasAutoSynced])
+
+  const handleSync = async (silent = false) => {
+    if (isSyncing) return
+    setIsSyncing(true)
+
+    try {
+      const result = await runAnalysis.mutateAsync()
+
+      if (!silent) {
+        if (result.success) {
+          toast({ title: 'Sync complete', description: 'Data updated from your integrations' })
+        } else {
+          toast({
+            title: 'Sync partially complete',
+            description: result.steps.filter(s => s.status === 'error').map(s => s.detail).join(', '),
+            variant: 'destructive'
+          })
+        }
+      }
+
+      // Refresh all data
+      utils.dashboard.invalidate()
+      utils.bottlenecks.invalidate()
+      utils.predictions.invalidate()
+      utils.agents.invalidate()
+    } catch (error: any) {
+      if (!silent) {
+        toast({ title: 'Sync failed', description: error?.message, variant: 'destructive' })
+      }
+    } finally {
+      setIsSyncing(false)
+    }
+  }
 
   // Show checklist if setup is not complete
   const showChecklist = setupProgress && !setupProgress.isComplete
@@ -30,6 +88,14 @@ export function DashboardDetail() {
     <div className="space-y-6">
       {/* Impact Banner - show value proposition */}
       <ImpactBanner />
+
+      {/* Sync status bar */}
+      {isSyncing && (
+        <div className="flex items-center gap-2 px-4 py-2 bg-blue-500/10 border border-blue-500/20 rounded-lg text-sm text-blue-400">
+          <RefreshCw className="w-4 h-4 animate-spin" />
+          Syncing data from your integrations...
+        </div>
+      )}
 
       {/* Smart Prompt - contextual guidance */}
       {dashboardPrompt && (
@@ -100,9 +166,23 @@ export function DashboardDetail() {
           </div>
         </div>
 
-        {/* Right column - AI Activity Widget */}
-        <div>
+        {/* Right column - Project Context + AI Activity Widget */}
+        <div className="space-y-6">
+          {/* Project Context - help AI understand what you're building */}
+          <ProjectContextCard />
+
+          {/* AI Activity Widget */}
           <AIActivityWidget />
+
+          {/* Manual Sync Button */}
+          <button
+            onClick={() => handleSync(false)}
+            disabled={isSyncing}
+            className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-background-secondary border border-border rounded-lg text-sm text-foreground-muted hover:text-foreground hover:border-foreground/30 transition-colors disabled:opacity-50"
+          >
+            <RefreshCw className={`w-4 h-4 ${isSyncing ? 'animate-spin' : ''}`} />
+            {isSyncing ? 'Syncing...' : 'Sync from Integrations'}
+          </button>
         </div>
       </div>
     </div>
