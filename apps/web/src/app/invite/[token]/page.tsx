@@ -90,7 +90,7 @@ export default function InvitePage() {
       <Card className="max-w-md w-full">
         <CardHeader className="text-center">
           <div className="w-16 h-16 bg-foreground rounded-[12px] flex items-center justify-center mx-auto mb-4">
-            <span className="text-2xl font-bold text-white">
+            <span className="text-2xl font-bold text-background">
               {invitation.organizationName.charAt(0)}
             </span>
           </div>

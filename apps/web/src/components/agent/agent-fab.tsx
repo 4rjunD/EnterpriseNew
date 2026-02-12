@@ -16,7 +16,7 @@ export function AgentFab() {
         className={cn(
           'fixed bottom-6 right-6 z-40',
           'w-14 h-14 rounded-full',
-          'bg-accent hover:bg-accent-hover text-white',
+          'bg-accent hover:bg-accent-hover text-black',
           'shadow-lg hover:shadow-xl',
           'flex items-center justify-center',
           'transition-all duration-300',

@@ -76,9 +76,9 @@ export function AgentChatMessage({
         )}
       >
         {isUser ? (
-          <User className="w-4 h-4 text-white" />
+          <User className="w-4 h-4 text-black" />
         ) : (
-          <Bot className="w-4 h-4 text-accent" />
+          <Bot className="w-4 h-4 text-foreground" />
         )}
       </div>
 
@@ -88,7 +88,7 @@ export function AgentChatMessage({
           className={cn(
             'rounded-2xl px-4 py-2.5',
             isUser
-              ? 'bg-accent text-white rounded-br-md'
+              ? 'bg-accent text-black rounded-br-md'
               : 'bg-background-secondary border border-border rounded-bl-md'
           )}
         >

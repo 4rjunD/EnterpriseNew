@@ -9,37 +9,37 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
-        // Background - pure white hierarchy
+        // Background - Vercel dark theme
         background: {
-          DEFAULT: '#FFFFFF',
-          secondary: '#FAFAFA',
-          tertiary: '#F5F5F5',
+          DEFAULT: '#000000',
+          secondary: '#111111',
+          tertiary: '#1A1A1A',
         },
-        // Text - near black with clear hierarchy
+        // Text - white with clear hierarchy
         foreground: {
-          DEFAULT: '#000000',
-          secondary: '#454545',
-          muted: '#888888',
+          DEFAULT: '#EDEDED',
+          secondary: '#A1A1A1',
+          muted: '#666666',
         },
-        // Accent - minimal, black for CTAs (Vercel-style)
+        // Accent - white for CTAs (Vercel dark style)
         accent: {
-          DEFAULT: '#000000',
-          hover: '#333333',
-          light: '#F5F5F5',
+          DEFAULT: '#FFFFFF',
+          hover: '#D9D9D9',
+          light: '#1A1A1A',
         },
-        // Status colors - muted, professional
+        // Status colors - vibrant on dark
         status: {
           critical: '#E5484D',
-          'critical-light': '#FFEFEF',
+          'critical-light': '#2D1515',
           warning: '#FF9500',
-          'warning-light': '#FFF4E5',
-          healthy: '#30A46C',
-          'healthy-light': '#E9F9EF',
+          'warning-light': '#2D2010',
+          healthy: '#3ECF8E',
+          'healthy-light': '#152D1F',
         },
-        // Border - subtle
+        // Border - subtle on dark
         border: {
-          DEFAULT: '#E3E3E3',
-          hover: '#CCCCCC',
+          DEFAULT: '#262626',
+          hover: '#404040',
         },
       },
       borderRadius: {

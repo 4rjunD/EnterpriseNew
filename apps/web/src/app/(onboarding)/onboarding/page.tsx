@@ -281,13 +281,14 @@ function OnboardingContent() {
     try {
       await completeOnboarding.mutateAsync()
       localStorage.removeItem(ONBOARDING_STEP_KEY)
-      router.push('/dashboard')
+      // Use hard redirect to force server-side re-check of onboarding status
+      window.location.href = '/dashboard'
     } catch (error: any) {
       console.error('Failed to complete onboarding:', error)
       // Still redirect to dashboard even if marking complete failed
       // The user can still use the app
       localStorage.removeItem(ONBOARDING_STEP_KEY)
-      router.push('/dashboard')
+      window.location.href = '/dashboard'
     } finally {
       setIsLoading(false)
     }
@@ -924,7 +925,7 @@ function AgentCard({
     <div className="p-4 bg-background-secondary border border-border rounded-lg">
       <div className="flex items-center gap-3 mb-2">
         <div className="w-8 h-8 rounded-lg bg-foreground flex items-center justify-center">
-          <Bot className="w-4 h-4 text-white" />
+          <Bot className="w-4 h-4 text-background" />
         </div>
         <span className="font-medium text-foreground text-sm">{name}</span>
       </div>

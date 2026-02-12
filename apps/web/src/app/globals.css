@@ -4,37 +4,37 @@
 
 @layer base {
   :root {
-    /* Backgrounds - pure white hierarchy */
-    --background: 0 0% 100%;           /* #FFFFFF - primary */
-    --background-secondary: 0 0% 98%;  /* #FAFAFA - secondary */
-    --background-tertiary: 0 0% 96%;   /* #F5F5F5 - tertiary */
+    /* Backgrounds - Vercel dark theme */
+    --background: 0 0% 0%;             /* #000000 - primary */
+    --background-secondary: 0 0% 7%;   /* #111111 - secondary */
+    --background-tertiary: 0 0% 10%;   /* #1A1A1A - tertiary */
 
-    /* Foreground - near black with clear hierarchy */
-    --foreground: 0 0% 0%;             /* #000000 - primary text */
-    --foreground-secondary: 0 0% 27%;  /* #454545 - secondary text */
-    --foreground-muted: 0 0% 53%;      /* #888888 - muted text */
+    /* Foreground - white with clear hierarchy */
+    --foreground: 0 0% 93%;            /* #EDEDED - primary text */
+    --foreground-secondary: 0 0% 63%;  /* #A1A1A1 - secondary text */
+    --foreground-muted: 0 0% 40%;      /* #666666 - muted text */
 
-    /* Accent - minimal, black for CTAs (Vercel-style) */
-    --accent: 0 0% 0%;                 /* #000000 - primary actions */
-    --accent-hover: 0 0% 20%;          /* #333333 - hover state */
-    --accent-light: 0 0% 96%;          /* #F5F5F5 - light accent bg */
+    /* Accent - white for CTAs (Vercel dark style) */
+    --accent: 0 0% 100%;               /* #FFFFFF - primary actions */
+    --accent-hover: 0 0% 85%;          /* #D9D9D9 - hover state */
+    --accent-light: 0 0% 10%;          /* #1A1A1A - light accent bg */
 
-    /* Status - muted, professional colors */
+    /* Status - vibrant on dark background */
     --status-critical: 0 72% 51%;      /* #E5484D - errors */
     --status-warning: 35 100% 50%;     /* #FF9500 - warnings */
-    --status-healthy: 142 72% 40%;     /* #30A46C - success */
+    --status-healthy: 142 72% 46%;     /* #3ECF8E - success */
 
-    /* Status light variants */
-    --status-critical-light: 0 86% 97%;    /* #FFEFEF */
-    --status-warning-light: 35 100% 95%;   /* #FFF4E5 */
-    --status-healthy-light: 142 76% 95%;   /* #E9F9EF */
+    /* Status light variants (darker for dark mode) */
+    --status-critical-light: 0 72% 12%;    /* Dark red bg */
+    --status-warning-light: 35 100% 12%;   /* Dark orange bg */
+    --status-healthy-light: 142 72% 12%;   /* Dark green bg */
 
-    /* Borders - subtle */
-    --border: 0 0% 89%;                /* #E3E3E3 */
-    --border-hover: 0 0% 80%;          /* #CCCCCC */
+    /* Borders - subtle on dark */
+    --border: 0 0% 15%;                /* #262626 */
+    --border-hover: 0 0% 25%;          /* #404040 */
 
-    /* Cards - flat, no shadow by default */
-    --card: 0 0% 100%;
+    /* Cards - slightly elevated from background */
+    --card: 0 0% 7%;                   /* #111111 */
 
     /* Radius - tighter, more professional */
     --radius-card: 8px;
