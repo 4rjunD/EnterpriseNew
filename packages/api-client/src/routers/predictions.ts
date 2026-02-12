@@ -1,9 +1,9 @@
 import { z } from 'zod'
-import { router, managerProcedure } from '../trpc'
+import { router, protectedProcedure, managerProcedure } from '../trpc'
 import { prisma, PredictionType } from '@nexflow/database'
 
 export const predictionsRouter = router({
-  list: managerProcedure
+  list: protectedProcedure
     .input(z.object({
       type: z.string().optional(),
       projectId: z.string().optional(),
@@ -27,7 +27,7 @@ export const predictionsRouter = router({
       })
     }),
 
-  getForProject: managerProcedure
+  getForProject: protectedProcedure
     .input(z.object({ projectId: z.string() }))
     .query(async ({ input }) => {
       const predictions = await prisma.prediction.findMany({
@@ -46,7 +46,7 @@ export const predictionsRouter = router({
       }
     }),
 
-  getStats: managerProcedure.query(async ({ ctx }) => {
+  getStats: protectedProcedure.query(async ({ ctx }) => {
     const predictions = await prisma.prediction.findMany({
       where: {
         project: { organizationId: ctx.organizationId },

@@ -1,9 +1,9 @@
 import { z } from 'zod'
-import { router, managerProcedure } from '../trpc'
+import { router, protectedProcedure, managerProcedure } from '../trpc'
 import { prisma, BottleneckType, BottleneckSeverity, BottleneckStatus } from '@nexflow/database'
 
 export const bottlenecksRouter = router({
-  list: managerProcedure
+  list: protectedProcedure
     .input(z.object({
       status: z.string().optional(),
       type: z.string().optional(),
@@ -65,7 +65,7 @@ export const bottlenecksRouter = router({
       }))
     }),
 
-  getStats: managerProcedure.query(async ({ ctx }) => {
+  getStats: protectedProcedure.query(async ({ ctx }) => {
     const [byType, bySeverity, resolved24h, total] = await Promise.all([
       prisma.bottleneck.groupBy({
         by: ['type'],
