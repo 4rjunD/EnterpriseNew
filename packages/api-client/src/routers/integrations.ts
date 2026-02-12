@@ -161,10 +161,8 @@ export const integrationsRouter = router({
             break
           }
           default:
-            throw new TRPCError({
-              code: 'BAD_REQUEST',
-              message: `Sync not implemented for ${input.type}`,
-            })
+            // For integrations without sync (Slack, Notion, etc.), just mark as synced
+            result = { success: true, itemsSynced: 0 }
         }
 
         return { success: result.success, itemsSynced: result.itemsSynced }
@@ -187,6 +185,67 @@ export const integrationsRouter = router({
         })
       }
     }),
+
+  // Sync all connected integrations at once
+  syncAll: protectedProcedure.mutation(async ({ ctx }) => {
+    const integrations = await prisma.integration.findMany({
+      where: {
+        organizationId: ctx.organizationId,
+        status: 'CONNECTED',
+      },
+    })
+
+    const results: Array<{ type: string; success: boolean; itemsSynced: number; error?: string }> = []
+
+    for (const integration of integrations) {
+      try {
+        let result: { success: boolean; itemsSynced: number }
+
+        switch (integration.type) {
+          case 'GITHUB': {
+            const client = new GitHubClient(ctx.organizationId)
+            result = await client.sync()
+            break
+          }
+          case 'LINEAR': {
+            const client = new LinearClient(ctx.organizationId)
+            result = await client.sync()
+            break
+          }
+          case 'DISCORD': {
+            const client = new DiscordClient(ctx.organizationId)
+            result = await client.sync()
+            break
+          }
+          default:
+            // Skip integrations without sync capability
+            result = { success: true, itemsSynced: 0 }
+        }
+
+        results.push({
+          type: integration.type,
+          success: result.success,
+          itemsSynced: result.itemsSynced,
+        })
+      } catch (e) {
+        results.push({
+          type: integration.type,
+          success: false,
+          itemsSynced: 0,
+          error: String(e),
+        })
+      }
+    }
+
+    const totalSynced = results.reduce((sum, r) => sum + r.itemsSynced, 0)
+    const allSuccess = results.every((r) => r.success)
+
+    return {
+      success: allSuccess,
+      totalItemsSynced: totalSynced,
+      results,
+    }
+  }),
 })
 
 export type IntegrationsRouter = typeof integrationsRouter

@@ -33,6 +33,17 @@ export async function GET(req: NextRequest) {
 
   try {
     await GitHubClient.handleOAuthCallback(code, organizationId)
+
+    // Trigger immediate sync after successful OAuth
+    try {
+      const client = new GitHubClient(organizationId)
+      const syncResult = await client.sync()
+      console.log(`GitHub sync completed: ${syncResult.itemsSynced} items synced`)
+    } catch (syncError) {
+      console.error('GitHub initial sync failed (non-blocking):', syncError)
+      // Don't fail the OAuth flow if sync fails - it will retry later
+    }
+
     return NextResponse.redirect(`${baseUrl}${redirectPath}${separator}success=github_connected`)
   } catch (error) {
     console.error('GitHub OAuth error:', error)

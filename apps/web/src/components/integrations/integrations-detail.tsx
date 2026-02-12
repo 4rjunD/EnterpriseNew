@@ -7,6 +7,7 @@ import { Badge } from '@nexflow/ui/badge'
 import { Button } from '@nexflow/ui/button'
 import { Switch } from '@nexflow/ui/switch'
 import { Skeleton } from '@nexflow/ui/skeleton'
+import { toast } from '@nexflow/ui/toast'
 import {
   Plug,
   Bot,
@@ -36,7 +37,40 @@ export function IntegrationsDetail() {
   })
 
   const syncMutation = trpc.integrations.triggerSync.useMutation({
-    onSuccess: () => utils.integrations.invalidate(),
+    onSuccess: (data) => {
+      utils.integrations.invalidate()
+      toast({
+        title: 'Sync complete',
+        description: `Synced ${data.itemsSynced} items`,
+      })
+    },
+    onError: (error) => {
+      toast({
+        title: 'Sync failed',
+        description: error.message,
+        variant: 'destructive',
+      })
+    },
+  })
+
+  const syncAllMutation = trpc.integrations.syncAll.useMutation({
+    onSuccess: (data) => {
+      utils.integrations.invalidate()
+      // Also invalidate tasks and other synced data
+      utils.tasks.invalidate()
+      utils.dashboard.invalidate()
+      toast({
+        title: 'All integrations synced',
+        description: `Synced ${data.totalItemsSynced} items from ${data.results.length} integration(s)`,
+      })
+    },
+    onError: (error) => {
+      toast({
+        title: 'Sync failed',
+        description: error.message,
+        variant: 'destructive',
+      })
+    },
   })
 
   const disconnectMutation = trpc.integrations.disconnect.useMutation({
@@ -88,6 +122,24 @@ export function IntegrationsDetail() {
 
       {activeTab === 'integrations' && (
         <div className="space-y-6">
+          {/* Sync All Button */}
+          {integrations?.connected && integrations.connected.length > 0 && (
+            <div className="flex items-center justify-between">
+              <p className="text-sm text-foreground-muted">
+                {integrations.connected.length} integration(s) connected
+              </p>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => syncAllMutation.mutate()}
+                disabled={syncAllMutation.isLoading}
+              >
+                <RefreshCw className={cn('mr-2 h-4 w-4', syncAllMutation.isLoading && 'animate-spin')} />
+                {syncAllMutation.isLoading ? 'Syncing...' : 'Sync All Now'}
+              </Button>
+            </div>
+          )}
+
           {/* Connected */}
           {integrations?.connected && integrations.connected.length > 0 && (
             <div>
@@ -103,7 +155,7 @@ export function IntegrationsDetail() {
                     onDisconnect={() =>
                       disconnectMutation.mutate({ type: integration.type })
                     }
-                    syncing={syncMutation.isPending}
+                    syncing={syncMutation.isLoading}
                   />
                 ))}
               </div>
@@ -124,7 +176,7 @@ export function IntegrationsDetail() {
                     onConnect={() =>
                       initOAuthMutation.mutate({ type: integration.type })
                     }
-                    connecting={initOAuthMutation.isPending}
+                    connecting={initOAuthMutation.isLoading}
                   />
                 ))}
               </div>

@@ -35,6 +35,17 @@ export async function GET(req: NextRequest) {
 
   try {
     await LinearClient.handleOAuthCallback(code, organizationId)
+
+    // Trigger immediate sync after successful OAuth
+    try {
+      const client = new LinearClient(organizationId)
+      const syncResult = await client.sync()
+      console.log(`Linear sync completed: ${syncResult.itemsSynced} items synced`)
+    } catch (syncError) {
+      console.error('Linear initial sync failed (non-blocking):', syncError)
+      // Don't fail the OAuth flow if sync fails - it will retry later
+    }
+
     return NextResponse.redirect(`${baseUrl}${redirectPath}${separator}success=linear_connected`)
   } catch (error) {
     console.error('Linear OAuth error:', error)
