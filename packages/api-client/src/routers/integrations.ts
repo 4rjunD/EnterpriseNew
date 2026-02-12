@@ -2,7 +2,8 @@ import { z } from 'zod'
 import { TRPCError } from '@trpc/server'
 import { router, adminProcedure, protectedProcedure } from '../trpc'
 import { prisma, IntegrationType, IntegrationStatus } from '@nexflow/database'
-import { GitHubClient, LinearClient, DiscordClient } from '@nexflow/integrations'
+import { GitHubClient, LinearClient, DiscordClient, GitHubRepoAnalyzer } from '@nexflow/integrations'
+import { AutonomousAnalyzer, BottleneckDetector, PredictionEngine } from '@nexflow/ai'
 
 const integrationInfo: Record<string, { name: string; description: string; icon: string }> = {
   LINEAR: { name: 'Linear', description: 'Issue tracking', icon: 'linear' },
@@ -311,12 +312,49 @@ export const integrationsRouter = router({
     const totalSynced = results.reduce((sum, r) => sum + r.itemsSynced, 0)
     const allSuccess = results.every((r) => r.success)
 
+    // If GitHub was synced, trigger autonomous analysis in background
+    const githubResult = results.find((r) => r.type === 'GITHUB' && r.success)
+    let analysisTriggered = false
+    if (githubResult) {
+      // Run analysis asynchronously (don't await)
+      runAutonomousAnalysisInBackground(ctx.organizationId).catch((e) => {
+        console.error('Background analysis failed:', e)
+      })
+      analysisTriggered = true
+    }
+
     return {
       success: allSuccess,
       totalItemsSynced: totalSynced,
       results,
+      analysisTriggered,
     }
   }),
 })
+
+// Background analysis function
+async function runAutonomousAnalysisInBackground(organizationId: string) {
+  try {
+    // Analyze repos
+    const repoAnalyzer = new GitHubRepoAnalyzer(organizationId)
+    const repoAnalyses = await repoAnalyzer.analyzeAllRepos()
+
+    // Generate insights
+    const autonomousAnalyzer = new AutonomousAnalyzer(organizationId)
+    await autonomousAnalyzer.analyzeAndGenerate(repoAnalyses)
+
+    // Run bottleneck detection
+    const detector = new BottleneckDetector(organizationId)
+    await detector.runDetection()
+
+    // Run predictions
+    const engine = new PredictionEngine({ organizationId })
+    await engine.runAllPredictions()
+
+    console.log(`Autonomous analysis completed for org ${organizationId}`)
+  } catch (e) {
+    console.error(`Autonomous analysis failed for org ${organizationId}:`, e)
+  }
+}
 
 export type IntegrationsRouter = typeof integrationsRouter

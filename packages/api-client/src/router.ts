@@ -14,6 +14,7 @@ import { contextRouter } from './routers/context'
 import { progressRouter } from './routers/progress'
 import { calendarRouter } from './routers/calendar'
 import { agentChatRouter } from './routers/agent-chat'
+import { analysisRouter } from './routers/analysis'
 
 export const appRouter = router({
   dashboard: dashboardRouter,
@@ -31,6 +32,7 @@ export const appRouter = router({
   progress: progressRouter,
   calendar: calendarRouter,
   agentChat: agentChatRouter,
+  analysis: analysisRouter,
 })
 
 export type AppRouter = typeof appRouter

@@ -1,6 +1,7 @@
 export * from './predictions'
 export * from './agents'
 export { BottleneckDetector } from './bottleneck-detector'
+export { AutonomousAnalyzer, type AnalysisResult } from './autonomous'
 
 // AI Agent Chat System
 // Re-export specific items to avoid conflicts with ./agents AgentContext
