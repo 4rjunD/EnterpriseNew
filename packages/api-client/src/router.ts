@@ -9,6 +9,11 @@ import { agentsRouter } from './routers/agents'
 import { projectsRouter } from './routers/projects'
 import { onboardingRouter } from './routers/onboarding'
 import { invitationsRouter } from './routers/invitations'
+import { syncRouter } from './routers/sync'
+import { contextRouter } from './routers/context'
+import { progressRouter } from './routers/progress'
+import { calendarRouter } from './routers/calendar'
+import { agentChatRouter } from './routers/agent-chat'
 
 export const appRouter = router({
   dashboard: dashboardRouter,
@@ -21,6 +26,11 @@ export const appRouter = router({
   projects: projectsRouter,
   onboarding: onboardingRouter,
   invitations: invitationsRouter,
+  sync: syncRouter,
+  context: contextRouter,
+  progress: progressRouter,
+  calendar: calendarRouter,
+  agentChat: agentChatRouter,
 })
 
 export type AppRouter = typeof appRouter

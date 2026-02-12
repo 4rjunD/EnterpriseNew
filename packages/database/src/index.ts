@@ -41,4 +41,17 @@ export {
   MetricSource,
   NotificationType,
   InvitationStatus,
+  SyncStatus,
+  FocusTimeType,
+  FocusTimeStatus,
+  MemoryType,
+  ConversationChannel,
+} from '@prisma/client'
+
+// Re-export new AI Agent types
+export type {
+  AgentMemory,
+  AgentConversation,
+  AgentMessage,
+  HeartbeatConfig,
 } from '@prisma/client'

@@ -3,6 +3,7 @@ import { redirect } from 'next/navigation'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@nexflow/database'
+import { AgentProvider } from '@/components/agent/agent-provider'
 
 export default async function DashboardLayout({
   children,
@@ -31,6 +32,7 @@ export default async function DashboardLayout({
       <main className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
         {children}
       </main>
+      <AgentProvider />
     </div>
   )
 }

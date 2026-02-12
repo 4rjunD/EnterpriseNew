@@ -20,13 +20,18 @@ model Organization {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  users           User[]
-  teams           Team[]
-  projects        Project[]
-  integrations    Integration[]
-  agents          AgentConfig[]
-  invitations     Invitation[]
-  projectContexts ProjectContext[]
+  users               User[]
+  teams               Team[]
+  projects            Project[]
+  integrations        Integration[]
+  agents              AgentConfig[]
+  invitations         Invitation[]
+  projectContexts     ProjectContext[]
+  syncLogs            SyncLog[]
+  progressSnapshots   ProgressSnapshot[]
+  agentMemory         AgentMemory[]
+  agentConversations  AgentConversation[]
+  heartbeatConfig     HeartbeatConfig?
 
   @@map("organizations")
 }
@@ -37,7 +42,7 @@ model ProjectContext {
 
   // What are you building
   buildingDescription String   @db.Text
-  milestones          Json?    // [{ name, targetDate, description }]
+  milestones          Json?    // [{ name, targetDate, description, status }]
   goals               String[]
   techStack           String[]
 
@@ -46,6 +51,8 @@ model ProjectContext {
   project        Project?      @relation(fields: [projectId], references: [id])
   organizationId String?       @unique
   organization   Organization? @relation(fields: [organizationId], references: [id])
+
+  milestoneProgress MilestoneProgress[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -79,6 +86,9 @@ model User {
   notifications   Notification[]
   notificationPreferences UserNotificationPreferences?
   sentInvitations Invitation[]    @relation("inviter")
+  focusTimeBlocks FocusTimeBlock[]
+  calendarPreference CalendarSyncPreference?
+  agentConversations AgentConversation[]
 
   @@index([organizationId])
   @@map("users")
@@ -191,11 +201,12 @@ model Project {
   teamId         String?
   team           Team?        @relation(fields: [teamId], references: [id])
 
-  tasks        Task[]
-  pullRequests PullRequest[]
-  predictions  Prediction[]
-  bottlenecks  Bottleneck[]
-  context      ProjectContext?
+  tasks             Task[]
+  pullRequests      PullRequest[]
+  predictions       Prediction[]
+  bottlenecks       Bottleneck[]
+  context           ProjectContext?
+  progressSnapshots ProgressSnapshot[]
 
   @@unique([organizationId, key])
   @@index([organizationId])
@@ -376,6 +387,7 @@ enum IntegrationType {
   NOTION
   SLACK
   DISCORD
+  GOOGLE_CALENDAR
 }
 
 enum IntegrationStatus {
@@ -632,4 +644,248 @@ enum InvitationStatus {
   ACCEPTED
   EXPIRED
   CANCELLED
+}
+
+// ============================================================================
+// Sync Logging
+// ============================================================================
+
+model SyncLog {
+  id              String          @id @default(cuid())
+  integrationType IntegrationType
+  status          SyncStatus
+  itemsSynced     Int             @default(0)
+  itemsCreated    Int             @default(0)
+  itemsUpdated    Int             @default(0)
+  error           String?         @db.Text
+  startedAt       DateTime        @default(now())
+  completedAt     DateTime?
+  duration        Int?
+
+  organizationId  String
+  organization    Organization    @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId, startedAt])
+  @@map("sync_logs")
+}
+
+enum SyncStatus {
+  IN_PROGRESS
+  COMPLETED
+  FAILED
+}
+
+// ============================================================================
+// Milestone Progress Tracking
+// ============================================================================
+
+model MilestoneProgress {
+  id              String   @id @default(cuid())
+  milestoneIndex  Int
+  date            DateTime @db.Date
+  tasksCompleted  Int      @default(0)
+  tasksTotal      Int      @default(0)
+  pointsCompleted Int      @default(0)
+  pointsTotal     Int      @default(0)
+
+  projectContextId String
+  projectContext   ProjectContext @relation(fields: [projectContextId], references: [id], onDelete: Cascade)
+
+  @@unique([projectContextId, milestoneIndex, date])
+  @@map("milestone_progress")
+}
+
+// ============================================================================
+// Progress Snapshots
+// ============================================================================
+
+model ProgressSnapshot {
+  id              String   @id @default(cuid())
+  date            DateTime @db.Date
+  plannedPoints   Int      @default(0)
+  completedPoints Int      @default(0)
+  plannedTasks    Int      @default(0)
+  completedTasks  Int      @default(0)
+  totalScope      Int      @default(0)
+
+  projectId       String?
+  project         Project? @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  organizationId  String
+  organization    Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  createdAt       DateTime @default(now())
+
+  @@unique([organizationId, projectId, date])
+  @@index([organizationId, date])
+  @@map("progress_snapshots")
+}
+
+// ============================================================================
+// Calendar & Focus Time (Skeleton for future)
+// ============================================================================
+
+model FocusTimeBlock {
+  id          String         @id @default(cuid())
+  title       String
+  startTime   DateTime
+  endTime     DateTime
+  type        FocusTimeType
+  status      FocusTimeStatus @default(SCHEDULED)
+  externalId  String?
+  reason      String?
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId, startTime])
+  @@map("focus_time_blocks")
+}
+
+enum FocusTimeType {
+  DEEP_WORK
+  MEETING
+  BREAK
+}
+
+enum FocusTimeStatus {
+  SCHEDULED
+  CONFIRMED
+  CANCELLED
+}
+
+model CalendarSyncPreference {
+  id                  String   @id @default(cuid())
+  userId              String   @unique
+  user                User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  preferredFocusHours Int      @default(4)
+  focusStartTime      String   @default("09:00")
+  focusEndTime        String   @default("17:00")
+  autoBlockEnabled    Boolean  @default(false)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("calendar_sync_preferences")
+}
+
+// ============================================================================
+// AI Agent Chat System
+// ============================================================================
+
+// Persistent memory per organization
+model AgentMemory {
+  id              String       @id @default(cuid())
+  organizationId  String
+  organization    Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  type            MemoryType
+  key             String
+  content         String       @db.Text
+  metadata        Json?
+
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+  expiresAt       DateTime?
+
+  @@unique([organizationId, type, key])
+  @@index([organizationId, type])
+  @@map("agent_memory")
+}
+
+enum MemoryType {
+  CONTEXT         // Project context, team info
+  CONVERSATION    // Chat history
+  LEARNED         // Patterns learned over time
+  DECISION        // Past decisions for reference
+}
+
+// Chat conversations
+model AgentConversation {
+  id              String              @id @default(cuid())
+  organizationId  String
+  organization    Organization        @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  userId          String?
+  user            User?               @relation(fields: [userId], references: [id])
+
+  channel         ConversationChannel
+  externalId      String?             // Slack thread ID, Discord channel, etc.
+  title           String?
+
+  messages        AgentMessage[]
+
+  createdAt       DateTime            @default(now())
+  updatedAt       DateTime            @updatedAt
+
+  @@index([organizationId, channel])
+  @@map("agent_conversations")
+}
+
+enum ConversationChannel {
+  WEB
+  SLACK
+  DISCORD
+  API
+}
+
+model AgentMessage {
+  id              String            @id @default(cuid())
+  conversationId  String
+  conversation    AgentConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+
+  role            String            // 'user' | 'assistant' | 'system' | 'tool'
+  content         String            @db.Text
+
+  // For tool/skill calls
+  toolCalls       Json?             // [{name, arguments, result}]
+
+  // For pending actions
+  pendingActions  Json?             // Actions awaiting approval
+
+  // Metadata
+  tokens          Int?
+  latencyMs       Int?
+  model           String?
+
+  createdAt       DateTime          @default(now())
+
+  @@index([conversationId])
+  @@map("agent_messages")
+}
+
+// Heartbeat configuration
+model HeartbeatConfig {
+  id              String       @id @default(cuid())
+  organizationId  String       @unique
+  organization    Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  enabled         Boolean      @default(true)
+
+  // Daily briefing
+  dailyBriefingEnabled Boolean  @default(true)
+  dailyBriefingTime    String   @default("09:00")
+  dailyBriefingDays    String[] @default(["MON", "TUE", "WED", "THU", "FRI"])
+
+  // Alerts
+  alertOnBlockers   Boolean    @default(true)
+  alertOnRisks      Boolean    @default(true)
+  alertOnMilestones Boolean    @default(true)
+
+  // Channels
+  slackChannelId    String?
+  discordChannelId  String?
+  webNotifications  Boolean    @default(true)
+
+  // Quiet hours
+  quietHoursStart   String?
+  quietHoursEnd     String?
+  timezone          String     @default("UTC")
+
+  createdAt         DateTime   @default(now())
+  updatedAt         DateTime   @updatedAt
+
+  @@map("heartbeat_configs")
 }
