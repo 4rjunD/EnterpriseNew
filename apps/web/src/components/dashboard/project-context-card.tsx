@@ -82,7 +82,7 @@ export function ProjectContextCard() {
       <Card>
         <CardHeader className="pb-3">
           <CardTitle className="text-base flex items-center gap-2">
-            <Lightbulb className="w-4 h-4 text-amber-500" />
+            <Lightbulb className="w-4 h-4 text-status-warning" />
             Project Context
           </CardTitle>
         </CardHeader>
@@ -100,7 +100,7 @@ export function ProjectContextCard() {
       <CardHeader className="pb-3">
         <div className="flex items-center justify-between">
           <CardTitle className="text-base flex items-center gap-2">
-            <Lightbulb className="w-4 h-4 text-amber-500" />
+            <Lightbulb className="w-4 h-4 text-status-warning" />
             Project Context
           </CardTitle>
           <button
@@ -167,7 +167,7 @@ export function ProjectContextCard() {
                     {isEditing && goals.length > 1 && (
                       <button
                         onClick={() => removeGoal(index)}
-                        className="text-foreground-muted hover:text-red-500"
+                        className="text-foreground-muted hover:text-status-critical"
                       >
                         <X className="w-4 h-4" />
                       </button>
@@ -206,7 +206,7 @@ export function ProjectContextCard() {
                     {isEditing && techStack.length > 1 && (
                       <button
                         onClick={() => removeTech(index)}
-                        className="text-foreground-muted hover:text-red-500"
+                        className="text-foreground-muted hover:text-status-critical"
                       >
                         <X className="w-3 h-3" />
                       </button>

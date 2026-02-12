@@ -66,9 +66,6 @@ export default function SignUpPage() {
   return (
     <Card>
       <CardHeader className="text-center">
-        <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-lg bg-accent">
-          <span className="text-2xl font-bold text-white">N</span>
-        </div>
         <CardTitle className="text-2xl">Create your account</CardTitle>
         <CardDescription>Get started with NexFlow Enterprise</CardDescription>
       </CardHeader>
@@ -192,7 +189,7 @@ export default function SignUpPage() {
       <CardFooter className="flex justify-center">
         <p className="text-sm text-foreground-muted">
           Already have an account?{' '}
-          <Link href="/login" className="font-medium text-accent hover:underline">
+          <Link href="/login" className="font-medium text-foreground hover:underline">
             Sign in
           </Link>
         </p>

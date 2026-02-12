@@ -22,8 +22,8 @@ export function ContextDetail() {
     return (
       <div className="space-y-6">
         <div className="flex items-center gap-3">
-          <div className="p-2 rounded-lg bg-purple-500/10">
-            <Target className="w-5 h-5 text-purple-400" />
+          <div className="p-2 rounded-lg bg-accent-light">
+            <Target className="w-5 h-5 text-foreground" />
           </div>
           <div>
             <h2 className="text-lg font-semibold text-foreground">Project Context</h2>
@@ -43,8 +43,8 @@ export function ContextDetail() {
       {/* Header with summary stats */}
       <div className="flex items-start justify-between">
         <div className="flex items-center gap-3">
-          <div className="p-2 rounded-lg bg-purple-500/10">
-            <Target className="w-5 h-5 text-purple-400" />
+          <div className="p-2 rounded-lg bg-accent-light">
+            <Target className="w-5 h-5 text-foreground" />
           </div>
           <div>
             <h2 className="text-lg font-semibold text-foreground">Project Context</h2>

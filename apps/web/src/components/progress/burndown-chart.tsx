@@ -68,7 +68,7 @@ export function BurndownChart({ data }: BurndownChartProps) {
   // Determine if on track
   const latestData = chartData[chartData.length - 1]
   const isAhead = latestData && latestData.remaining < latestData.ideal
-  const statusColor = isAhead ? 'hsl(var(--green-400))' : 'hsl(var(--amber-400))'
+  const statusColor = isAhead ? '#30A46C' : '#FF9500'
 
   return (
     <div className="h-64">
@@ -126,12 +126,12 @@ export function BurndownChart({ data }: BurndownChartProps) {
           {todayIndex >= 0 && (
             <ReferenceLine
               x={chartData[todayIndex]?.date}
-              stroke="hsl(var(--amber-400))"
+              stroke="#FF9500"
               strokeDasharray="5 5"
               label={{
                 value: 'Today',
                 position: 'top',
-                fill: 'hsl(var(--amber-400))',
+                fill: '#FF9500',
                 fontSize: 10,
               }}
             />
@@ -164,9 +164,9 @@ export function BurndownChart({ data }: BurndownChartProps) {
       {/* Status indicator */}
       <div className="mt-2 text-center">
         {isAhead ? (
-          <span className="text-xs text-green-400">✓ Ahead of schedule</span>
+          <span className="text-xs text-status-healthy">✓ Ahead of schedule</span>
         ) : (
-          <span className="text-xs text-amber-400">⚠ Behind schedule</span>
+          <span className="text-xs text-status-warning">⚠ Behind schedule</span>
         )}
       </div>
     </div>

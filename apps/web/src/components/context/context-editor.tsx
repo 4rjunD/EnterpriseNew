@@ -71,7 +71,7 @@ export function ContextEditor({ initialContext }: ContextEditorProps) {
   return (
     <div className="space-y-4">
       {!initialContext && (
-        <div className="p-4 rounded-lg bg-purple-500/10 border border-purple-500/20">
+        <div className="p-4 rounded-lg bg-accent-light border border-accent/20">
           <h3 className="font-medium text-foreground mb-1">Tell NexFlow about your project</h3>
           <p className="text-sm text-foreground-muted">
             This helps our AI understand your goals and provide better insights, predictions, and recommendations.
@@ -90,7 +90,7 @@ export function ContextEditor({ initialContext }: ContextEditorProps) {
           className={cn(
             'w-full min-h-[150px] p-3 rounded-lg border bg-background-secondary',
             'text-foreground placeholder:text-foreground-muted',
-            'focus:outline-none focus:ring-2 focus:ring-purple-500/50 focus:border-purple-500/50',
+            'focus:outline-none focus:ring-2 focus:ring-accent/50 focus:border-accent/50',
             'resize-y'
           )}
         />
@@ -109,7 +109,7 @@ export function ContextEditor({ initialContext }: ContextEditorProps) {
         <Button
           onClick={handleSave}
           disabled={upsertMutation.isLoading || !description.trim()}
-          className="bg-purple-600 hover:bg-purple-700"
+          className="bg-accent hover:bg-accent/80"
         >
           {upsertMutation.isLoading ? (
             <>

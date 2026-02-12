@@ -4,29 +4,42 @@
 
 @layer base {
   :root {
-    --background: 0 0% 100%;
-    --background-secondary: 0 0% 98%;
-    --foreground: 0 0% 9%;
-    --foreground-secondary: 0 0% 32%;
-    --foreground-muted: 0 0% 64%;
+    /* Backgrounds - pure white hierarchy */
+    --background: 0 0% 100%;           /* #FFFFFF - primary */
+    --background-secondary: 0 0% 98%;  /* #FAFAFA - secondary */
+    --background-tertiary: 0 0% 96%;   /* #F5F5F5 - tertiary */
 
-    --accent: 217 91% 60%;
-    --accent-hover: 224 76% 48%;
-    --accent-light: 214 95% 93%;
+    /* Foreground - near black with clear hierarchy */
+    --foreground: 0 0% 0%;             /* #000000 - primary text */
+    --foreground-secondary: 0 0% 27%;  /* #454545 - secondary text */
+    --foreground-muted: 0 0% 53%;      /* #888888 - muted text */
 
-    --status-critical: 0 84% 60%;
-    --status-warning: 32 95% 44%;
-    --status-healthy: 142 72% 29%;
+    /* Accent - minimal, black for CTAs (Vercel-style) */
+    --accent: 0 0% 0%;                 /* #000000 - primary actions */
+    --accent-hover: 0 0% 20%;          /* #333333 - hover state */
+    --accent-light: 0 0% 96%;          /* #F5F5F5 - light accent bg */
 
-    --border: 0 0% 90%;
-    --border-hover: 0 0% 83%;
+    /* Status - muted, professional colors */
+    --status-critical: 0 72% 51%;      /* #E5484D - errors */
+    --status-warning: 35 100% 50%;     /* #FF9500 - warnings */
+    --status-healthy: 142 72% 40%;     /* #30A46C - success */
 
+    /* Status light variants */
+    --status-critical-light: 0 86% 97%;    /* #FFEFEF */
+    --status-warning-light: 35 100% 95%;   /* #FFF4E5 */
+    --status-healthy-light: 142 76% 95%;   /* #E9F9EF */
+
+    /* Borders - subtle */
+    --border: 0 0% 89%;                /* #E3E3E3 */
+    --border-hover: 0 0% 80%;          /* #CCCCCC */
+
+    /* Cards - flat, no shadow by default */
     --card: 0 0% 100%;
-    --card-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
 
-    --radius-card: 12px;
+    /* Radius - tighter, more professional */
+    --radius-card: 8px;
     --radius-button: 6px;
-    --radius-input: 8px;
+    --radius-input: 6px;
   }
 }
 

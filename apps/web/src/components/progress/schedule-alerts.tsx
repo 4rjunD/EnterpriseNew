@@ -39,7 +39,7 @@ export function ScheduleAlerts({ alerts }: ScheduleAlertsProps) {
   if (alerts.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center py-8 text-foreground-muted">
-        <CheckCircle2 className="w-8 h-8 mb-2 text-green-400" />
+        <CheckCircle2 className="w-8 h-8 mb-2 text-status-healthy" />
         <p className="text-sm">No schedule alerts</p>
         <p className="text-xs">Everything is on track!</p>
       </div>
@@ -58,21 +58,21 @@ export function ScheduleAlerts({ alerts }: ScheduleAlertsProps) {
             className={cn(
               'p-3 rounded-lg border transition-colors',
               alert.severity === 'critical'
-                ? 'bg-red-500/5 border-red-500/30'
-                : 'bg-amber-500/5 border-amber-500/30'
+                ? 'bg-status-critical-light border-status-critical/30'
+                : 'bg-status-warning-light border-status-warning/30'
             )}
           >
             <div className="flex items-start gap-3">
               <div
                 className={cn(
                   'p-1.5 rounded-md flex-shrink-0',
-                  alert.severity === 'critical' ? 'bg-red-500/10' : 'bg-amber-500/10'
+                  alert.severity === 'critical' ? 'bg-status-critical-light' : 'bg-status-warning-light'
                 )}
               >
                 <Icon
                   className={cn(
                     'w-4 h-4',
-                    alert.severity === 'critical' ? 'text-red-400' : 'text-amber-400'
+                    alert.severity === 'critical' ? 'text-status-critical' : 'text-status-warning'
                   )}
                 />
               </div>
@@ -83,8 +83,8 @@ export function ScheduleAlerts({ alerts }: ScheduleAlertsProps) {
                     className={cn(
                       'text-[10px] font-medium uppercase px-1.5 py-0.5 rounded',
                       alert.severity === 'critical'
-                        ? 'bg-red-500/10 text-red-400'
-                        : 'bg-amber-500/10 text-amber-400'
+                        ? 'bg-status-critical-light text-status-critical'
+                        : 'bg-status-warning-light text-status-warning'
                     )}
                   >
                     {alert.severity}
@@ -103,8 +103,8 @@ export function ScheduleAlerts({ alerts }: ScheduleAlertsProps) {
                     className={cn(
                       'inline-flex items-center gap-1 mt-2 text-xs',
                       alert.severity === 'critical'
-                        ? 'text-red-400 hover:text-red-300'
-                        : 'text-amber-400 hover:text-amber-300'
+                        ? 'text-status-critical hover:text-status-critical/80'
+                        : 'text-status-warning hover:text-status-warning/80'
                     )}
                   >
                     View details

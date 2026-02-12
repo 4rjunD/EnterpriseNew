@@ -96,7 +96,7 @@ export function GoalsTracker({ goals, techStack }: GoalsTrackerProps) {
       {/* Goals Section */}
       <div>
         <div className="flex items-center gap-2 mb-3">
-          <Target className="w-4 h-4 text-purple-400" />
+          <Target className="w-4 h-4 text-foreground" />
           <h4 className="text-sm font-medium text-foreground">Goals</h4>
         </div>
 
@@ -118,7 +118,7 @@ export function GoalsTracker({ goals, techStack }: GoalsTrackerProps) {
                 <span className="text-sm text-foreground">{goal}</span>
                 <button
                   onClick={() => handleRemoveGoal(idx)}
-                  className="opacity-0 group-hover:opacity-100 p-1 rounded hover:bg-red-500/10 text-red-400 transition-opacity"
+                  className="opacity-0 group-hover:opacity-100 p-1 rounded hover:bg-status-critical-light text-status-critical transition-opacity"
                   disabled={upsertMutation.isLoading}
                 >
                   <X className="w-3 h-3" />
@@ -142,7 +142,7 @@ export function GoalsTracker({ goals, techStack }: GoalsTrackerProps) {
                   size="sm"
                   onClick={handleAddGoal}
                   disabled={upsertMutation.isLoading || !newGoal.trim()}
-                  className="bg-purple-600 hover:bg-purple-700"
+                  className="bg-foreground hover:bg-foreground/90"
                 >
                   {upsertMutation.isLoading ? (
                     <Loader2 className="w-4 h-4 animate-spin" />
@@ -172,7 +172,7 @@ export function GoalsTracker({ goals, techStack }: GoalsTrackerProps) {
       {/* Tech Stack Section */}
       <div>
         <div className="flex items-center gap-2 mb-3">
-          <Code className="w-4 h-4 text-blue-400" />
+          <Code className="w-4 h-4 text-foreground" />
           <h4 className="text-sm font-medium text-foreground">Tech Stack</h4>
         </div>
 
@@ -190,12 +190,12 @@ export function GoalsTracker({ goals, techStack }: GoalsTrackerProps) {
               {localTech.map((tech, idx) => (
                 <div
                   key={idx}
-                  className="group flex items-center gap-1 px-2 py-1 rounded-md bg-blue-500/10 text-blue-400 text-xs"
+                  className="group flex items-center gap-1 px-2 py-1 rounded-md bg-accent-light text-foreground text-xs"
                 >
                   <span>{tech}</span>
                   <button
                     onClick={() => handleRemoveTech(idx)}
-                    className="opacity-0 group-hover:opacity-100 p-0.5 rounded hover:bg-red-500/10 text-red-400 transition-opacity"
+                    className="opacity-0 group-hover:opacity-100 p-0.5 rounded hover:bg-status-critical-light text-status-critical transition-opacity"
                     disabled={upsertMutation.isLoading}
                   >
                     <X className="w-3 h-3" />
@@ -220,7 +220,7 @@ export function GoalsTracker({ goals, techStack }: GoalsTrackerProps) {
                   size="sm"
                   onClick={handleAddTech}
                   disabled={upsertMutation.isLoading || !newTech.trim()}
-                  className="bg-blue-600 hover:bg-blue-700"
+                  className="bg-foreground hover:bg-foreground/90"
                 >
                   {upsertMutation.isLoading ? (
                     <Loader2 className="w-4 h-4 animate-spin" />

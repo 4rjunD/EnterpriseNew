@@ -204,31 +204,31 @@ export function InsightsDetail() {
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
-              <Sparkles className="h-5 w-5 text-yellow-500" />
+              <Sparkles className="h-5 w-5 text-status-warning" />
               Latest Analysis Results
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="grid grid-cols-5 gap-3 text-center">
               <div>
-                <p className="text-2xl font-bold text-primary">{analysisResults.reposAnalyzed}</p>
-                <p className="text-xs text-muted-foreground">Repos</p>
+                <p className="text-2xl font-bold text-foreground">{analysisResults.reposAnalyzed}</p>
+                <p className="text-xs text-foreground-muted">Repos</p>
               </div>
               <div>
-                <p className="text-2xl font-bold text-green-500">{analysisResults.tasksCreated}</p>
-                <p className="text-xs text-muted-foreground">Tasks</p>
+                <p className="text-2xl font-bold text-status-healthy">{analysisResults.tasksCreated}</p>
+                <p className="text-xs text-foreground-muted">Tasks</p>
               </div>
               <div>
-                <p className="text-2xl font-bold text-orange-500">{analysisResults.bottlenecksCreated}</p>
-                <p className="text-xs text-muted-foreground">Bottlenecks</p>
+                <p className="text-2xl font-bold text-status-warning">{analysisResults.bottlenecksCreated}</p>
+                <p className="text-xs text-foreground-muted">Bottlenecks</p>
               </div>
               <div>
-                <p className="text-2xl font-bold text-blue-500">{analysisResults.predictionsCreated}</p>
-                <p className="text-xs text-muted-foreground">Predictions</p>
+                <p className="text-2xl font-bold text-foreground-secondary">{analysisResults.predictionsCreated}</p>
+                <p className="text-xs text-foreground-muted">Predictions</p>
               </div>
               <div>
-                <p className="text-2xl font-bold text-purple-500">{analysisResults.projectsCreated}</p>
-                <p className="text-xs text-muted-foreground">Projects</p>
+                <p className="text-2xl font-bold text-foreground">{analysisResults.projectsCreated}</p>
+                <p className="text-xs text-foreground-muted">Projects</p>
               </div>
             </div>
 
@@ -253,7 +253,7 @@ export function InsightsDetail() {
                 <h4 className="text-sm font-medium">AI Insights</h4>
                 {analysisResults.insights.slice(0, 3).map((insight, i) => (
                   <div key={i} className="flex items-start gap-2 rounded-lg bg-muted/50 p-2">
-                    <Sparkles className="mt-0.5 h-3 w-3 text-yellow-500" />
+                    <Sparkles className="mt-0.5 h-3 w-3 text-status-warning" />
                     <p className="text-sm">{insight}</p>
                   </div>
                 ))}

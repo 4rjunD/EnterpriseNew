@@ -5,16 +5,16 @@ import { cn } from './utils'
 import { Loader2 } from 'lucide-react'
 
 const buttonVariants = cva(
-  'inline-flex items-center justify-center whitespace-nowrap text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50',
+  'inline-flex items-center justify-center whitespace-nowrap text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50',
   {
     variants: {
       variant: {
-        default: 'bg-accent text-white hover:bg-accent-hover',
+        default: 'bg-foreground text-white hover:bg-foreground/90',
         destructive: 'bg-status-critical text-white hover:bg-status-critical/90',
-        outline: 'border border-border bg-transparent hover:bg-background-secondary hover:border-border-hover',
-        secondary: 'bg-background-secondary text-foreground hover:bg-border',
-        ghost: 'hover:bg-background-secondary',
-        link: 'text-accent underline-offset-4 hover:underline',
+        outline: 'border border-foreground bg-transparent text-foreground hover:bg-foreground hover:text-white',
+        secondary: 'bg-background-secondary text-foreground border border-border hover:bg-background-tertiary',
+        ghost: 'text-foreground hover:bg-background-secondary',
+        link: 'text-foreground underline-offset-4 hover:underline',
       },
       size: {
         default: 'h-10 px-4 py-2 rounded-button',

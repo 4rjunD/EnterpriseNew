@@ -14,9 +14,9 @@ export function HealthScoreRing({ score, trend }: HealthScoreRingProps) {
   const strokeDashoffset = circumference - (score / 100) * circumference
 
   const getScoreColor = () => {
-    if (score >= 80) return '#16A34A' // healthy
-    if (score >= 60) return '#D97706' // warning
-    return '#DC2626' // critical
+    if (score >= 80) return '#30A46C' // healthy
+    if (score >= 60) return '#FF9500' // warning
+    return '#E5484D' // critical
   }
 
   const getScoreLabel = () => {

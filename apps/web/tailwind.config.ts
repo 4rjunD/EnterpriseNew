@@ -9,47 +9,48 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
-        // Background
+        // Background - pure white hierarchy
         background: {
           DEFAULT: '#FFFFFF',
           secondary: '#FAFAFA',
+          tertiary: '#F5F5F5',
         },
-        // Text
+        // Text - near black with clear hierarchy
         foreground: {
-          DEFAULT: '#171717',
-          secondary: '#525252',
-          muted: '#A3A3A3',
+          DEFAULT: '#000000',
+          secondary: '#454545',
+          muted: '#888888',
         },
-        // Accent
+        // Accent - minimal, black for CTAs (Vercel-style)
         accent: {
-          DEFAULT: '#2563EB',
-          hover: '#1D4ED8',
-          light: '#DBEAFE',
+          DEFAULT: '#000000',
+          hover: '#333333',
+          light: '#F5F5F5',
         },
-        // Status colors
+        // Status colors - muted, professional
         status: {
-          critical: '#DC2626',
-          'critical-light': '#FEE2E2',
-          warning: '#D97706',
-          'warning-light': '#FEF3C7',
-          healthy: '#16A34A',
-          'healthy-light': '#DCFCE7',
+          critical: '#E5484D',
+          'critical-light': '#FFEFEF',
+          warning: '#FF9500',
+          'warning-light': '#FFF4E5',
+          healthy: '#30A46C',
+          'healthy-light': '#E9F9EF',
         },
-        // Border
+        // Border - subtle
         border: {
-          DEFAULT: '#E5E5E5',
-          hover: '#D4D4D4',
+          DEFAULT: '#E3E3E3',
+          hover: '#CCCCCC',
         },
       },
       borderRadius: {
-        card: '12px',
+        card: '8px',
         button: '6px',
-        input: '8px',
+        input: '6px',
       },
       boxShadow: {
-        card: '0 1px 3px rgba(0, 0, 0, 0.05)',
-        'card-hover': '0 4px 12px rgba(0, 0, 0, 0.08)',
-        dropdown: '0 4px 16px rgba(0, 0, 0, 0.12)',
+        card: 'none',
+        'card-hover': 'none',
+        dropdown: '0 4px 12px rgba(0, 0, 0, 0.08)',
       },
       fontFamily: {
         sans: ['Satoshi', 'Inter', 'system-ui', 'sans-serif'],

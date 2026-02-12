@@ -43,37 +43,37 @@ export function SummaryStats({ analytics }: SummaryStatsProps) {
       {/* Tasks Completed */}
       <StatCard
         icon={<CheckCircle2 className="w-5 h-5" />}
-        iconColor="text-green-400"
-        iconBg="bg-green-500/10"
+        iconColor="text-status-healthy"
+        iconBg="bg-status-healthy-light"
         label="Tasks Completed"
         value={`${completedTasks}/${totalTasks}`}
         subValue={`${taskCompletionRate}%`}
         progress={taskCompletionRate}
-        progressColor="bg-green-500"
+        progressColor="bg-status-healthy"
       />
 
       {/* Points Completed */}
       <StatCard
         icon={<TrendingUp className="w-5 h-5" />}
-        iconColor="text-blue-400"
-        iconBg="bg-blue-500/10"
+        iconColor="text-foreground"
+        iconBg="bg-accent-light"
         label="Points Completed"
         value={`${completedPoints}/${totalPoints}`}
         subValue={`${pointsCompletionRate}%`}
         progress={pointsCompletionRate}
-        progressColor="bg-blue-500"
+        progressColor="bg-foreground"
       />
 
       {/* Milestones */}
       <StatCard
         icon={<Target className="w-5 h-5" />}
-        iconColor={atRiskMilestones > 0 ? 'text-red-400' : 'text-purple-400'}
-        iconBg={atRiskMilestones > 0 ? 'bg-red-500/10' : 'bg-purple-500/10'}
+        iconColor={atRiskMilestones > 0 ? 'text-status-critical' : 'text-foreground'}
+        iconBg={atRiskMilestones > 0 ? 'bg-status-critical-light' : 'bg-accent-light'}
         label="Milestones"
         value={`${completedMilestones}/${milestoneStats.length}`}
         subValue={atRiskMilestones > 0 ? `${atRiskMilestones} at risk` : 'On track'}
         progress={milestoneStats.length > 0 ? (completedMilestones / milestoneStats.length) * 100 : 0}
-        progressColor={atRiskMilestones > 0 ? 'bg-red-500' : 'bg-purple-500'}
+        progressColor={atRiskMilestones > 0 ? 'bg-status-critical' : 'bg-foreground'}
       />
 
       {/* Next Milestone */}
@@ -81,16 +81,16 @@ export function SummaryStats({ analytics }: SummaryStatsProps) {
         icon={<Calendar className="w-5 h-5" />}
         iconColor={
           nextMilestone?.isAtRisk
-            ? 'text-red-400'
+            ? 'text-status-critical'
             : nextMilestone?.daysRemaining <= 7
-              ? 'text-amber-400'
+              ? 'text-status-warning'
               : 'text-foreground-muted'
         }
         iconBg={
           nextMilestone?.isAtRisk
-            ? 'bg-red-500/10'
+            ? 'bg-status-critical-light'
             : nextMilestone?.daysRemaining <= 7
-              ? 'bg-amber-500/10'
+              ? 'bg-status-warning-light'
               : 'bg-background-secondary'
         }
         label="Next Milestone"
@@ -156,9 +156,9 @@ function StatCard({
           className={cn(
             'text-xs',
             subValue.includes('at risk') || subValue.includes('overdue')
-              ? 'text-red-400'
+              ? 'text-status-critical'
               : subValue.includes('left') && parseInt(subValue) <= 7
-                ? 'text-amber-400'
+                ? 'text-status-warning'
                 : 'text-foreground-muted'
           )}
         >

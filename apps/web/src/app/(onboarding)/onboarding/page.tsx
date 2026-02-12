@@ -317,7 +317,7 @@ function OnboardingContent() {
               <div
                 className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-medium ${
                   index < currentStepIndex
-                    ? 'bg-emerald-500 text-white'
+                    ? 'bg-status-healthy text-white'
                     : index === currentStepIndex
                     ? 'bg-foreground text-background'
                     : 'bg-border text-foreground-muted'
@@ -374,8 +374,8 @@ function OnboardingContent() {
 
               <div className="space-y-4 mb-8">
                 <div className="flex items-start gap-4 p-4 bg-background-secondary rounded-lg border border-border">
-                  <div className="w-10 h-10 rounded-lg bg-blue-500/10 flex items-center justify-center flex-shrink-0">
-                    <Users className="w-5 h-5 text-blue-500" />
+                  <div className="w-10 h-10 rounded-lg bg-status-critical-light flex items-center justify-center flex-shrink-0">
+                    <Users className="w-5 h-5 text-status-critical" />
                   </div>
                   <div>
                     <h3 className="font-medium text-foreground">Detect bottlenecks</h3>
@@ -383,8 +383,8 @@ function OnboardingContent() {
                   </div>
                 </div>
                 <div className="flex items-start gap-4 p-4 bg-background-secondary rounded-lg border border-border">
-                  <div className="w-10 h-10 rounded-lg bg-emerald-500/10 flex items-center justify-center flex-shrink-0">
-                    <Bot className="w-5 h-5 text-emerald-500" />
+                  <div className="w-10 h-10 rounded-lg bg-status-healthy-light flex items-center justify-center flex-shrink-0">
+                    <Bot className="w-5 h-5 text-status-healthy" />
                   </div>
                   <div>
                     <h3 className="font-medium text-foreground">AI-powered actions</h3>
@@ -392,8 +392,8 @@ function OnboardingContent() {
                   </div>
                 </div>
                 <div className="flex items-start gap-4 p-4 bg-background-secondary rounded-lg border border-border">
-                  <div className="w-10 h-10 rounded-lg bg-purple-500/10 flex items-center justify-center flex-shrink-0">
-                    <Link2 className="w-5 h-5 text-purple-500" />
+                  <div className="w-10 h-10 rounded-lg bg-accent-light flex items-center justify-center flex-shrink-0">
+                    <Link2 className="w-5 h-5 text-foreground" />
                   </div>
                   <div>
                     <h3 className="font-medium text-foreground">Connect your tools</h3>
@@ -450,7 +450,7 @@ function OnboardingContent() {
                       <span className="text-foreground flex-1">{team.name}</span>
                       <button
                         onClick={() => removeTeam(index)}
-                        className="text-foreground-muted hover:text-red-500 transition-colors"
+                        className="text-foreground-muted hover:text-status-critical transition-colors"
                       >
                         <X className="w-4 h-4" />
                       </button>
@@ -521,7 +521,7 @@ function OnboardingContent() {
                     {inviteEmails.length > 1 && (
                       <button
                         onClick={() => removeEmail(index)}
-                        className="px-3 text-foreground-muted hover:text-red-500 transition-colors"
+                        className="px-3 text-foreground-muted hover:text-status-critical transition-colors"
                       >
                         <X className="w-4 h-4" />
                       </button>
@@ -669,7 +669,7 @@ function OnboardingContent() {
                       {projectContext.milestones.length > 1 && (
                         <button
                           onClick={() => removeMilestone(index)}
-                          className="px-2 text-foreground-muted hover:text-red-500 transition-colors"
+                          className="px-2 text-foreground-muted hover:text-status-critical transition-colors"
                         >
                           <X className="w-4 h-4" />
                         </button>
@@ -702,7 +702,7 @@ function OnboardingContent() {
                       {projectContext.goals.length > 1 && (
                         <button
                           onClick={() => removeGoal(index)}
-                          className="px-2 text-foreground-muted hover:text-red-500 transition-colors"
+                          className="px-2 text-foreground-muted hover:text-status-critical transition-colors"
                         >
                           <X className="w-4 h-4" />
                         </button>
@@ -738,7 +738,7 @@ function OnboardingContent() {
                       {projectContext.techStack.length > 1 && (
                         <button
                           onClick={() => removeTechStack(index)}
-                          className="text-foreground-muted hover:text-red-500 transition-colors"
+                          className="text-foreground-muted hover:text-status-critical transition-colors"
                         >
                           <X className="w-3 h-3" />
                         </button>
@@ -754,9 +754,9 @@ function OnboardingContent() {
                 </div>
               </div>
 
-              <div className="p-4 bg-blue-500/10 border border-blue-500/20 rounded-lg mb-6">
+              <div className="p-4 bg-accent-light border border-border rounded-lg mb-6">
                 <div className="flex items-start gap-3">
-                  <Lightbulb className="w-5 h-5 text-blue-500 flex-shrink-0 mt-0.5" />
+                  <Lightbulb className="w-5 h-5 text-foreground flex-shrink-0 mt-0.5" />
                   <p className="text-sm text-foreground-muted">
                     This context helps AI agents make smarter decisions about task priorities,
                     reassignments, and deadline predictions based on your project goals.
@@ -826,8 +826,8 @@ function OnboardingContent() {
           {/* Complete Step */}
           {currentStep === 'complete' && (
             <div className="text-center">
-              <div className="w-16 h-16 bg-emerald-500/10 rounded-full flex items-center justify-center mx-auto mb-6">
-                <CheckCircle2 className="w-8 h-8 text-emerald-500" />
+              <div className="w-16 h-16 bg-status-healthy-light rounded-full flex items-center justify-center mx-auto mb-6">
+                <CheckCircle2 className="w-8 h-8 text-status-healthy" />
               </div>
               <h2 className="text-2xl font-semibold text-foreground mb-2">You&apos;re all set</h2>
               <p className="text-foreground-muted mb-8">
@@ -876,7 +876,7 @@ function IntegrationCard({
 }) {
   if (connected) {
     return (
-      <div className="flex items-center gap-3 p-4 bg-background-secondary border border-emerald-500/30 rounded-lg">
+      <div className="flex items-center gap-3 p-4 bg-background-secondary border border-status-healthy/30 rounded-lg">
         <div
           className="w-10 h-10 rounded-lg flex items-center justify-center text-white font-semibold text-sm"
           style={{ backgroundColor: color }}
@@ -886,8 +886,8 @@ function IntegrationCard({
         <div className="flex-1 min-w-0">
           <p className="font-medium text-foreground text-sm">{name}</p>
           <div className="flex items-center gap-1.5 mt-0.5">
-            <Check className="w-3 h-3 text-emerald-500" />
-            <span className="text-xs font-medium text-emerald-500">Connected</span>
+            <Check className="w-3 h-3 text-status-healthy" />
+            <span className="text-xs font-medium text-status-healthy">Connected</span>
           </div>
         </div>
       </div>
@@ -923,7 +923,7 @@ function AgentCard({
   return (
     <div className="p-4 bg-background-secondary border border-border rounded-lg">
       <div className="flex items-center gap-3 mb-2">
-        <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-blue-500 to-purple-500 flex items-center justify-center">
+        <div className="w-8 h-8 rounded-lg bg-foreground flex items-center justify-center">
           <Bot className="w-4 h-4 text-white" />
         </div>
         <span className="font-medium text-foreground text-sm">{name}</span>

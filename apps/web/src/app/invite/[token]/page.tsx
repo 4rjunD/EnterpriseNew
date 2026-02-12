@@ -1,9 +1,11 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import { Button } from '@nexflow/ui/button'
 import { Input } from '@nexflow/ui/input'
+import { Label } from '@nexflow/ui/label'
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@nexflow/ui/card'
 import { trpc } from '@/lib/trpc'
 import { Loader2, CheckCircle2, XCircle } from 'lucide-react'
 import Link from 'next/link'
@@ -54,141 +56,124 @@ export default function InvitePage() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 flex items-center justify-center">
-        <Loader2 className="w-8 h-8 animate-spin text-blue-500" />
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <Loader2 className="w-8 h-8 animate-spin text-foreground-muted" />
       </div>
     )
   }
 
   if (fetchError || !invitation) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 flex items-center justify-center p-4">
-        <div className="bg-slate-800/50 backdrop-blur-sm rounded-2xl border border-slate-700 p-8 max-w-md w-full text-center">
-          <div className="w-16 h-16 bg-red-500/20 rounded-full flex items-center justify-center mx-auto mb-4">
-            <XCircle className="w-8 h-8 text-red-500" />
-          </div>
-          <h1 className="text-2xl font-bold text-white mb-2">Invalid Invitation</h1>
-          <p className="text-slate-400 mb-6">
-            {fetchError?.message || 'This invitation link is invalid or has expired.'}
-          </p>
-          <Link href="/login">
-            <Button className="bg-blue-600 hover:bg-blue-700 text-white">
-              Go to Login
-            </Button>
-          </Link>
-        </div>
+      <div className="min-h-screen bg-background flex items-center justify-center p-4">
+        <Card className="max-w-md w-full">
+          <CardHeader className="text-center">
+            <div className="w-16 h-16 bg-status-critical-light rounded-full flex items-center justify-center mx-auto mb-4">
+              <XCircle className="w-8 h-8 text-status-critical" />
+            </div>
+            <CardTitle className="text-2xl">Invalid Invitation</CardTitle>
+            <CardDescription>
+              {fetchError?.message || 'This invitation link is invalid or has expired.'}
+            </CardDescription>
+          </CardHeader>
+          <CardFooter className="justify-center">
+            <Link href="/login">
+              <Button>Go to Login</Button>
+            </Link>
+          </CardFooter>
+        </Card>
       </div>
     )
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 flex items-center justify-center p-4">
-      <div className="bg-slate-800/50 backdrop-blur-sm rounded-2xl border border-slate-700 p-8 max-w-md w-full">
-        <div className="text-center mb-8">
-          {invitation.organizationLogo ? (
-            <img
-              src={invitation.organizationLogo}
-              alt={invitation.organizationName}
-              className="w-16 h-16 rounded-xl mx-auto mb-4"
-            />
-          ) : (
-            <div className="w-16 h-16 bg-gradient-to-br from-blue-500 to-purple-600 rounded-xl flex items-center justify-center mx-auto mb-4">
-              <span className="text-2xl font-bold text-white">
-                {invitation.organizationName.charAt(0)}
-              </span>
-            </div>
-          )}
-          <h1 className="text-2xl font-bold text-white mb-2">
+    <div className="min-h-screen bg-background flex items-center justify-center p-4">
+      <Card className="max-w-md w-full">
+        <CardHeader className="text-center">
+          <div className="w-16 h-16 bg-foreground rounded-[12px] flex items-center justify-center mx-auto mb-4">
+            <span className="text-2xl font-bold text-white">
+              {invitation.organizationName.charAt(0)}
+            </span>
+          </div>
+          <CardTitle className="text-2xl">
             Join {invitation.organizationName}
-          </h1>
-          <p className="text-slate-400">
+          </CardTitle>
+          <CardDescription>
             You&apos;ve been invited to join as {invitation.role.toLowerCase()}
             {invitation.teamName && ` on the ${invitation.teamName} team`}.
-          </p>
-        </div>
+          </CardDescription>
+        </CardHeader>
 
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
-            <label className="block text-sm font-medium text-slate-300 mb-1">
-              Email
-            </label>
-            <Input
-              type="email"
-              value={invitation.email}
-              disabled
-              className="bg-slate-700/50 border-slate-600 text-slate-400"
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-slate-300 mb-1">
-              Your Name
-            </label>
-            <Input
-              type="text"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder="John Doe"
-              required
-              className="bg-slate-700 border-slate-600 text-white"
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-slate-300 mb-1">
-              Password
-            </label>
-            <Input
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              placeholder="At least 8 characters"
-              required
-              minLength={8}
-              className="bg-slate-700 border-slate-600 text-white"
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-slate-300 mb-1">
-              Confirm Password
-            </label>
-            <Input
-              type="password"
-              value={confirmPassword}
-              onChange={(e) => setConfirmPassword(e.target.value)}
-              placeholder="Confirm your password"
-              required
-              className="bg-slate-700 border-slate-600 text-white"
-            />
-          </div>
-
-          {error && (
-            <div className="bg-red-500/10 border border-red-500/50 rounded-lg p-3 text-red-400 text-sm">
-              {error}
+        <CardContent>
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="email">Email</Label>
+              <Input
+                id="email"
+                type="email"
+                value={invitation.email}
+                disabled
+                className="bg-background-secondary text-foreground-muted"
+              />
             </div>
-          )}
 
-          <Button
-            type="submit"
-            disabled={isSubmitting}
-            className="w-full bg-blue-600 hover:bg-blue-700 text-white py-3"
-          >
-            {isSubmitting ? (
-              <Loader2 className="w-4 h-4 animate-spin" />
-            ) : (
-              'Create Account & Join'
+            <div className="space-y-2">
+              <Label htmlFor="name">Your Name</Label>
+              <Input
+                id="name"
+                type="text"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                placeholder="John Doe"
+                required
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="password">Password</Label>
+              <Input
+                id="password"
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="At least 8 characters"
+                required
+                minLength={8}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="confirmPassword">Confirm Password</Label>
+              <Input
+                id="confirmPassword"
+                type="password"
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+                placeholder="Confirm your password"
+                required
+              />
+            </div>
+
+            {error && (
+              <div className="bg-status-critical-light border border-status-critical/20 rounded-lg p-3 text-status-critical text-sm">
+                {error}
+              </div>
             )}
-          </Button>
-        </form>
 
-        <p className="text-center text-slate-500 text-sm mt-6">
-          Already have an account?{' '}
-          <Link href="/login" className="text-blue-400 hover:text-blue-300">
-            Sign in
-          </Link>
-        </p>
-      </div>
+            <Button type="submit" className="w-full" loading={isSubmitting}>
+              Create Account & Join
+            </Button>
+          </form>
+        </CardContent>
+
+        <CardFooter className="flex justify-center">
+          <p className="text-sm text-foreground-muted">
+            Already have an account?{' '}
+            <Link href="/login" className="font-medium text-foreground hover:underline">
+              Sign in
+            </Link>
+          </p>
+        </CardFooter>
+      </Card>
     </div>
   )
 }

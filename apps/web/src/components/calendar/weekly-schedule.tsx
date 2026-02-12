@@ -9,23 +9,23 @@ import { Calendar, Clock, Users, Coffee } from 'lucide-react'
 const typeConfig = {
   DEEP_WORK: {
     icon: Clock,
-    color: 'text-blue-400',
-    bgColor: 'bg-blue-500/20',
-    borderColor: 'border-blue-500/30',
+    color: 'text-foreground',
+    bgColor: 'bg-accent-light',
+    borderColor: 'border-accent/30',
     label: 'Focus Time',
   },
   MEETING: {
     icon: Users,
-    color: 'text-purple-400',
-    bgColor: 'bg-purple-500/20',
-    borderColor: 'border-purple-500/30',
+    color: 'text-foreground',
+    bgColor: 'bg-accent-light',
+    borderColor: 'border-accent/30',
     label: 'Meeting',
   },
   BREAK: {
     icon: Coffee,
-    color: 'text-green-400',
-    bgColor: 'bg-green-500/20',
-    borderColor: 'border-green-500/30',
+    color: 'text-status-healthy',
+    bgColor: 'bg-status-healthy-light',
+    borderColor: 'border-status-healthy/30',
     label: 'Break',
   },
 }
@@ -62,22 +62,22 @@ export function WeeklySchedule() {
       {/* Stats row */}
       <div className="grid grid-cols-4 gap-3 text-center">
         <StatBox
-          icon={<Clock className="w-4 h-4 text-blue-400" />}
+          icon={<Clock className="w-4 h-4 text-foreground" />}
           value={`${stats.totalFocusHours}h`}
           label="Focus Time"
         />
         <StatBox
-          icon={<Users className="w-4 h-4 text-purple-400" />}
+          icon={<Users className="w-4 h-4 text-foreground" />}
           value={`${stats.totalMeetingHours}h`}
           label="Meetings"
         />
         <StatBox
-          icon={<Clock className="w-4 h-4 text-green-400" />}
+          icon={<Clock className="w-4 h-4 text-status-healthy" />}
           value={stats.focusBlockCount.toString()}
           label="Focus Blocks"
         />
         <StatBox
-          icon={<Users className="w-4 h-4 text-amber-400" />}
+          icon={<Users className="w-4 h-4 text-status-warning" />}
           value={stats.meetingCount.toString()}
           label="Meetings"
         />
@@ -95,7 +95,7 @@ export function WeeklySchedule() {
               key={day}
               className={cn(
                 'text-center py-2 text-xs font-medium rounded-t-lg',
-                isToday ? 'bg-blue-500/20 text-blue-400' : 'text-foreground-muted'
+                isToday ? 'bg-accent-light text-foreground' : 'text-foreground-muted'
               )}
             >
               <div>{format(date, 'EEE')}</div>
@@ -114,7 +114,7 @@ export function WeeklySchedule() {
               key={`content-${day}`}
               className={cn(
                 'min-h-[120px] p-1 rounded-b-lg border',
-                isToday ? 'border-blue-500/30 bg-blue-500/5' : 'border-border bg-background-secondary/30'
+                isToday ? 'border-accent/30 bg-accent-light' : 'border-border bg-background-secondary/30'
               )}
             >
               {blocks.length === 0 ? (

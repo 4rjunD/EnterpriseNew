@@ -22,23 +22,23 @@ interface MilestoneTrackerProps {
 const statusConfig = {
   completed: {
     icon: CheckCircle2,
-    color: 'text-green-400',
-    bgColor: 'bg-green-500/10',
-    borderColor: 'border-green-500/30',
+    color: 'text-status-healthy',
+    bgColor: 'bg-status-healthy-light',
+    borderColor: 'border-status-healthy/30',
     label: 'Completed',
   },
   at_risk: {
     icon: AlertTriangle,
-    color: 'text-red-400',
-    bgColor: 'bg-red-500/10',
-    borderColor: 'border-red-500/30',
+    color: 'text-status-critical',
+    bgColor: 'bg-status-critical-light',
+    borderColor: 'border-status-critical/30',
     label: 'At Risk',
   },
   in_progress: {
     icon: Clock,
-    color: 'text-blue-400',
-    bgColor: 'bg-blue-500/10',
-    borderColor: 'border-blue-500/30',
+    color: 'text-foreground',
+    bgColor: 'bg-accent-light',
+    borderColor: 'border-foreground/30',
     label: 'In Progress',
   },
   not_started: {
@@ -105,11 +105,11 @@ export function MilestoneTracker({ milestones }: MilestoneTrackerProps) {
                   className={cn(
                     'text-xs',
                     milestone.isCompleted
-                      ? 'text-green-400'
+                      ? 'text-status-healthy'
                       : milestone.isPast
-                        ? 'text-red-400'
+                        ? 'text-status-critical'
                         : milestone.daysRemaining <= 7
-                          ? 'text-amber-400'
+                          ? 'text-status-warning'
                           : 'text-foreground-muted'
                   )}
                 >
@@ -131,11 +131,11 @@ export function MilestoneTracker({ milestones }: MilestoneTrackerProps) {
                   className={cn(
                     'h-full rounded-full transition-all',
                     milestone.isCompleted
-                      ? 'bg-green-500 w-full'
+                      ? 'bg-status-healthy w-full'
                       : milestone.isAtRisk
-                        ? 'bg-red-500'
+                        ? 'bg-status-critical'
                         : status === 'in_progress'
-                          ? 'bg-blue-500'
+                          ? 'bg-foreground'
                           : 'bg-gray-500'
                   )}
                   style={{

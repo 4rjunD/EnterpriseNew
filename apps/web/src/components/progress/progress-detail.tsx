@@ -24,8 +24,8 @@ export function ProgressDetail() {
     <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center gap-3">
-        <div className="p-2 rounded-lg bg-blue-500/10">
-          <TrendingUp className="w-5 h-5 text-blue-400" />
+        <div className="p-2 rounded-lg bg-accent-light">
+          <TrendingUp className="w-5 h-5 text-foreground" />
         </div>
         <div>
           <h2 className="text-lg font-semibold text-foreground">Progress Tracking</h2>
@@ -48,19 +48,19 @@ export function ProgressDetail() {
             label="Completed"
             value={burndown.summary.completedPoints}
             subValue={`${burndown.summary.completionPercentage}%`}
-            color="text-green-400"
+            color="text-status-healthy"
           />
           <StatCard
             label="Remaining"
             value={burndown.summary.remainingPoints}
             subValue="points left"
-            color="text-amber-400"
+            color="text-status-warning"
           />
           <StatCard
             label="Avg Velocity"
             value={burndown.summary.averageVelocity}
             subValue="pts/day"
-            color="text-blue-400"
+            color="text-foreground"
           />
         </div>
       )}
@@ -92,9 +92,9 @@ export function ProgressDetail() {
                 </CardTitle>
                 {milestones && (
                   <div className="flex items-center gap-3 text-xs">
-                    <span className="text-green-400">{milestones.completedCount} done</span>
+                    <span className="text-status-healthy">{milestones.completedCount} done</span>
                     {milestones.atRiskCount > 0 && (
-                      <span className="text-red-400">{milestones.atRiskCount} at risk</span>
+                      <span className="text-status-critical">{milestones.atRiskCount} at risk</span>
                     )}
                   </div>
                 )}
@@ -115,7 +115,7 @@ export function ProgressDetail() {
                 <AlertTriangle className="w-4 h-4" />
                 Schedule Alerts
                 {alerts && alerts.counts.total > 0 && (
-                  <span className="ml-auto text-xs font-normal bg-red-500/10 text-red-400 px-2 py-0.5 rounded">
+                  <span className="ml-auto text-xs font-normal bg-status-critical-light text-status-critical px-2 py-0.5 rounded">
                     {alerts.counts.total}
                   </span>
                 )}

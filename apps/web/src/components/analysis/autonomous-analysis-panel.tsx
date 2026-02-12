@@ -194,7 +194,7 @@ export function AutonomousAnalysisPanel() {
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
-              <Sparkles className="h-5 w-5 text-yellow-500" />
+              <Sparkles className="h-5 w-5 text-status-warning" />
               Analysis Results
             </CardTitle>
           </CardHeader>
@@ -206,19 +206,19 @@ export function AutonomousAnalysisPanel() {
                 <p className="text-sm text-muted-foreground">Repos Analyzed</p>
               </div>
               <div className="text-center">
-                <p className="text-3xl font-bold text-green-500">{analysisResults.tasksCreated}</p>
+                <p className="text-3xl font-bold text-status-healthy">{analysisResults.tasksCreated}</p>
                 <p className="text-sm text-muted-foreground">Tasks Created</p>
               </div>
               <div className="text-center">
-                <p className="text-3xl font-bold text-orange-500">{analysisResults.bottlenecksCreated}</p>
+                <p className="text-3xl font-bold text-status-warning">{analysisResults.bottlenecksCreated}</p>
                 <p className="text-sm text-muted-foreground">Bottlenecks</p>
               </div>
               <div className="text-center">
-                <p className="text-3xl font-bold text-blue-500">{analysisResults.predictionsCreated}</p>
+                <p className="text-3xl font-bold text-foreground">{analysisResults.predictionsCreated}</p>
                 <p className="text-sm text-muted-foreground">Predictions</p>
               </div>
               <div className="text-center">
-                <p className="text-3xl font-bold text-purple-500">{analysisResults.projectsCreated}</p>
+                <p className="text-3xl font-bold text-foreground">{analysisResults.projectsCreated}</p>
                 <p className="text-sm text-muted-foreground">Projects</p>
               </div>
             </div>
@@ -238,10 +238,10 @@ export function AutonomousAnalysisPanel() {
                         <Badge
                           variant={
                             repo.completeness >= 70
-                              ? 'default'
+                              ? 'healthy'
                               : repo.completeness >= 50
-                                ? 'secondary'
-                                : 'destructive'
+                                ? 'warning'
+                                : 'critical'
                           }
                         >
                           {repo.completeness}% complete
@@ -271,7 +271,7 @@ export function AutonomousAnalysisPanel() {
                       key={i}
                       className="flex items-start gap-2 rounded-lg bg-muted/50 p-3"
                     >
-                      <Sparkles className="mt-0.5 h-4 w-4 text-yellow-500" />
+                      <Sparkles className="mt-0.5 h-4 w-4 text-status-warning" />
                       <p className="text-sm">{insight}</p>
                     </div>
                   ))}

@@ -51,9 +51,9 @@ export function SyncStatusBar() {
       className={cn(
         'flex items-center justify-between px-4 py-2 rounded-lg border transition-colors',
         inProgress
-          ? 'bg-blue-500/10 border-blue-500/20'
+          ? 'bg-accent-light border-accent-light'
           : hasErrors
-            ? 'bg-red-500/10 border-red-500/20'
+            ? 'bg-status-critical-light border-status-critical-light'
             : 'bg-background-secondary border-border'
       )}
     >
@@ -62,17 +62,17 @@ export function SyncStatusBar() {
         <div className="flex items-center gap-2">
           {inProgress ? (
             <>
-              <RefreshCw className="w-4 h-4 text-blue-400 animate-spin" />
-              <span className="text-sm text-blue-400">Syncing...</span>
+              <RefreshCw className="w-4 h-4 text-foreground animate-spin" />
+              <span className="text-sm text-foreground">Syncing...</span>
             </>
           ) : hasErrors ? (
             <>
-              <AlertCircle className="w-4 h-4 text-red-400" />
-              <span className="text-sm text-red-400">Sync error</span>
+              <AlertCircle className="w-4 h-4 text-status-critical" />
+              <span className="text-sm text-status-critical">Sync error</span>
             </>
           ) : (
             <>
-              <Check className="w-4 h-4 text-green-400" />
+              <Check className="w-4 h-4 text-status-healthy" />
               <span className="text-sm text-foreground-muted">Synced</span>
             </>
           )}
@@ -126,7 +126,7 @@ function IntegrationChip({
     <div
       className={cn(
         'flex items-center gap-1.5 px-2 py-1 rounded-md text-xs',
-        hasError ? 'bg-red-500/10 text-red-400' : 'bg-background text-foreground-muted'
+        hasError ? 'bg-status-critical-light text-status-critical' : 'bg-background text-foreground-muted'
       )}
       title={
         hasError

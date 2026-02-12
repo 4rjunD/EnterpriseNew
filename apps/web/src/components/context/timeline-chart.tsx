@@ -13,19 +13,19 @@ const statusConfig = {
     iconColor: 'text-gray-400',
   },
   in_progress: {
-    color: 'bg-blue-500',
+    color: 'bg-foreground',
     icon: Clock,
-    iconColor: 'text-blue-400',
+    iconColor: 'text-foreground',
   },
   completed: {
-    color: 'bg-green-500',
+    color: 'bg-status-healthy',
     icon: CheckCircle2,
-    iconColor: 'text-green-400',
+    iconColor: 'text-status-healthy',
   },
   at_risk: {
-    color: 'bg-red-500',
+    color: 'bg-status-critical',
     icon: AlertTriangle,
-    iconColor: 'text-red-400',
+    iconColor: 'text-status-critical',
   },
 }
 
@@ -80,10 +80,10 @@ export function TimelineChart() {
 
         {/* Today marker */}
         <div
-          className="absolute top-0 w-0.5 h-6 -mt-2 bg-amber-400 rounded"
+          className="absolute top-0 w-0.5 h-6 -mt-2 bg-status-warning rounded"
           style={{ left: `${todayPosition}%` }}
         >
-          <div className="absolute -top-5 left-1/2 -translate-x-1/2 text-[10px] text-amber-400 whitespace-nowrap">
+          <div className="absolute -top-5 left-1/2 -translate-x-1/2 text-[10px] text-status-warning whitespace-nowrap">
             Today
           </div>
         </div>
@@ -144,9 +144,9 @@ export function TimelineChart() {
               className={cn(
                 'flex items-center justify-between p-2 rounded-lg',
                 status === 'completed'
-                  ? 'bg-green-500/5'
+                  ? 'bg-status-healthy-light'
                   : status === 'at_risk' || (isPast && status !== 'completed')
-                    ? 'bg-red-500/5'
+                    ? 'bg-status-critical-light'
                     : 'bg-background-secondary/50'
               )}
             >
@@ -159,11 +159,11 @@ export function TimelineChart() {
                   className={cn(
                     'text-xs',
                     status === 'completed'
-                      ? 'text-green-400'
+                      ? 'text-status-healthy'
                       : isPast
-                        ? 'text-red-400'
+                        ? 'text-status-critical'
                         : daysUntil <= 7
-                          ? 'text-amber-400'
+                          ? 'text-status-warning'
                           : 'text-foreground-muted'
                   )}
                 >

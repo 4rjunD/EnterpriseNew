@@ -46,7 +46,7 @@ export function UnifiedTodosPanel() {
         </CardHeader>
         <CardContent>
           <div className="flex flex-col items-center justify-center py-8 text-foreground-muted">
-            <CheckCircle2 className="w-8 h-8 mb-2 text-green-400" />
+            <CheckCircle2 className="w-8 h-8 mb-2 text-status-healthy" />
             <p className="text-sm">All caught up!</p>
             <p className="text-xs">No pending todos across your integrations</p>
           </div>
@@ -70,13 +70,13 @@ export function UnifiedTodosPanel() {
           {/* Quick stats */}
           <div className="flex items-center gap-3 text-xs">
             {data.counts.overdue > 0 && (
-              <span className="flex items-center gap-1 text-red-400">
+              <span className="flex items-center gap-1 text-status-critical">
                 <AlertTriangle className="w-3 h-3" />
                 {data.counts.overdue} overdue
               </span>
             )}
             {data.counts.dueToday > 0 && (
-              <span className="flex items-center gap-1 text-amber-400">
+              <span className="flex items-center gap-1 text-status-warning">
                 <Clock className="w-3 h-3" />
                 {data.counts.dueToday} today
               </span>
@@ -101,10 +101,10 @@ export function UnifiedTodosPanel() {
             >
               {filterLabels[f]}
               {f === 'overdue' && data.counts.overdue > 0 && (
-                <span className="ml-1 text-red-400">{data.counts.overdue}</span>
+                <span className="ml-1 text-status-critical">{data.counts.overdue}</span>
               )}
               {f === 'due_today' && data.counts.dueToday > 0 && (
-                <span className="ml-1 text-amber-400">{data.counts.dueToday}</span>
+                <span className="ml-1 text-status-warning">{data.counts.dueToday}</span>
               )}
             </Button>
           ))}
@@ -155,9 +155,9 @@ function TodoGroup({
   variant: 'overdue' | 'today' | 'week' | 'later' | 'none'
 }) {
   const variantStyles = {
-    overdue: 'text-red-400',
-    today: 'text-amber-400',
-    week: 'text-blue-400',
+    overdue: 'text-status-critical',
+    today: 'text-status-warning',
+    week: 'text-foreground',
     later: 'text-foreground-muted',
     none: 'text-foreground-muted',
   }
@@ -190,10 +190,10 @@ function TodoItem({ task }: { task: any }) {
   const isDueTomorrow = dueDate && isTomorrow(dueDate)
 
   const priorityColors = {
-    URGENT: 'border-l-red-500',
-    HIGH: 'border-l-orange-500',
-    MEDIUM: 'border-l-yellow-500',
-    LOW: 'border-l-green-500',
+    URGENT: 'border-l-status-critical',
+    HIGH: 'border-l-status-warning',
+    MEDIUM: 'border-l-status-warning',
+    LOW: 'border-l-status-healthy',
   }
 
   return (
@@ -228,11 +228,11 @@ function TodoItem({ task }: { task: any }) {
               className={cn(
                 'text-xs flex items-center gap-1',
                 isOverdue
-                  ? 'text-red-400'
+                  ? 'text-status-critical'
                   : isDueToday
-                    ? 'text-amber-400'
+                    ? 'text-status-warning'
                     : isDueTomorrow
-                      ? 'text-blue-400'
+                      ? 'text-foreground'
                       : 'text-foreground-muted'
               )}
             >

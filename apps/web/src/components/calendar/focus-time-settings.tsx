@@ -48,13 +48,13 @@ export function FocusTimeSettings() {
       <div className={cn(
         'p-4 rounded-lg border',
         integrationStatus?.connected
-          ? 'bg-green-500/10 border-green-500/30'
-          : 'bg-amber-500/10 border-amber-500/30'
+          ? 'bg-status-healthy-light border-status-healthy/30'
+          : 'bg-status-warning-light border-status-warning/30'
       )}>
         <div className="flex items-center gap-3">
           <Calendar className={cn(
             'w-5 h-5',
-            integrationStatus?.connected ? 'text-green-400' : 'text-amber-400'
+            integrationStatus?.connected ? 'text-status-healthy' : 'text-status-warning'
           )} />
           <div>
             <p className="text-sm font-medium text-foreground">
@@ -138,7 +138,7 @@ export function FocusTimeSettings() {
             }
             className={cn(
               'relative w-11 h-6 rounded-full transition-colors',
-              localPrefs.autoBlockEnabled ? 'bg-blue-500' : 'bg-foreground-muted/30'
+              localPrefs.autoBlockEnabled ? 'bg-foreground' : 'bg-foreground-muted/30'
             )}
           >
             <span
@@ -154,7 +154,7 @@ export function FocusTimeSettings() {
         <Button
           onClick={handleSave}
           disabled={updateMutation.isLoading}
-          className="w-full bg-blue-600 hover:bg-blue-700"
+          className="w-full"
         >
           {updateMutation.isLoading ? (
             <>

@@ -16,41 +16,41 @@ import {
 const typeConfig = {
   scope_reduction: {
     icon: Scissors,
-    color: 'text-purple-400',
-    bgColor: 'bg-purple-500/10',
+    color: 'text-foreground',
+    bgColor: 'bg-accent-light',
   },
   resource_reallocation: {
     icon: Users,
-    color: 'text-blue-400',
-    bgColor: 'bg-blue-500/10',
+    color: 'text-foreground',
+    bgColor: 'bg-accent-light',
   },
   deadline_adjustment: {
     icon: Calendar,
-    color: 'text-amber-400',
-    bgColor: 'bg-amber-500/10',
+    color: 'text-status-warning',
+    bgColor: 'bg-status-warning-light',
   },
   process_improvement: {
     icon: Settings,
-    color: 'text-green-400',
-    bgColor: 'bg-green-500/10',
+    color: 'text-status-healthy',
+    bgColor: 'bg-status-healthy-light',
   },
 }
 
 const priorityConfig = {
   high: {
     label: 'High Priority',
-    color: 'text-red-400',
-    bgColor: 'bg-red-500/10',
+    color: 'text-status-critical',
+    bgColor: 'bg-status-critical-light',
   },
   medium: {
     label: 'Medium',
-    color: 'text-amber-400',
-    bgColor: 'bg-amber-500/10',
+    color: 'text-status-warning',
+    bgColor: 'bg-status-warning-light',
   },
   low: {
     label: 'Low',
-    color: 'text-green-400',
-    bgColor: 'bg-green-500/10',
+    color: 'text-status-healthy',
+    bgColor: 'bg-status-healthy-light',
   },
 }
 
@@ -119,7 +119,7 @@ export function AIRecommendations() {
                   </div>
 
                   {rec.action && (
-                    <button className="flex items-center gap-1 text-xs text-blue-400 hover:text-blue-300">
+                    <button className="flex items-center gap-1 text-xs text-foreground hover:text-foreground/80">
                       {rec.action}
                       <ArrowRight className="w-3 h-3" />
                     </button>

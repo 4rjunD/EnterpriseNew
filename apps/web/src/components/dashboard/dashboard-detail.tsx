@@ -96,7 +96,7 @@ export function DashboardDetail() {
 
       {/* Legacy sync indicator (when manually syncing) */}
       {isSyncing && (
-        <div className="flex items-center gap-2 px-4 py-2 bg-blue-500/10 border border-blue-500/20 rounded-lg text-sm text-blue-400">
+        <div className="flex items-center gap-2 px-4 py-2 bg-background-secondary border border-border rounded-lg text-sm text-foreground-muted">
           <RefreshCw className="w-4 h-4 animate-spin" />
           Syncing data from your integrations...
         </div>

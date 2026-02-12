@@ -49,20 +49,20 @@ const statusConfig = {
   in_progress: {
     label: 'In Progress',
     icon: Clock,
-    color: 'text-blue-400',
-    bgColor: 'bg-blue-500/10',
+    color: 'text-foreground',
+    bgColor: 'bg-accent-light',
   },
   completed: {
     label: 'Completed',
     icon: CheckCircle2,
-    color: 'text-green-400',
-    bgColor: 'bg-green-500/10',
+    color: 'text-status-healthy',
+    bgColor: 'bg-status-healthy-light',
   },
   at_risk: {
     label: 'At Risk',
     icon: AlertTriangle,
-    color: 'text-red-400',
-    bgColor: 'bg-red-500/10',
+    color: 'text-status-critical',
+    bgColor: 'bg-status-critical-light',
   },
 }
 
@@ -159,7 +159,7 @@ export function MilestoneEditor({ milestones }: MilestoneEditorProps) {
             className={cn(
               'p-3 rounded-lg border transition-colors',
               milestone.isAtRisk && milestone.status !== 'completed'
-                ? 'border-red-500/30 bg-red-500/5'
+                ? 'border-status-critical/30 bg-status-critical-light'
                 : 'border-border bg-background-secondary/50'
             )}
           >
@@ -173,9 +173,9 @@ export function MilestoneEditor({ milestones }: MilestoneEditorProps) {
                       className={cn(
                         'text-xs',
                         milestone.isPast && milestone.status !== 'completed'
-                          ? 'text-red-400'
+                          ? 'text-status-critical'
                           : milestone.daysRemaining <= 7
-                            ? 'text-amber-400'
+                            ? 'text-status-warning'
                             : 'text-foreground-muted'
                       )}
                     >
@@ -220,10 +220,10 @@ export function MilestoneEditor({ milestones }: MilestoneEditorProps) {
                     className={cn(
                       'h-full rounded-full transition-all',
                       milestone.progress.percentage >= 100
-                        ? 'bg-green-500'
+                        ? 'bg-status-healthy'
                         : milestone.isAtRisk
-                          ? 'bg-red-500'
-                          : 'bg-blue-500'
+                          ? 'bg-status-critical'
+                          : 'bg-foreground'
                     )}
                     style={{ width: `${Math.min(100, milestone.progress.percentage)}%` }}
                   />
@@ -270,7 +270,7 @@ export function MilestoneEditor({ milestones }: MilestoneEditorProps) {
                   size="sm"
                   onClick={() => handleRemove(idx)}
                   disabled={removeMutation.isLoading}
-                  className="text-red-400 hover:text-red-300 hover:bg-red-500/10"
+                  className="text-status-critical hover:text-status-critical hover:bg-status-critical-light"
                 >
                   <Trash2 className="w-4 h-4 mr-1" />
                   Remove
@@ -283,25 +283,25 @@ export function MilestoneEditor({ milestones }: MilestoneEditorProps) {
 
       {/* Add milestone form */}
       {isAdding ? (
-        <div className="p-3 rounded-lg border border-dashed border-purple-500/30 bg-purple-500/5 space-y-3">
+        <div className="p-3 rounded-lg border border-dashed border-accent/30 bg-accent-light space-y-3">
           <input
             type="text"
             placeholder="Milestone name"
             value={newMilestone.name}
             onChange={(e) => setNewMilestone({ ...newMilestone, name: e.target.value })}
-            className="w-full px-3 py-2 rounded-md border border-border bg-background text-sm text-foreground placeholder:text-foreground-muted focus:outline-none focus:ring-2 focus:ring-purple-500/50"
+            className="w-full px-3 py-2 rounded-md border border-border bg-background text-sm text-foreground placeholder:text-foreground-muted focus:outline-none focus:ring-2 focus:ring-accent/50"
           />
           <input
             type="date"
             value={newMilestone.targetDate}
             onChange={(e) => setNewMilestone({ ...newMilestone, targetDate: e.target.value })}
-            className="w-full px-3 py-2 rounded-md border border-border bg-background text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-purple-500/50"
+            className="w-full px-3 py-2 rounded-md border border-border bg-background text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-accent/50"
           />
           <textarea
             placeholder="Description (optional)"
             value={newMilestone.description}
             onChange={(e) => setNewMilestone({ ...newMilestone, description: e.target.value })}
-            className="w-full px-3 py-2 rounded-md border border-border bg-background text-sm text-foreground placeholder:text-foreground-muted focus:outline-none focus:ring-2 focus:ring-purple-500/50 resize-none"
+            className="w-full px-3 py-2 rounded-md border border-border bg-background text-sm text-foreground placeholder:text-foreground-muted focus:outline-none focus:ring-2 focus:ring-accent/50 resize-none"
             rows={2}
           />
           <div className="flex justify-end gap-2">
@@ -319,7 +319,7 @@ export function MilestoneEditor({ milestones }: MilestoneEditorProps) {
               size="sm"
               onClick={handleAdd}
               disabled={addMutation.isLoading}
-              className="bg-purple-600 hover:bg-purple-700"
+              className="bg-accent hover:bg-accent/80"
             >
               {addMutation.isLoading ? (
                 <Loader2 className="w-4 h-4 animate-spin" />
