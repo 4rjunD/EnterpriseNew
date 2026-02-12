@@ -2,8 +2,8 @@ import { initTRPC, TRPCError } from '@trpc/server'
 import superjson from 'superjson'
 
 // Demo mode bypasses auth for UI development
-// Set to false in production with proper auth
-const DEMO_MODE = false
+// Set to true for demo, false for production with proper auth
+const DEMO_MODE = process.env.DEMO_MODE === 'true'
 
 // Define UserRole locally to avoid Prisma dependency in demo mode
 enum UserRole {

@@ -4,8 +4,8 @@ import { useSession } from 'next-auth/react'
 import { cn } from '@nexflow/ui/utils'
 import type { CardType } from '@/app/(dashboard)/dashboard/page'
 
-// Demo mode - show all tabs
-const DEMO_MODE = false
+// Demo mode - show all tabs (controlled via env var)
+const DEMO_MODE = process.env.NEXT_PUBLIC_DEMO_MODE === 'true'
 
 interface SummaryCardRowProps {
   activeCard: CardType
