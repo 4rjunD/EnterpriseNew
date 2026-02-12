@@ -14,6 +14,8 @@ interface SummaryCardRowProps {
 
 const navItems: Array<{ id: CardType; label: string; managerOnly?: boolean }> = [
   { id: 'dashboard', label: 'Overview' },
+  { id: 'context', label: 'Context' },
+  { id: 'progress', label: 'Progress' },
   { id: 'bottlenecks', label: 'Bottlenecks', managerOnly: true },
   { id: 'team', label: 'Team' },
   { id: 'tasks', label: 'Tasks' },

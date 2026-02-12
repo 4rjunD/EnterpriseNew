@@ -10,6 +10,8 @@ import { PredictionsDetail } from '@/components/predictions/predictions-detail'
 import { InsightsDetail } from '@/components/insights/insights-detail'
 import { ProjectsDetail } from '@/components/projects/projects-detail'
 import { IntegrationsDetail } from '@/components/integrations/integrations-detail'
+import { ContextDetail } from '@/components/context/context-detail'
+import { ProgressDetail } from '@/components/progress/progress-detail'
 
 export type CardType =
   | 'dashboard'
@@ -20,6 +22,8 @@ export type CardType =
   | 'insights'
   | 'projects'
   | 'integrations'
+  | 'context'
+  | 'progress'
 
 export default function DashboardPage() {
   const [activeCard, setActiveCard] = useState<CardType>('dashboard')
@@ -42,6 +46,10 @@ export default function DashboardPage() {
         return <ProjectsDetail />
       case 'integrations':
         return <IntegrationsDetail />
+      case 'context':
+        return <ContextDetail />
+      case 'progress':
+        return <ProgressDetail />
       default:
         return <DashboardDetail />
     }

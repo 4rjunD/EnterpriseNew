@@ -8,6 +8,8 @@ import { GettingStartedChecklist } from './getting-started-checklist'
 import { AIActivityWidget } from './ai-activity-widget'
 import { ImpactBanner } from './impact-banner'
 import { ProjectContextCard } from './project-context-card'
+import { SyncStatusBar } from './sync-status-bar'
+import { UnifiedTodosPanel } from './unified-todos-panel'
 import { SmartPrompt } from '../shared/smart-prompt'
 import { Card, CardContent, CardHeader, CardTitle } from '@nexflow/ui/card'
 import { Skeleton } from '@nexflow/ui/skeleton'
@@ -89,7 +91,10 @@ export function DashboardDetail() {
       {/* Impact Banner - show value proposition */}
       <ImpactBanner />
 
-      {/* Sync status bar */}
+      {/* Sync status bar - shows integration sync status */}
+      <SyncStatusBar />
+
+      {/* Legacy sync indicator (when manually syncing) */}
       {isSyncing && (
         <div className="flex items-center gap-2 px-4 py-2 bg-blue-500/10 border border-blue-500/20 rounded-lg text-sm text-blue-400">
           <RefreshCw className="w-4 h-4 animate-spin" />
@@ -166,8 +171,11 @@ export function DashboardDetail() {
           </div>
         </div>
 
-        {/* Right column - Project Context + AI Activity Widget */}
+        {/* Right column - Unified Todos + AI Activity Widget */}
         <div className="space-y-6">
+          {/* Unified Todos - all tasks across integrations */}
+          <UnifiedTodosPanel />
+
           {/* Project Context - help AI understand what you're building */}
           <ProjectContextCard />
 
