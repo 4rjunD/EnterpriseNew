@@ -2,17 +2,22 @@
 
 import { useState } from 'react'
 import { cn } from '@nexflow/ui/utils'
-import { Card, CardHeader, CardTitle, CardContent } from '@/components/nf/card'
-import { Badge, SeverityBadge } from '@/components/nf/badge'
-import { Button } from '@/components/nf/button'
-import { BreathingDot } from '@/components/nf/breathing-dot'
-import { Progress } from '@/components/nf/progress'
-import { SEVERITY_LEVELS, INTEGRATIONS } from '@/lib/theme'
+import { INTEGRATIONS, type TeamType } from '@/lib/theme'
+
+// Severity levels
+const SEVERITY_CONFIG = {
+  critical: { label: 'Critical', color: '#ff4444' },
+  warning: { label: 'Warning', color: '#f5a623' },
+  info: { label: 'Info', color: '#0070f3' },
+  resolved: { label: 'Resolved', color: '#50e3c2' },
+}
+
+type Severity = keyof typeof SEVERITY_CONFIG
 
 // Risk type
 interface Risk {
   id: string
-  severity: keyof typeof SEVERITY_LEVELS
+  severity: Severity
   title: string
   description: string
   impact: string
@@ -113,7 +118,7 @@ function timeAgo(date: Date): string {
   return `${days}d ago`
 }
 
-// Risk card
+// Risk card - clean
 function RiskCard({
   risk,
   onResolve,
@@ -124,65 +129,71 @@ function RiskCard({
   onMonitor: (id: string) => void
 }) {
   const [expanded, setExpanded] = useState(false)
-  const severityConfig = SEVERITY_LEVELS[risk.severity]
+  const severityConfig = SEVERITY_CONFIG[risk.severity]
+
+  const accentColor = risk.severity === 'critical' ? '#ff4444' : risk.severity === 'warning' ? '#f5a623' : undefined
 
   return (
-    <Card
-      hover
-      glow={risk.severity === 'critical' ? 'critical' : risk.severity === 'warning' ? 'warning' : 'none'}
+    <div
       className={cn(
-        'cursor-pointer',
+        'bg-[#0a0a0a] border border-[#1a1a1a] rounded-md cursor-pointer transition-colors hover:border-[#252525]',
+        accentColor && 'border-l-2',
         risk.status === 'resolved' && 'opacity-60'
       )}
+      style={accentColor ? { borderLeftColor: accentColor } : undefined}
       onClick={() => setExpanded(!expanded)}
     >
-      <CardContent className="p-4">
+      <div className="p-4">
         {/* Header */}
-        <div className="flex items-start gap-3 mb-3">
+        <div className="flex items-start gap-3 mb-2">
           {/* Severity indicator */}
-          <div className={cn(
-            'w-2 h-2 rounded-full mt-2 flex-shrink-0',
-            risk.severity === 'critical' && 'bg-status-critical animate-pulse',
-            risk.severity === 'warning' && 'bg-status-warning',
-            risk.severity === 'info' && 'bg-status-info',
-            risk.severity === 'resolved' && 'bg-status-success'
-          )} />
+          <span
+            className={cn(
+              'w-2 h-2 rounded-full mt-1.5 flex-shrink-0',
+              risk.severity === 'critical' && 'animate-pulse'
+            )}
+            style={{ backgroundColor: severityConfig.color }}
+          />
 
           <div className="flex-1 min-w-0">
+            {/* Labels row */}
             <div className="flex items-center gap-2 mb-1">
-              <SeverityBadge severity={risk.severity} />
-              <Badge
-                variant="default"
-                size="sm"
-                className={cn(
-                  risk.status === 'active' && 'bg-status-critical-muted text-status-critical',
-                  risk.status === 'monitoring' && 'bg-status-warning-muted text-status-warning',
-                  risk.status === 'resolved' && 'bg-status-success-muted text-status-success'
-                )}
+              <span
+                className="text-[10px] font-mono font-medium uppercase tracking-[0.5px]"
+                style={{ color: severityConfig.color }}
               >
+                {severityConfig.label}
+              </span>
+              <span className={cn(
+                'text-[10px] font-mono uppercase tracking-[0.5px] px-1.5 py-0.5 rounded',
+                risk.status === 'active' && 'text-[#ff4444] bg-[#ff4444]/10',
+                risk.status === 'monitoring' && 'text-[#f5a623] bg-[#f5a623]/10',
+                risk.status === 'resolved' && 'text-[#50e3c2] bg-[#50e3c2]/10'
+              )}>
                 {risk.status}
-              </Badge>
+              </span>
             </div>
 
-            <h3 className="text-sm font-medium text-foreground mb-1">{risk.title}</h3>
-            <p className="text-xs text-foreground-secondary">{risk.description}</p>
+            {/* Title */}
+            <h3 className="text-[14px] font-medium text-[#ededed] mb-1">{risk.title}</h3>
+            <p className="text-[12px] text-[#888]">{risk.description}</p>
           </div>
 
           {/* Impact */}
           <div className="text-right flex-shrink-0">
-            <div className="text-sm font-medium text-foreground">{risk.impact}</div>
-            <div className="text-xs text-foreground-tertiary">{timeAgo(risk.detectedAt)}</div>
+            <div className="text-[13px] font-medium text-[#ededed]">{risk.impact}</div>
+            <div className="text-[10px] font-mono text-[#555]">{timeAgo(risk.detectedAt)}</div>
           </div>
         </div>
 
         {/* Sources */}
-        <div className="flex items-center gap-2 mb-3">
-          <span className="text-xs text-foreground-tertiary">Sources:</span>
+        <div className="flex items-center gap-2">
+          <span className="text-[10px] font-mono uppercase tracking-[0.5px] text-[#555]">Sources:</span>
           <div className="flex items-center gap-1">
             {risk.sources.map(source => (
               <span
                 key={source}
-                className="w-5 h-5 rounded bg-background-secondary flex items-center justify-center text-xs text-foreground-tertiary"
+                className="w-5 h-5 rounded bg-[#1a1a1a] flex items-center justify-center text-[11px] text-[#555]"
                 title={INTEGRATIONS.find(i => i.id === source)?.name}
               >
                 {getIntegrationIcon(source)}
@@ -193,15 +204,15 @@ function RiskCard({
 
         {/* Expanded content */}
         {expanded && (
-          <div className="pt-3 border-t border-border space-y-3 animate-fade-in-up">
+          <div className="pt-3 mt-3 border-t border-[#1a1a1a] space-y-3">
             {/* Affected items */}
             <div>
-              <span className="text-xs text-foreground-tertiary">Affected:</span>
+              <span className="text-[10px] font-mono uppercase tracking-[0.5px] text-[#555]">Affected:</span>
               <div className="flex flex-wrap gap-1 mt-1">
                 {risk.affectedItems.map((item, i) => (
                   <span
                     key={i}
-                    className="px-2 py-0.5 bg-background-secondary rounded text-xs text-foreground-secondary"
+                    className="px-2 py-0.5 bg-[#1a1a1a] rounded text-[11px] font-mono text-[#888]"
                   >
                     {item.label}
                   </span>
@@ -211,45 +222,48 @@ function RiskCard({
 
             {/* Mitigation */}
             {risk.mitigation && risk.status !== 'resolved' && (
-              <div className="p-3 bg-nf-muted border border-nf/20 rounded-md">
+              <div className="p-3 border border-[#d4a574]/20 rounded">
                 <div className="flex items-center gap-2 mb-1">
-                  <BreathingDot variant="nf" size="sm" />
-                  <span className="text-xs font-medium text-nf">Suggested Mitigation</span>
+                  <span className="w-1.5 h-1.5 rounded-full bg-[#d4a574] animate-pulse" />
+                  <span className="text-[10px] font-mono uppercase tracking-[0.5px] text-[#d4a574]">Suggested Mitigation</span>
                 </div>
-                <p className="text-xs text-foreground-secondary">{risk.mitigation}</p>
+                <p className="text-[12px] text-[#888]">{risk.mitigation}</p>
               </div>
             )}
 
             {/* Actions */}
             {risk.status !== 'resolved' && (
               <div className="flex items-center gap-2 pt-2">
-                <Button
-                  variant="secondary"
-                  size="sm"
+                <button
                   onClick={(e) => {
                     e.stopPropagation()
                     onMonitor(risk.id)
                   }}
                   disabled={risk.status === 'monitoring'}
+                  className={cn(
+                    'text-[12px] px-3 py-1 rounded border transition-colors',
+                    risk.status === 'monitoring'
+                      ? 'text-[#555] border-[#1a1a1a] cursor-not-allowed'
+                      : 'text-[#888] border-[#1a1a1a] hover:border-[#252525] hover:text-[#ededed]'
+                  )}
                 >
                   {risk.status === 'monitoring' ? 'Monitoring' : 'Monitor'}
-                </Button>
-                <Button
-                  variant="primary"
-                  size="sm"
+                </button>
+                <button
                   onClick={(e) => {
                     e.stopPropagation()
                     onResolve(risk.id)
                   }}
+                  className="text-[12px] text-[#000] bg-[#ededed] hover:bg-[#d9d9d9] px-3 py-1 rounded transition-colors"
                 >
                   Mark Resolved
-                </Button>
+                </button>
               </div>
             )}
           </div>
         )}
-      </CardContent>
-    </Card>
+      </div>
+    </div>
   )
 }
 
@@ -261,43 +275,36 @@ function RiskStats({ risks }: { risks: Risk[] }) {
   const monitoring = risks.filter(r => r.status === 'monitoring').length
   const resolved = risks.filter(r => r.status === 'resolved').length
 
+  const stats = [
+    { value: critical.toString(), label: 'Critical', color: critical > 0 ? '#ff4444' : '#ededed' },
+    { value: warnings.toString(), label: 'Warnings', color: warnings > 0 ? '#f5a623' : '#ededed' },
+    { value: monitoring.toString(), label: 'Monitoring', color: '#ededed' },
+    { value: resolved.toString(), label: 'Resolved', color: resolved > 0 ? '#50e3c2' : '#ededed' },
+  ]
+
   return (
-    <div className="grid grid-cols-4 gap-4">
-      <Card padding="sm" glow={critical > 0 ? 'critical' : 'none'}>
-        <CardContent className="p-3">
-          <div className="text-2xl font-mono font-medium text-status-critical">{critical}</div>
-          <div className="text-xs text-foreground-secondary">Critical</div>
-        </CardContent>
-      </Card>
-      <Card padding="sm" glow={warnings > 0 ? 'warning' : 'none'}>
-        <CardContent className="p-3">
-          <div className="text-2xl font-mono font-medium text-status-warning">{warnings}</div>
-          <div className="text-xs text-foreground-secondary">Warnings</div>
-        </CardContent>
-      </Card>
-      <Card padding="sm">
-        <CardContent className="p-3">
-          <div className="text-2xl font-mono font-medium text-foreground">{monitoring}</div>
-          <div className="text-xs text-foreground-secondary">Monitoring</div>
-        </CardContent>
-      </Card>
-      <Card padding="sm" glow={resolved > 0 ? 'success' : 'none'}>
-        <CardContent className="p-3">
-          <div className="text-2xl font-mono font-medium text-status-success">{resolved}</div>
-          <div className="text-xs text-foreground-secondary">Resolved</div>
-        </CardContent>
-      </Card>
+    <div className="grid grid-cols-4 gap-3">
+      {stats.map((stat, i) => (
+        <div key={i} className="bg-[#0a0a0a] border border-[#1a1a1a] rounded-md p-3">
+          <div className="text-[20px] font-mono font-semibold" style={{ color: stat.color }}>{stat.value}</div>
+          <div className="text-[10px] font-mono uppercase tracking-[0.5px] text-[#555] mt-1">{stat.label}</div>
+        </div>
+      ))}
     </div>
   )
 }
 
-export function RisksTab() {
+interface RisksTabProps {
+  teamType?: TeamType
+}
+
+export function RisksTab({ teamType = 'launch' }: RisksTabProps) {
   const [risks, setRisks] = useState<Risk[]>(mockRisks)
   const [filter, setFilter] = useState<'all' | 'active' | 'monitoring' | 'resolved'>('all')
 
   const handleResolve = (id: string) => {
     setRisks(prev => prev.map(r =>
-      r.id === id ? { ...r, status: 'resolved' as const, severity: 'resolved' as const } : r
+      r.id === id ? { ...r, status: 'resolved' as const, severity: 'resolved' as Severity } : r
     ))
   }
 
@@ -319,11 +326,11 @@ export function RisksTab() {
   })
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="space-y-4">
       {/* Header */}
       <div>
-        <h2 className="text-xl font-semibold text-foreground">Risks</h2>
-        <p className="text-sm text-foreground-secondary mt-1">
+        <h2 className="text-[20px] font-semibold text-[#ededed] tracking-[-0.5px]">Risks</h2>
+        <p className="text-[13px] text-[#888] mt-1">
           Active risks and blockers detected by NexFlow
         </p>
       </div>
@@ -332,16 +339,16 @@ export function RisksTab() {
       <RiskStats risks={risks} />
 
       {/* Filter tabs */}
-      <div className="flex items-center gap-1 p-1 bg-background-secondary rounded-lg w-fit">
+      <div className="flex items-center gap-1 pt-2">
         {(['all', 'active', 'monitoring', 'resolved'] as const).map(f => (
           <button
             key={f}
             onClick={() => setFilter(f)}
             className={cn(
-              'px-3 py-1.5 text-sm rounded-md transition-colors capitalize',
+              'px-3 py-1.5 text-[13px] rounded-md transition-colors capitalize',
               filter === f
-                ? 'bg-foreground text-background font-medium'
-                : 'text-foreground-secondary hover:text-foreground'
+                ? 'bg-[#ededed] text-[#000] font-medium'
+                : 'text-[#888] hover:text-[#ededed]'
             )}
           >
             {f}
@@ -361,32 +368,29 @@ export function RisksTab() {
         ))}
 
         {sortedRisks.length === 0 && (
-          <Card padding="lg">
-            <CardContent className="p-8 text-center">
-              <div className="w-12 h-12 rounded-full bg-status-success-muted flex items-center justify-center mx-auto mb-3">
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" className="text-status-success">
-                  <path d="M5 12L10 17L19 8" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                </svg>
-              </div>
-              <h3 className="text-foreground font-medium mb-1">All clear</h3>
-              <p className="text-sm text-foreground-secondary">
-                No {filter !== 'all' ? `${filter} ` : ''}risks detected
-              </p>
-            </CardContent>
-          </Card>
+          <div className="bg-[#0a0a0a] border border-[#1a1a1a] rounded-md p-8 text-center">
+            <div className="w-10 h-10 rounded-full bg-[#50e3c2]/10 flex items-center justify-center mx-auto mb-3">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" className="text-[#50e3c2]">
+                <path d="M5 12L10 17L19 8" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+              </svg>
+            </div>
+            <h3 className="text-[14px] font-medium text-[#ededed] mb-1">All clear</h3>
+            <p className="text-[12px] text-[#555]">
+              No {filter !== 'all' ? `${filter} ` : ''}risks detected
+            </p>
+          </div>
         )}
       </div>
 
-      {/* Risk detection explanation */}
-      <div className="p-4 bg-background-secondary border border-border rounded-lg">
+      {/* Risk detection explanation - minimal */}
+      <div className="p-4 border border-[#1a1a1a] rounded-md">
         <div className="flex items-start gap-3">
-          <BreathingDot variant="nf" size="md" />
+          <span className="w-2 h-2 rounded-full bg-[#d4a574] mt-1.5 animate-pulse" />
           <div>
-            <h4 className="text-sm font-medium text-foreground mb-1">How NexFlow detects risks</h4>
-            <p className="text-xs text-foreground-secondary leading-relaxed">
+            <h4 className="text-[13px] font-medium text-[#ededed] mb-1">How NexFlow detects risks</h4>
+            <p className="text-[12px] text-[#555] leading-[1.5]">
               NexFlow continuously analyzes your connected integrations to identify blocking PRs,
               stale tasks, velocity drops, scope creep, and other patterns that indicate risk.
-              Critical risks require immediate attention, while warnings can be monitored.
             </p>
           </div>
         </div>

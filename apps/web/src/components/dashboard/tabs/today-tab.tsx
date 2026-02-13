@@ -2,33 +2,37 @@
 
 import { useState, useMemo } from 'react'
 import { cn } from '@nexflow/ui/utils'
-import { trpc } from '@/lib/trpc'
-import { Card, CardHeader, CardTitle, CardContent } from '@/components/nf/card'
-import { Button } from '@/components/nf/button'
-import { Badge, UrgencyBadge } from '@/components/nf/badge'
-import { BreathingDot, NexFlowStatus } from '@/components/nf/breathing-dot'
-import { AnimPercent } from '@/components/nf/anim-num'
-import { ACTION_TYPES, URGENCY_LEVELS, INTEGRATIONS, TEAM_TYPES, LAYOUT, type TeamType } from '@/lib/theme'
+import { TEAM_TYPES, INTEGRATIONS, type TeamType } from '@/lib/theme'
+
+// Action types
+const ACTION_TYPES = {
+  review: { icon: '○', label: 'Review' },
+  decision: { icon: '◆', label: 'Decision' },
+  code: { icon: '◇', label: 'Code' },
+  scope: { icon: '◈', label: 'Scope' },
+  planning: { icon: '□', label: 'Planning' },
+}
+
+// Urgency types
+type Urgency = 'now' | 'today' | 'this-week'
 
 // Action item type
 interface ActionItem {
   id: string
   type: keyof typeof ACTION_TYPES
-  urgency: keyof typeof URGENCY_LEVELS
+  urgency: Urgency
   title: string
   subtitle?: string
-  source: string[]  // Integration IDs
-  impact: number    // 0-100 impact on ship date
+  source: string[]
+  impact: number
   agentStatus?: 'pending' | 'processing' | 'waiting'
   agentAction?: string
-  relatedId?: string
-  relatedType?: 'task' | 'pr' | 'bottleneck'
 }
 
 // Generate actions based on team type
 function getActionsForTeamType(teamType: TeamType): ActionItem[] {
   const config = TEAM_TYPES[teamType]
-  const urgencies: Array<keyof typeof URGENCY_LEVELS> = ['now', 'now', 'today', 'today', 'this-week']
+  const urgencies: Urgency[] = ['now', 'now', 'today', 'today', 'this-week']
   const sources = [['github'], ['linear', 'slack'], ['github', 'linear'], ['linear'], ['linear', 'calendar']]
   const impacts = [95, 88, 72, 65, 45]
 
@@ -51,7 +55,7 @@ function getIntegrationIcon(id: string): string {
   return integration?.icon || '?'
 }
 
-// Action row component
+// Action row - clean, minimal design
 function ActionRow({ action, onDone, onSnooze }: {
   action: ActionItem
   onDone: (id: string) => void
@@ -60,45 +64,54 @@ function ActionRow({ action, onDone, onSnooze }: {
   const typeConfig = ACTION_TYPES[action.type]
   const [isHovered, setIsHovered] = useState(false)
 
+  const urgencyConfig = {
+    now: { label: 'DO NOW', color: '#ff4444', bg: 'rgba(255,68,68,0.1)' },
+    today: { label: 'TODAY', color: '#f5a623', bg: 'rgba(245,166,35,0.1)' },
+    'this-week': { label: 'THIS WEEK', color: '#555', bg: 'transparent' },
+  }[action.urgency]
+
   return (
     <div
       className={cn(
-        'group relative p-4 border-b border-border last:border-b-0',
-        'hover:bg-background-secondary transition-colors',
-        action.urgency === 'now' && 'bg-status-critical-muted/20'
+        'group p-4 border-b border-[#1a1a1a] last:border-b-0',
+        'hover:bg-[#111] transition-colors',
+        action.urgency === 'now' && 'bg-[#ff4444]/5'
       )}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
     >
-      <div className="flex items-start gap-4">
+      <div className="flex items-start gap-3">
         {/* Type icon */}
-        <div className={cn(
-          'w-8 h-8 rounded-md flex items-center justify-center text-sm',
-          'bg-background-tertiary text-foreground-secondary'
-        )}>
+        <div className="w-7 h-7 rounded bg-[#1a1a1a] flex items-center justify-center text-[12px] text-[#555] flex-shrink-0">
           {typeConfig.icon}
         </div>
 
         {/* Main content */}
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 mb-1">
-            <UrgencyBadge urgency={action.urgency} />
-            <span className="text-sm font-medium text-foreground truncate">
+            {/* Urgency badge - minimal */}
+            <span
+              className="text-[10px] font-mono font-medium uppercase tracking-[0.5px] px-1.5 py-0.5 rounded"
+              style={{ color: urgencyConfig.color, backgroundColor: urgencyConfig.bg, border: action.urgency === 'this-week' ? '1px solid #1a1a1a' : 'none' }}
+            >
+              {urgencyConfig.label}
+            </span>
+            <span className="text-[13px] font-medium text-[#ededed] truncate">
               {action.title}
             </span>
           </div>
 
           {action.subtitle && (
-            <p className="text-xs text-foreground-secondary mb-2">{action.subtitle}</p>
+            <p className="text-[12px] text-[#555] mb-2">{action.subtitle}</p>
           )}
 
-          {/* Source integrations */}
+          {/* Source integrations + impact */}
           <div className="flex items-center gap-2">
             <div className="flex items-center gap-1">
               {action.source.map(sourceId => (
                 <span
                   key={sourceId}
-                  className="w-5 h-5 rounded bg-background-tertiary flex items-center justify-center text-xs text-foreground-tertiary"
+                  className="w-5 h-5 rounded bg-[#1a1a1a] flex items-center justify-center text-[11px] text-[#555]"
                   title={INTEGRATIONS.find(i => i.id === sourceId)?.name}
                 >
                   {getIntegrationIcon(sourceId)}
@@ -107,52 +120,49 @@ function ActionRow({ action, onDone, onSnooze }: {
             </div>
 
             {/* Impact score */}
-            <div className={cn(
-              'px-1.5 py-0.5 rounded text-xs font-mono',
-              action.impact >= 80 ? 'bg-status-critical-muted text-status-critical' :
-              action.impact >= 60 ? 'bg-status-warning-muted text-status-warning' :
-              'bg-foreground/5 text-foreground-secondary'
+            <span className={cn(
+              'text-[11px] font-mono',
+              action.impact >= 80 ? 'text-[#ff4444]' :
+              action.impact >= 60 ? 'text-[#f5a623]' :
+              'text-[#555]'
             )}>
               {action.impact}% impact
-            </div>
+            </span>
           </div>
 
           {/* Agent status */}
           {action.agentStatus && action.agentAction && (
-            <div className="mt-2 flex items-center gap-2 px-2 py-1.5 bg-nf-muted rounded-md">
-              <BreathingDot variant="nf" size="sm" />
-              <span className="text-xs text-nf">{action.agentAction}</span>
+            <div className="mt-2 flex items-center gap-2 px-2 py-1.5 border border-[#d4a574]/20 rounded">
+              <span className="w-1.5 h-1.5 rounded-full bg-[#d4a574] animate-pulse" />
+              <span className="text-[11px] text-[#d4a574]">{action.agentAction}</span>
             </div>
           )}
         </div>
 
         {/* Actions (show on hover) */}
         <div className={cn(
-          'flex items-center gap-2 transition-opacity',
+          'flex items-center gap-2 transition-opacity flex-shrink-0',
           isHovered ? 'opacity-100' : 'opacity-0'
         )}>
-          <Button
-            variant="ghost"
-            size="sm"
+          <button
             onClick={() => onSnooze(action.id)}
-            className="text-foreground-secondary"
+            className="text-[12px] text-[#555] hover:text-[#888] px-2 py-1"
           >
             Snooze
-          </Button>
-          <Button
-            variant="secondary"
-            size="sm"
+          </button>
+          <button
             onClick={() => onDone(action.id)}
+            className="text-[12px] text-[#ededed] bg-[#1a1a1a] hover:bg-[#252525] px-3 py-1 rounded"
           >
             Done
-          </Button>
+          </button>
         </div>
       </div>
     </div>
   )
 }
 
-// Summary stats
+// Summary stats - inline, minimal
 function TodayStats({ actions }: { actions: ActionItem[] }) {
   const nowCount = actions.filter(a => a.urgency === 'now').length
   const todayCount = actions.filter(a => a.urgency === 'today').length
@@ -160,21 +170,21 @@ function TodayStats({ actions }: { actions: ActionItem[] }) {
   const avgImpact = Math.round(actions.reduce((acc, a) => acc + a.impact, 0) / actions.length) || 0
 
   return (
-    <div className="flex items-center gap-6 text-sm">
+    <div className="flex items-center gap-6 text-[12px]">
       <div className="flex items-center gap-2">
-        <span className="w-2 h-2 rounded-full bg-status-critical animate-pulse" />
-        <span className="text-foreground-secondary">{nowCount} urgent</span>
+        <span className="w-1.5 h-1.5 rounded-full bg-[#ff4444] animate-pulse" />
+        <span className="text-[#888]">{nowCount} urgent</span>
       </div>
       <div className="flex items-center gap-2">
-        <span className="w-2 h-2 rounded-full bg-status-warning" />
-        <span className="text-foreground-secondary">{todayCount} today</span>
+        <span className="w-1.5 h-1.5 rounded-full bg-[#f5a623]" />
+        <span className="text-[#888]">{todayCount} today</span>
       </div>
       <div className="flex items-center gap-2">
-        <span className="w-2 h-2 rounded-full bg-foreground-tertiary" />
-        <span className="text-foreground-secondary">{weekCount} this week</span>
+        <span className="w-1.5 h-1.5 rounded-full bg-[#555]" />
+        <span className="text-[#888]">{weekCount} this week</span>
       </div>
-      <div className="ml-auto text-foreground-tertiary">
-        Avg. impact: <span className="font-mono text-foreground">{avgImpact}%</span>
+      <div className="ml-auto text-[#555]">
+        Avg impact: <span className="font-mono text-[#ededed]">{avgImpact}%</span>
       </div>
     </div>
   )
@@ -187,8 +197,7 @@ interface TodayTabProps {
 export function TodayTab({ teamType = 'launch' }: TodayTabProps) {
   const initialActions = useMemo(() => getActionsForTeamType(teamType), [teamType])
   const [actions, setActions] = useState<ActionItem[]>(initialActions)
-  const [filter, setFilter] = useState<'all' | 'now' | 'today' | 'this-week'>('all')
-  const teamConfig = TEAM_TYPES[teamType]
+  const [filter, setFilter] = useState<'all' | Urgency>('all')
 
   // Filter actions
   const filteredActions = filter === 'all'
@@ -203,41 +212,52 @@ export function TodayTab({ teamType = 'launch' }: TodayTabProps) {
   }
 
   const handleSnooze = (id: string) => {
-    // Move to next urgency level
     setActions(prev => prev.map(a => {
       if (a.id !== id) return a
-      const newUrgency = a.urgency === 'now' ? 'today' : 'this-week'
-      return { ...a, urgency: newUrgency as keyof typeof URGENCY_LEVELS }
+      const newUrgency: Urgency = a.urgency === 'now' ? 'today' : 'this-week'
+      return { ...a, urgency: newUrgency }
     }))
   }
 
+  // Team-specific copy
+  const impactTarget = {
+    launch: 'launch date',
+    product: 'sprint goals',
+    agency: 'client deliverables',
+    engineering: 'deploy velocity',
+  }[teamType]
+
   return (
-    <div className="p-6 space-y-6">
+    <div className="space-y-4">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-xl font-semibold text-foreground">Your Action Queue</h2>
-          <p className="text-sm text-foreground-secondary mt-1">
-            Actions ranked by impact on your {teamType === 'launch' ? 'launch date' : teamType === 'product' ? 'sprint goals' : teamType === 'agency' ? 'client deliverables' : 'deploy velocity'}
+          <h2 className="text-[20px] font-semibold text-[#ededed] tracking-[-0.5px]">Your Action Queue</h2>
+          <p className="text-[13px] text-[#888] mt-1">
+            Actions ranked by impact on your {impactTarget}
           </p>
         </div>
-        <NexFlowStatus />
+        {/* NexFlow status indicator */}
+        <div className="flex items-center gap-2 px-2.5 py-1 rounded-full border border-[#d4a574]/20">
+          <span className="w-1.5 h-1.5 rounded-full bg-[#d4a574] animate-pulse" />
+          <span className="text-[11px] font-mono text-[#d4a574]">NexFlow AI</span>
+        </div>
       </div>
 
       {/* Stats bar */}
       <TodayStats actions={actions} />
 
-      {/* Filter tabs */}
-      <div className="flex items-center gap-1 p-1 bg-background-secondary rounded-lg w-fit">
+      {/* Filter tabs - minimal */}
+      <div className="flex items-center gap-1">
         {(['all', 'now', 'today', 'this-week'] as const).map(f => (
           <button
             key={f}
             onClick={() => setFilter(f)}
             className={cn(
-              'px-3 py-1.5 text-sm rounded-md transition-colors',
+              'px-3 py-1.5 text-[13px] rounded-md transition-colors',
               filter === f
-                ? 'bg-foreground text-background font-medium'
-                : 'text-foreground-secondary hover:text-foreground'
+                ? 'bg-[#ededed] text-[#000] font-medium'
+                : 'text-[#888] hover:text-[#ededed]'
             )}
           >
             {f === 'all' ? 'All' :
@@ -248,43 +268,40 @@ export function TodayTab({ teamType = 'launch' }: TodayTabProps) {
       </div>
 
       {/* Action list */}
-      <Card padding="none">
-        <CardContent className="p-0">
-          {sortedActions.length > 0 ? (
-            sortedActions.map(action => (
-              <ActionRow
-                key={action.id}
-                action={action}
-                onDone={handleDone}
-                onSnooze={handleSnooze}
-              />
-            ))
-          ) : (
-            <div className="p-8 text-center">
-              <div className="w-12 h-12 rounded-full bg-status-success-muted flex items-center justify-center mx-auto mb-3">
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" className="text-status-success">
-                  <path d="M5 12L10 17L19 8" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                </svg>
-              </div>
-              <h3 className="text-foreground font-medium mb-1">All clear</h3>
-              <p className="text-sm text-foreground-secondary">
-                No {filter === 'all' ? '' : filter === 'now' ? 'urgent ' : filter === 'today' ? "today's " : "this week's "}actions remaining
-              </p>
+      <div className="bg-[#0a0a0a] border border-[#1a1a1a] rounded-md overflow-hidden">
+        {sortedActions.length > 0 ? (
+          sortedActions.map(action => (
+            <ActionRow
+              key={action.id}
+              action={action}
+              onDone={handleDone}
+              onSnooze={handleSnooze}
+            />
+          ))
+        ) : (
+          <div className="p-8 text-center">
+            <div className="w-10 h-10 rounded-full bg-[#50e3c2]/10 flex items-center justify-center mx-auto mb-3">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" className="text-[#50e3c2]">
+                <path d="M5 12L10 17L19 8" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+              </svg>
             </div>
-          )}
-        </CardContent>
-      </Card>
+            <h3 className="text-[14px] font-medium text-[#ededed] mb-1">All clear</h3>
+            <p className="text-[12px] text-[#555]">
+              No {filter === 'all' ? '' : filter === 'now' ? 'urgent ' : filter === 'today' ? "today's " : "this week's "}actions remaining
+            </p>
+          </div>
+        )}
+      </div>
 
-      {/* NexFlow explanation */}
-      <div className="p-4 bg-nf-muted border border-nf/20 rounded-lg">
+      {/* NexFlow explanation - minimal */}
+      <div className="p-4 border border-[#d4a574]/20 rounded-md">
         <div className="flex items-start gap-3">
-          <BreathingDot variant="nf" size="md" />
+          <span className="w-2 h-2 rounded-full bg-[#d4a574] mt-1.5 animate-pulse" />
           <div>
-            <h4 className="text-sm font-medium text-nf mb-1">How NexFlow ranks your actions</h4>
-            <p className="text-xs text-foreground-secondary leading-relaxed">
+            <h4 className="text-[13px] font-medium text-[#d4a574] mb-1">How NexFlow ranks your actions</h4>
+            <p className="text-[12px] text-[#555] leading-[1.5]">
               NexFlow analyzes your codebase, project tracker, and comms to calculate impact scores.
               Actions blocking other work or affecting your ship date are ranked highest.
-              The AI continuously re-ranks as you complete actions and new information arrives.
             </p>
           </div>
         </div>

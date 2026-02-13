@@ -17,7 +17,7 @@ import {
   ScheduleTab,
   ProjectsTab,
 } from '@/components/dashboard/tabs'
-import { LAYOUT, type TeamType } from '@/lib/theme'
+import { type TeamType } from '@/lib/theme'
 
 // Tab badges (would come from real data)
 const DEFAULT_TAB_BADGES: Record<string, number> = {
@@ -103,7 +103,7 @@ export function DashboardWrapper({ user, workspace }: DashboardWrapperProps) {
 
   return (
     <div className="min-h-screen bg-black">
-      {/* New header with role switcher */}
+      {/* Header - 52px fixed height */}
       <NexFlowHeader
         user={{
           ...user,
@@ -116,13 +116,8 @@ export function DashboardWrapper({ user, workspace }: DashboardWrapperProps) {
       />
 
       {/* Main content - Vercel-style centered layout */}
-      <main
-        className="mx-auto"
-        style={{
-          maxWidth: `${LAYOUT.maxContentWidth}px`,
-          padding: `${LAYOUT.pagePadding}px`,
-        }}
-      >
+      {/* 880px max width, 24px padding on sides, 16px top padding below tabs */}
+      <main className="mx-auto px-6 pt-4 pb-8" style={{ maxWidth: 880 }}>
         {renderTab()}
       </main>
     </div>

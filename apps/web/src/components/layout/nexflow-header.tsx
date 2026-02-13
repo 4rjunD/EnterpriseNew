@@ -2,9 +2,8 @@
 
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
-import { useSession, signOut } from 'next-auth/react'
+import { signOut } from 'next-auth/react'
 import { cn } from '@nexflow/ui/utils'
-import { trpc } from '@/lib/trpc'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -14,45 +13,41 @@ import {
   DropdownMenuTrigger,
 } from '@nexflow/ui/dropdown-menu'
 import { Settings, LogOut, User, Plus } from 'lucide-react'
-import { BreathingDot } from '@/components/nf/breathing-dot'
 import type { TeamType } from '@/lib/theme'
+import { TEAM_TYPES, getTabsForRole } from '@/lib/theme'
 
-// Role colors
+// Role colors - minimal, just text colors
 const ROLE_COLORS = {
-  cofounder: { bg: 'bg-[#a78bfa]', text: 'text-white', label: 'Co-founder' },
-  admin: { bg: 'bg-[#50e3c2]', text: 'text-black', label: 'Admin' },
-  member: { bg: 'bg-[#0070f3]', text: 'text-white', label: 'Member' },
+  cofounder: { color: '#a78bfa', label: 'Co-founder' },
+  admin: { color: '#50e3c2', label: 'Admin' },
+  member: { color: '#555', label: 'Member' },
 } as const
 
 type UserRole = keyof typeof ROLE_COLORS
 
-// Import team type configs from theme
-import { TEAM_TYPES, getTabsForRole } from '@/lib/theme'
-
-
-// Mock team members (will be replaced with real data)
+// Mock team members
 const MOCK_TEAM = [
   { id: '1', name: 'You', role: 'cofounder' as UserRole },
   { id: '2', name: 'Sarah', role: 'admin' as UserRole },
   { id: '3', name: 'Mike', role: 'member' as UserRole },
 ]
 
-// Logo component
+// Logo - simple triangle
 function NexFlowLogo() {
   return (
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="white">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="white">
       <path d="M12 2L2 22h20L12 2z" />
     </svg>
   )
 }
 
-// Animated number component
+// Animated metric
 function AnimatedMetric({ value, unit, color }: { value: number; unit: string; color: string }) {
   const [displayValue, setDisplayValue] = useState(0)
 
   useEffect(() => {
-    const duration = 1000
-    const steps = 30
+    const duration = 800
+    const steps = 20
     const increment = value / steps
     let current = 0
     const timer = setInterval(() => {
@@ -68,7 +63,7 @@ function AnimatedMetric({ value, unit, color }: { value: number; unit: string; c
   }, [value])
 
   return (
-    <span className={cn('font-mono font-medium tabular-nums', color)}>
+    <span className="text-[13px] font-mono font-semibold tabular-nums" style={{ color }}>
       {displayValue}{unit}
     </span>
   )
@@ -79,13 +74,13 @@ function DaysCounter({ targetDate }: { targetDate?: Date }) {
   const [now, setNow] = useState(new Date())
 
   useEffect(() => {
-    const timer = setInterval(() => setNow(new Date()), 1000)
+    const timer = setInterval(() => setNow(new Date()), 60000) // Update every minute
     return () => clearInterval(timer)
   }, [])
 
   if (!targetDate) {
     return (
-      <span className="text-xs text-gray-500 font-mono">
+      <span className="text-[11px] font-mono text-[#555]">
         {now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}
       </span>
     )
@@ -96,31 +91,29 @@ function DaysCounter({ targetDate }: { targetDate?: Date }) {
   const isWarning = diff <= 14 && diff > 7
 
   return (
-    <div className={cn(
-      'px-2 py-1 rounded text-xs font-mono',
-      isUrgent ? 'bg-red-500/20 text-red-400' :
-      isWarning ? 'bg-amber-500/20 text-amber-400' :
-      'bg-gray-800 text-gray-400'
+    <span className={cn(
+      'text-[11px] font-mono px-1.5 py-0.5 rounded',
+      isUrgent ? 'text-[#ff4444]' :
+      isWarning ? 'text-[#f5a623]' :
+      'text-[#555]'
     )}>
       {diff}d left
-    </div>
+    </span>
   )
 }
 
-// Role switcher (segmented buttons)
+// Role switcher - minimal segmented control
 function RoleSwitcher({
   members,
-  currentUserId,
   viewAsRole,
   onRoleChange
 }: {
   members: typeof MOCK_TEAM
-  currentUserId: string
   viewAsRole: UserRole
   onRoleChange: (role: UserRole) => void
 }) {
   return (
-    <div className="flex items-center border border-[#333] rounded-md overflow-hidden">
+    <div className="flex items-center border border-[#1a1a1a] rounded overflow-hidden">
       {members.map((member) => {
         const roleConfig = ROLE_COLORS[member.role]
         const isActive = member.role === viewAsRole
@@ -129,15 +122,15 @@ function RoleSwitcher({
             key={member.id}
             onClick={() => onRoleChange(member.role)}
             className={cn(
-              'flex items-center gap-1.5 px-2 py-1 text-xs transition-colors',
-              isActive ? 'bg-[#1a1a1a]' : 'bg-transparent hover:bg-[#111]'
+              'flex items-center gap-1.5 px-2 py-1 text-[11px] transition-colors',
+              isActive ? 'bg-[#1a1a1a]' : 'bg-transparent hover:bg-[#0a0a0a]'
             )}
           >
-            <span className="text-white">{member.name}</span>
-            <span className={cn(
-              'px-1.5 py-0.5 rounded text-[10px] font-medium',
-              roleConfig.bg, roleConfig.text
-            )}>
+            <span className="text-[#ededed]">{member.name}</span>
+            <span
+              className="text-[9px] font-mono font-medium uppercase"
+              style={{ color: roleConfig.color }}
+            >
               {member.role === 'cofounder' ? 'CF' : member.role === 'admin' ? 'A' : 'M'}
             </span>
           </button>
@@ -147,13 +140,11 @@ function RoleSwitcher({
   )
 }
 
-// Tab badge
+// Tab badge - small red dot or number
 function TabBadge({ count }: { count: number }) {
   if (count <= 0) return null
   return (
-    <span className="ml-1.5 px-1.5 py-0.5 bg-red-500 text-white text-[10px] font-medium rounded-full min-w-[18px] text-center">
-      {count}
-    </span>
+    <span className="ml-1 w-1.5 h-1.5 rounded-full bg-[#ff4444]" />
   )
 }
 
@@ -187,7 +178,7 @@ export function NexFlowHeader({
   const tabs = getTabsForRole(teamType, viewAsRole)
   const teamConfig = TEAM_TYPES[teamType]
 
-  // Mock metric value (would come from real data)
+  // Mock metric value
   const metricValue = teamType === 'engineering' ? 7 : 78
 
   const initials = user.name
@@ -200,103 +191,100 @@ export function NexFlowHeader({
 
   return (
     <div className="bg-black border-b border-[#1a1a1a]">
-      {/* Main header row */}
-      <div className="h-[52px] flex items-center justify-between px-4">
-        {/* Left section */}
+      {/* Main header - 52px */}
+      <div className="h-[52px] flex items-center justify-between px-6">
+        {/* Left */}
         <div className="flex items-center gap-3">
-          {/* Logo and name */}
           <Link href="/dashboard" className="flex items-center gap-2">
             <NexFlowLogo />
-            <span className="text-sm font-semibold text-white">NexFlow</span>
+            <span className="text-[13px] font-semibold text-white">NexFlow</span>
           </Link>
 
-          <span className="text-gray-600">/</span>
+          <span className="text-[#333]">/</span>
 
-          {/* Workspace name */}
-          <span className="text-sm text-gray-300">
+          <span className="text-[13px] text-[#888]">
             {workspace?.name || 'Workspace'}
           </span>
 
-          {/* Role switcher */}
           <RoleSwitcher
             members={MOCK_TEAM}
-            currentUserId={user.id}
             viewAsRole={viewAsRole}
             onRoleChange={setViewAsRole}
           />
         </div>
 
-        {/* Right section */}
-        <div className="flex items-center gap-4">
-          {/* NexFlow AI pill */}
-          <div className="flex items-center gap-2 px-3 py-1.5 bg-[#1a1a1a] rounded-full border border-[#333]">
-            <BreathingDot variant="warning" size="sm" />
-            <span className="text-xs text-amber-400">NexFlow AI active</span>
+        {/* Right */}
+        <div className="flex items-center gap-3">
+          {/* NexFlow AI pill - minimal */}
+          <div className="flex items-center gap-1.5 px-2 py-1 border border-[#d4a574]/30 rounded">
+            <span className="w-1.5 h-1.5 rounded-full bg-[#d4a574] animate-pulse" />
+            <span className="text-[11px] font-mono text-[#d4a574]">AI</span>
           </div>
 
-          {/* Primary metric pill */}
-          <div className="flex items-center gap-2 px-3 py-1.5 bg-[#1a1a1a] rounded-full border border-[#333]">
+          {/* Metric pill */}
+          <div className="flex items-center gap-1.5 px-2 py-1 border border-[#1a1a1a] rounded">
             <AnimatedMetric
               value={metricValue}
               unit={teamConfig.primaryMetricUnit}
               color={
                 teamType === 'engineering'
-                  ? metricValue >= 5 ? 'text-green-400' : metricValue >= 3 ? 'text-amber-400' : 'text-red-400'
-                  : metricValue >= 70 ? 'text-green-400' : metricValue >= 50 ? 'text-amber-400' : 'text-red-400'
+                  ? metricValue >= 5 ? '#50e3c2' : metricValue >= 3 ? '#f5a623' : '#ff4444'
+                  : metricValue >= 70 ? '#50e3c2' : metricValue >= 50 ? '#f5a623' : '#ff4444'
               }
             />
-            <span className="text-xs text-gray-500">{teamType === 'launch' ? 'launch' : teamType === 'product' ? 'sprint' : teamType === 'agency' ? 'util' : 'deploys'}</span>
+            <span className="text-[10px] font-mono text-[#555] uppercase">
+              {teamType === 'launch' ? 'launch' : teamType === 'product' ? 'sprint' : teamType === 'agency' ? 'util' : 'deploys'}
+            </span>
           </div>
 
-          {/* Days counter */}
           <DaysCounter targetDate={workspace?.targetDate} />
 
           {/* User dropdown */}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <button className="flex items-center gap-2 px-2 py-1 rounded hover:bg-[#1a1a1a] transition-colors">
-                <div className="w-7 h-7 rounded-full bg-gray-700 flex items-center justify-center text-xs font-medium text-white">
+                <div className="w-6 h-6 rounded-full bg-[#1a1a1a] flex items-center justify-center text-[10px] font-medium text-white">
                   {user.image ? (
                     <img src={user.image} alt="" className="w-full h-full rounded-full object-cover" />
                   ) : (
                     initials
                   )}
                 </div>
-                <span className="text-sm text-white hidden md:inline">{user.name || user.email}</span>
-                <span className={cn(
-                  'px-1.5 py-0.5 rounded text-[10px] font-medium',
-                  roleConfig.bg, roleConfig.text
-                )}>
+                <span className="text-[12px] text-[#ededed] hidden md:inline">{user.name || user.email}</span>
+                <span
+                  className="text-[9px] font-mono font-medium uppercase"
+                  style={{ color: roleConfig.color }}
+                >
                   {roleConfig.label}
                 </span>
               </button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-56 bg-[#1a1a1a] border-[#333]">
-              <DropdownMenuLabel className="text-gray-300">
-                <div className="flex flex-col space-y-1">
-                  <p className="text-sm font-medium text-white">{user.name}</p>
-                  <p className="text-xs text-gray-500">{user.email}</p>
+            <DropdownMenuContent align="end" className="w-48 bg-[#0a0a0a] border-[#1a1a1a]">
+              <DropdownMenuLabel className="text-[#888]">
+                <div className="flex flex-col">
+                  <p className="text-[12px] font-medium text-[#ededed]">{user.name}</p>
+                  <p className="text-[10px] text-[#555]">{user.email}</p>
                 </div>
               </DropdownMenuLabel>
-              <DropdownMenuSeparator className="bg-[#333]" />
-              <DropdownMenuItem asChild className="text-gray-300 hover:bg-[#252525] hover:text-white cursor-pointer">
+              <DropdownMenuSeparator className="bg-[#1a1a1a]" />
+              <DropdownMenuItem asChild className="text-[12px] text-[#888] hover:bg-[#1a1a1a] hover:text-[#ededed] cursor-pointer">
                 <Link href="/dashboard/profile">
-                  <User className="mr-2 h-4 w-4" />
+                  <User className="mr-2 h-3.5 w-3.5" />
                   Profile
                 </Link>
               </DropdownMenuItem>
-              <DropdownMenuItem asChild className="text-gray-300 hover:bg-[#252525] hover:text-white cursor-pointer">
+              <DropdownMenuItem asChild className="text-[12px] text-[#888] hover:bg-[#1a1a1a] hover:text-[#ededed] cursor-pointer">
                 <Link href="/dashboard/settings">
-                  <Settings className="mr-2 h-4 w-4" />
+                  <Settings className="mr-2 h-3.5 w-3.5" />
                   Settings
                 </Link>
               </DropdownMenuItem>
-              <DropdownMenuSeparator className="bg-[#333]" />
+              <DropdownMenuSeparator className="bg-[#1a1a1a]" />
               <DropdownMenuItem
                 onClick={() => signOut({ callbackUrl: '/login' })}
-                className="text-red-400 hover:bg-[#252525] hover:text-red-300 cursor-pointer"
+                className="text-[12px] text-[#ff4444] hover:bg-[#1a1a1a] cursor-pointer"
               >
-                <LogOut className="mr-2 h-4 w-4" />
+                <LogOut className="mr-2 h-3.5 w-3.5" />
                 Sign out
               </DropdownMenuItem>
             </DropdownMenuContent>
@@ -304,9 +292,9 @@ export function NexFlowHeader({
         </div>
       </div>
 
-      {/* Tab bar */}
-      <div className="flex items-center justify-between px-4 border-t border-[#1a1a1a]">
-        <nav className="flex items-center gap-1">
+      {/* Tab bar - 40px */}
+      <div className="h-[40px] flex items-center justify-between px-6 border-t border-[#1a1a1a]">
+        <nav className="flex items-center">
           {tabs.map((tab) => {
             const isActive = activeTab.toLowerCase() === tab.toLowerCase()
             const badge = tabBadges[tab.toLowerCase()] || 0
@@ -315,8 +303,8 @@ export function NexFlowHeader({
                 key={tab}
                 onClick={() => onTabChange(tab.toLowerCase())}
                 className={cn(
-                  'relative px-3 py-2.5 text-sm transition-colors',
-                  isActive ? 'text-white' : 'text-gray-500 hover:text-gray-300'
+                  'relative px-3 py-2 text-[13px] transition-colors',
+                  isActive ? 'text-[#ededed]' : 'text-[#555] hover:text-[#888]'
                 )}
               >
                 <span className="flex items-center">
@@ -324,18 +312,18 @@ export function NexFlowHeader({
                   <TabBadge count={badge} />
                 </span>
                 {isActive && (
-                  <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-white" />
+                  <div className="absolute bottom-0 left-3 right-3 h-px bg-[#ededed]" />
                 )}
               </button>
             )
           })}
         </nav>
 
-        {/* Invite button (cofounder/admin only) */}
+        {/* Invite button */}
         {(viewAsRole === 'cofounder' || viewAsRole === 'admin') && (
           <Link
             href="/dashboard/invite"
-            className="flex items-center gap-1.5 px-3 py-1.5 text-xs text-gray-400 hover:text-white border border-[#333] rounded hover:border-[#555] transition-colors"
+            className="flex items-center gap-1 px-2 py-1 text-[11px] text-[#555] hover:text-[#888] border border-[#1a1a1a] rounded hover:border-[#252525] transition-colors"
           >
             <Plus className="w-3 h-3" />
             Invite

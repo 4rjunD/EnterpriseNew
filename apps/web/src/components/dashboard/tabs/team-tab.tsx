@@ -2,11 +2,6 @@
 
 import { useState } from 'react'
 import { cn } from '@nexflow/ui/utils'
-import { Card, CardHeader, CardTitle, CardContent } from '@/components/nf/card'
-import { Badge, RoleBadge } from '@/components/nf/badge'
-import { BreathingDot } from '@/components/nf/breathing-dot'
-import { AnimPercent, StatCounter } from '@/components/nf/anim-num'
-import { Progress } from '@/components/nf/progress'
 import { ROLES, type UserRole } from '@/lib/theme'
 
 // Team member type
@@ -86,94 +81,113 @@ const mockTeam: TeamMember[] = [
   },
 ]
 
-// Member card component
+// Member card component - clean, minimal
 function MemberCard({ member }: { member: TeamMember }) {
-  const roleConfig = ROLES[member.role]
   const isOverloaded = member.load > 100
+  const hasBlockers = member.blockers > 0
+
+  // Determine card accent
+  const accentColor = isOverloaded ? '#f5a623' : hasBlockers ? '#ff4444' : undefined
 
   return (
-    <Card
-      hover
-      glow={isOverloaded ? 'warning' : member.blockers > 0 ? 'critical' : 'none'}
+    <div
+      className={cn(
+        'bg-[#0a0a0a] border border-[#1a1a1a] rounded-md transition-colors hover:border-[#252525]',
+        accentColor && 'border-l-2'
+      )}
+      style={accentColor ? { borderLeftColor: accentColor } : undefined}
     >
-      <CardContent className="p-4">
+      <div className="p-4">
         {/* Header */}
-        <div className="flex items-start gap-3 mb-4">
-          {/* Avatar */}
-          <div className="relative">
-            <div className={cn(
-              'w-10 h-10 rounded-full flex items-center justify-center text-sm font-medium',
-              roleConfig.bgClass, roleConfig.colorClass
-            )}>
+        <div className="flex items-start gap-3 mb-3">
+          {/* Avatar with status */}
+          <div className="relative flex-shrink-0">
+            <div className="w-9 h-9 rounded-full bg-[#1a1a1a] flex items-center justify-center text-[13px] font-medium text-[#ededed]">
               {member.name.charAt(0)}
             </div>
-            {/* Status indicator */}
             <div className={cn(
-              'absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full border-2 border-background-card',
-              member.status === 'online' && 'bg-status-success',
-              member.status === 'away' && 'bg-status-warning',
-              member.status === 'offline' && 'bg-foreground-tertiary'
+              'absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full border-2 border-[#0a0a0a]',
+              member.status === 'online' && 'bg-[#50e3c2]',
+              member.status === 'away' && 'bg-[#f5a623]',
+              member.status === 'offline' && 'bg-[#555]'
             )} />
           </div>
 
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2">
-              <span className="text-sm font-medium text-foreground truncate">{member.name}</span>
-              <RoleBadge role={member.role} />
+              <span className="text-[13px] font-medium text-[#ededed] truncate">{member.name}</span>
+              {/* Role - minimal text label */}
+              <span className={cn(
+                'text-[10px] font-mono uppercase tracking-[0.5px]',
+                member.role === 'cofounder' && 'text-[#a78bfa]',
+                member.role === 'admin' && 'text-[#50e3c2]',
+                member.role === 'member' && 'text-[#555]'
+              )}>
+                {member.role === 'cofounder' ? 'Co-founder' : member.role === 'admin' ? 'Admin' : 'Member'}
+              </span>
             </div>
-            <p className="text-xs text-foreground-secondary truncate">{member.email}</p>
+            <p className="text-[11px] font-mono text-[#555] truncate">{member.email}</p>
           </div>
 
-          {/* Blockers indicator */}
-          {member.blockers > 0 && (
-            <Badge variant="critical" size="sm">
-              {member.blockers} blocker{member.blockers > 1 ? 's' : ''}
-            </Badge>
+          {/* Blockers - small dot indicator */}
+          {hasBlockers && (
+            <div className="flex items-center gap-1 text-[11px] font-mono text-[#ff4444]">
+              <span className="w-1.5 h-1.5 rounded-full bg-[#ff4444]" />
+              <span>{member.blockers}</span>
+            </div>
           )}
         </div>
 
-        {/* Focus */}
+        {/* Focus - subtle */}
         {member.focus && (
-          <div className="mb-4 px-3 py-2 bg-background-secondary rounded-md">
-            <span className="text-xs text-foreground-tertiary">Currently working on:</span>
-            <p className="text-sm text-foreground">{member.focus}</p>
+          <div className="mb-3 text-[12px]">
+            <span className="text-[#555]">Working on: </span>
+            <span className="text-[#888]">{member.focus}</span>
           </div>
         )}
 
-        {/* Stats */}
-        <div className="space-y-3">
+        {/* Stats bars */}
+        <div className="space-y-2">
           {/* Velocity */}
           <div>
-            <div className="flex justify-between text-xs mb-1">
-              <span className="text-foreground-secondary">Velocity</span>
+            <div className="flex justify-between text-[11px] font-mono mb-1">
+              <span className="text-[#555]">Velocity</span>
               <span className={cn(
-                'font-mono',
-                member.velocity >= 80 ? 'text-status-success' :
-                member.velocity >= 60 ? 'text-status-warning' :
-                'text-status-critical'
+                member.velocity >= 80 ? 'text-[#50e3c2]' :
+                member.velocity >= 60 ? 'text-[#f5a623]' :
+                'text-[#ff4444]'
               )}>{member.velocity}%</span>
             </div>
-            <Progress value={member.velocity} showGlow={false} />
+            <div className="h-1 bg-[#1a1a1a] rounded-full overflow-hidden">
+              <div
+                className={cn(
+                  'h-full rounded-full',
+                  member.velocity >= 80 ? 'bg-[#50e3c2]' :
+                  member.velocity >= 60 ? 'bg-[#f5a623]' :
+                  'bg-[#ff4444]'
+                )}
+                style={{ width: `${member.velocity}%` }}
+              />
+            </div>
           </div>
 
           {/* Workload */}
           <div>
-            <div className="flex justify-between text-xs mb-1">
-              <span className="text-foreground-secondary">Workload</span>
+            <div className="flex justify-between text-[11px] font-mono mb-1">
+              <span className="text-[#555]">Workload</span>
               <span className={cn(
-                'font-mono',
-                member.load <= 80 ? 'text-status-success' :
-                member.load <= 100 ? 'text-status-warning' :
-                'text-status-critical'
+                member.load <= 80 ? 'text-[#50e3c2]' :
+                member.load <= 100 ? 'text-[#f5a623]' :
+                'text-[#ff4444]'
               )}>{member.load}%</span>
             </div>
-            <div className="h-1.5 bg-background-tertiary rounded-full overflow-hidden">
+            <div className="h-1 bg-[#1a1a1a] rounded-full overflow-hidden">
               <div
                 className={cn(
-                  'h-full rounded-full transition-all',
-                  member.load <= 80 ? 'bg-status-success' :
-                  member.load <= 100 ? 'bg-status-warning' :
-                  'bg-status-critical'
+                  'h-full rounded-full',
+                  member.load <= 80 ? 'bg-[#50e3c2]' :
+                  member.load <= 100 ? 'bg-[#f5a623]' :
+                  'bg-[#ff4444]'
                 )}
                 style={{ width: `${Math.min(member.load, 100)}%` }}
               />
@@ -181,64 +195,55 @@ function MemberCard({ member }: { member: TeamMember }) {
           </div>
         </div>
 
-        {/* Quick stats */}
-        <div className="mt-4 pt-3 border-t border-border grid grid-cols-3 gap-2 text-center">
-          <div>
-            <div className="text-lg font-mono text-foreground">{member.tasksCompleted}</div>
-            <div className="text-xs text-foreground-tertiary">Tasks</div>
-          </div>
-          <div>
-            <div className="text-lg font-mono text-foreground">{member.prsReviewed}</div>
-            <div className="text-xs text-foreground-tertiary">Reviews</div>
-          </div>
-          <div>
-            <div className={cn(
-              'text-lg font-mono',
-              member.avgReviewTime <= 4 ? 'text-status-success' :
-              member.avgReviewTime <= 8 ? 'text-status-warning' :
-              'text-status-critical'
-            )}>{member.avgReviewTime}h</div>
-            <div className="text-xs text-foreground-tertiary">Avg Review</div>
+        {/* Quick stats - grid with border dividers */}
+        <div className="mt-3 pt-3 border-t border-[#1a1a1a]">
+          <div className="grid grid-cols-3 gap-px bg-[#1a1a1a] rounded overflow-hidden">
+            <div className="bg-[#0a0a0a] p-2 text-center">
+              <div className="text-[16px] font-mono font-semibold text-[#ededed]">{member.tasksCompleted}</div>
+              <div className="text-[10px] font-mono uppercase tracking-[0.5px] text-[#555]">Tasks</div>
+            </div>
+            <div className="bg-[#0a0a0a] p-2 text-center">
+              <div className="text-[16px] font-mono font-semibold text-[#ededed]">{member.prsReviewed}</div>
+              <div className="text-[10px] font-mono uppercase tracking-[0.5px] text-[#555]">Reviews</div>
+            </div>
+            <div className="bg-[#0a0a0a] p-2 text-center">
+              <div className={cn(
+                'text-[16px] font-mono font-semibold',
+                member.avgReviewTime <= 4 ? 'text-[#50e3c2]' :
+                member.avgReviewTime <= 8 ? 'text-[#f5a623]' :
+                'text-[#ff4444]'
+              )}>{member.avgReviewTime}h</div>
+              <div className="text-[10px] font-mono uppercase tracking-[0.5px] text-[#555]">Avg Review</div>
+            </div>
           </div>
         </div>
-      </CardContent>
-    </Card>
+      </div>
+    </div>
   )
 }
 
-// Team stats
+// Team stats - 4 column grid
 function TeamStats({ team }: { team: TeamMember[] }) {
   const avgVelocity = Math.round(team.reduce((acc, m) => acc + m.velocity, 0) / team.length)
   const overloaded = team.filter(m => m.load > 100).length
   const totalBlockers = team.reduce((acc, m) => acc + m.blockers, 0)
   const online = team.filter(m => m.status === 'online').length
 
+  const stats = [
+    { value: `${avgVelocity}%`, label: 'Team Velocity', color: '#ededed' },
+    { value: overloaded.toString(), label: 'Overloaded', color: overloaded > 0 ? '#f5a623' : '#ededed' },
+    { value: totalBlockers.toString(), label: 'Total Blockers', color: totalBlockers > 0 ? '#ff4444' : '#ededed' },
+    { value: `${online}/${team.length}`, label: 'Online Now', color: '#50e3c2' },
+  ]
+
   return (
-    <div className="grid grid-cols-4 gap-4">
-      <Card padding="sm">
-        <CardContent className="p-3">
-          <div className="text-2xl font-mono font-medium text-foreground">{avgVelocity}%</div>
-          <div className="text-xs text-foreground-secondary">Team Velocity</div>
-        </CardContent>
-      </Card>
-      <Card padding="sm" glow={overloaded > 0 ? 'warning' : 'none'}>
-        <CardContent className="p-3">
-          <div className="text-2xl font-mono font-medium text-status-warning">{overloaded}</div>
-          <div className="text-xs text-foreground-secondary">Overloaded</div>
-        </CardContent>
-      </Card>
-      <Card padding="sm" glow={totalBlockers > 0 ? 'critical' : 'none'}>
-        <CardContent className="p-3">
-          <div className="text-2xl font-mono font-medium text-status-critical">{totalBlockers}</div>
-          <div className="text-xs text-foreground-secondary">Total Blockers</div>
-        </CardContent>
-      </Card>
-      <Card padding="sm">
-        <CardContent className="p-3">
-          <div className="text-2xl font-mono font-medium text-status-success">{online}/{team.length}</div>
-          <div className="text-xs text-foreground-secondary">Online Now</div>
-        </CardContent>
-      </Card>
+    <div className="grid grid-cols-4 gap-3">
+      {stats.map((stat, i) => (
+        <div key={i} className="bg-[#0a0a0a] border border-[#1a1a1a] rounded-md p-3">
+          <div className="text-[20px] font-mono font-semibold" style={{ color: stat.color }}>{stat.value}</div>
+          <div className="text-[10px] font-mono uppercase tracking-[0.5px] text-[#555] mt-1">{stat.label}</div>
+        </div>
+      ))}
     </div>
   )
 }
@@ -255,23 +260,23 @@ export function TeamTab() {
   })
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="space-y-4">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-xl font-semibold text-foreground">Team</h2>
-          <p className="text-sm text-foreground-secondary mt-1">
+          <h2 className="text-[20px] font-semibold text-[#ededed] tracking-[-0.5px]">Team</h2>
+          <p className="text-[13px] text-[#888] mt-1">
             Real-time team capacity and performance
           </p>
         </div>
 
-        {/* Sort control */}
+        {/* Sort control - minimal select */}
         <div className="flex items-center gap-2">
-          <span className="text-sm text-foreground-secondary">Sort by:</span>
+          <span className="text-[12px] text-[#555]">Sort by:</span>
           <select
             value={sortBy}
             onChange={(e) => setSortBy(e.target.value as typeof sortBy)}
-            className="bg-background-secondary border border-border rounded-md px-2 py-1 text-sm text-foreground"
+            className="bg-[#0a0a0a] border border-[#1a1a1a] rounded-md px-2 py-1 text-[13px] text-[#ededed] hover:border-[#252525] focus:border-[#252525] outline-none"
           >
             <option value="load">Workload</option>
             <option value="velocity">Velocity</option>
@@ -283,24 +288,23 @@ export function TeamTab() {
       {/* Stats */}
       <TeamStats team={team} />
 
-      {/* Team grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+      {/* Team grid - 2 columns on larger screens for better readability */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
         {sortedTeam.map(member => (
           <MemberCard key={member.id} member={member} />
         ))}
       </div>
 
-      {/* Load balancing suggestion */}
+      {/* Load balancing suggestion - minimal */}
       {team.some(m => m.load > 100) && team.some(m => m.load < 60) && (
-        <div className="p-4 bg-nf-muted border border-nf/20 rounded-lg">
+        <div className="p-4 border border-[#d4a574]/20 rounded-md">
           <div className="flex items-start gap-3">
-            <BreathingDot variant="nf" size="md" />
+            <span className="w-2 h-2 rounded-full bg-[#d4a574] mt-1.5 animate-pulse" />
             <div>
-              <h4 className="text-sm font-medium text-nf mb-1">Load Balancing Opportunity</h4>
-              <p className="text-xs text-foreground-secondary leading-relaxed">
+              <h4 className="text-[13px] font-medium text-[#d4a574] mb-1">Load Balancing Opportunity</h4>
+              <p className="text-[12px] text-[#555] leading-[1.5]">
                 NexFlow detected uneven workload distribution. Consider reassigning tasks from
-                overloaded team members to those with capacity. Click a team member to see
-                their task assignments.
+                overloaded team members to those with capacity.
               </p>
             </div>
           </div>

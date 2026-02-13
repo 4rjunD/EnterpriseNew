@@ -2,11 +2,7 @@
 
 import { useState } from 'react'
 import { cn } from '@nexflow/ui/utils'
-import { Card, CardHeader, CardTitle, CardContent } from '@/components/nf/card'
-import { Badge } from '@/components/nf/badge'
-import { BreathingDot } from '@/components/nf/breathing-dot'
-import { AnimPercent, StatCounter } from '@/components/nf/anim-num'
-import { Progress } from '@/components/nf/progress'
+import { TEAM_TYPES, type TeamType } from '@/lib/theme'
 
 // Milestone type
 interface Milestone {
@@ -89,7 +85,7 @@ function daysRemaining(date: Date): number {
   return Math.ceil(diff / (1000 * 60 * 60 * 24))
 }
 
-// Milestone card
+// Milestone card - clean
 function MilestoneCard({ milestone }: { milestone: Milestone }) {
   const days = daysRemaining(milestone.dueDate)
   const predictedDays = milestone.predictedCompletion
@@ -97,78 +93,89 @@ function MilestoneCard({ milestone }: { milestone: Milestone }) {
     : days
 
   const riskConfig = {
-    'on-track': { label: 'On Track', color: 'text-status-success', bg: 'bg-status-success-muted' },
-    'at-risk': { label: 'At Risk', color: 'text-status-warning', bg: 'bg-status-warning-muted' },
-    'delayed': { label: 'Delayed', color: 'text-status-critical', bg: 'bg-status-critical-muted' },
+    'on-track': { label: 'On Track', color: '#50e3c2' },
+    'at-risk': { label: 'At Risk', color: '#f5a623' },
+    'delayed': { label: 'Delayed', color: '#ff4444' },
   }[milestone.riskLevel]
 
+  const accentColor = milestone.riskLevel === 'delayed' ? '#ff4444' : milestone.riskLevel === 'at-risk' ? '#f5a623' : undefined
+
   return (
-    <Card
-      hover
-      glow={
-        milestone.riskLevel === 'delayed' ? 'critical' :
-        milestone.riskLevel === 'at-risk' ? 'warning' : 'none'
-      }
+    <div
+      className={cn(
+        'bg-[#0a0a0a] border border-[#1a1a1a] rounded-md transition-colors hover:border-[#252525]',
+        accentColor && 'border-l-2'
+      )}
+      style={accentColor ? { borderLeftColor: accentColor } : undefined}
     >
-      <CardContent className="p-4">
+      <div className="p-4">
         {/* Header */}
         <div className="flex items-start justify-between mb-3">
           <div>
-            <h3 className="text-sm font-medium text-foreground">{milestone.name}</h3>
+            <h3 className="text-[14px] font-medium text-[#ededed]">{milestone.name}</h3>
             {milestone.description && (
-              <p className="text-xs text-foreground-secondary mt-0.5">{milestone.description}</p>
+              <p className="text-[12px] text-[#555] mt-0.5">{milestone.description}</p>
             )}
           </div>
-          <Badge
-            variant="default"
-            size="sm"
-            className={cn(riskConfig.bg, riskConfig.color)}
+          <span
+            className="text-[10px] font-mono font-medium uppercase tracking-[0.5px]"
+            style={{ color: riskConfig.color }}
           >
             {riskConfig.label}
-          </Badge>
+          </span>
         </div>
 
         {/* Progress */}
-        <div className="mb-4">
-          <div className="flex justify-between text-xs mb-1.5">
-            <span className="text-foreground-secondary">
+        <div className="mb-3">
+          <div className="flex justify-between text-[11px] font-mono mb-1.5">
+            <span className="text-[#555]">
               {milestone.tasksCompleted}/{milestone.tasksTotal} tasks
             </span>
-            <span className="font-mono text-foreground">{milestone.progress}%</span>
+            <span className="text-[#ededed]">{milestone.progress}%</span>
           </div>
-          <Progress value={milestone.progress} />
+          <div className="h-1 bg-[#1a1a1a] rounded-full overflow-hidden">
+            <div
+              className={cn(
+                'h-full rounded-full',
+                milestone.riskLevel === 'on-track' ? 'bg-[#50e3c2]' :
+                milestone.riskLevel === 'at-risk' ? 'bg-[#f5a623]' :
+                'bg-[#ff4444]'
+              )}
+              style={{ width: `${milestone.progress}%` }}
+            />
+          </div>
         </div>
 
-        {/* Timeline */}
-        <div className="grid grid-cols-2 gap-4 p-3 bg-background-secondary rounded-md">
-          <div>
-            <div className="text-xs text-foreground-tertiary mb-1">Due Date</div>
-            <div className="text-sm font-medium text-foreground">
+        {/* Timeline - grid with border dividers */}
+        <div className="grid grid-cols-2 gap-px bg-[#1a1a1a] rounded overflow-hidden">
+          <div className="bg-[#0a0a0a] p-2">
+            <div className="text-[10px] font-mono uppercase tracking-[0.5px] text-[#555] mb-1">Due Date</div>
+            <div className="text-[13px] font-medium text-[#ededed]">
               {formatDate(milestone.dueDate)}
             </div>
             <div className={cn(
-              'text-xs',
-              days <= 0 ? 'text-status-critical' :
-              days <= 3 ? 'text-status-warning' :
-              'text-foreground-secondary'
+              'text-[11px] font-mono',
+              days <= 0 ? 'text-[#ff4444]' :
+              days <= 3 ? 'text-[#f5a623]' :
+              'text-[#555]'
             )}>
-              {days <= 0 ? 'Overdue' : `${days} days left`}
+              {days <= 0 ? 'Overdue' : `${days}d left`}
             </div>
           </div>
           {milestone.predictedCompletion && (
-            <div>
-              <div className="text-xs text-foreground-tertiary mb-1">Predicted</div>
+            <div className="bg-[#0a0a0a] p-2">
+              <div className="text-[10px] font-mono uppercase tracking-[0.5px] text-[#555] mb-1">Predicted</div>
               <div className={cn(
-                'text-sm font-medium',
-                predictedDays > days ? 'text-status-critical' : 'text-status-success'
+                'text-[13px] font-medium',
+                predictedDays > days ? 'text-[#ff4444]' : 'text-[#50e3c2]'
               )}>
                 {formatDate(milestone.predictedCompletion)}
               </div>
-              <div className="text-xs text-foreground-secondary">
+              <div className="text-[11px] font-mono text-[#555]">
                 {predictedDays > days
-                  ? `${predictedDays - days} days late`
+                  ? `${predictedDays - days}d late`
                   : predictedDays < days
-                  ? `${days - predictedDays} days early`
+                  ? `${days - predictedDays}d early`
                   : 'On time'}
               </div>
             </div>
@@ -177,15 +184,13 @@ function MilestoneCard({ milestone }: { milestone: Milestone }) {
 
         {/* Blockers */}
         {milestone.blockers > 0 && (
-          <div className="mt-3 flex items-center gap-2 px-3 py-2 bg-status-critical-muted rounded-md">
-            <span className="w-2 h-2 rounded-full bg-status-critical animate-pulse" />
-            <span className="text-xs text-status-critical">
-              {milestone.blockers} blocker{milestone.blockers > 1 ? 's' : ''} affecting this milestone
-            </span>
+          <div className="mt-3 flex items-center gap-2 text-[11px] text-[#ff4444]">
+            <span className="w-1.5 h-1.5 rounded-full bg-[#ff4444] animate-pulse" />
+            <span>{milestone.blockers} blocker{milestone.blockers > 1 ? 's' : ''}</span>
           </div>
         )}
-      </CardContent>
-    </Card>
+      </div>
+    </div>
   )
 }
 
@@ -194,41 +199,31 @@ function MilestoneStats({ milestones }: { milestones: Milestone[] }) {
   const onTrack = milestones.filter(m => m.riskLevel === 'on-track').length
   const atRisk = milestones.filter(m => m.riskLevel === 'at-risk').length
   const delayed = milestones.filter(m => m.riskLevel === 'delayed').length
-  const avgProgress = Math.round(
-    milestones.reduce((acc, m) => acc + m.progress, 0) / milestones.length
-  )
+
+  const stats = [
+    { value: milestones.length.toString(), label: 'Active', color: '#ededed' },
+    { value: onTrack.toString(), label: 'On Track', color: onTrack > 0 ? '#50e3c2' : '#ededed' },
+    { value: atRisk.toString(), label: 'At Risk', color: atRisk > 0 ? '#f5a623' : '#ededed' },
+    { value: delayed.toString(), label: 'Delayed', color: delayed > 0 ? '#ff4444' : '#ededed' },
+  ]
 
   return (
-    <div className="grid grid-cols-4 gap-4">
-      <Card padding="sm">
-        <CardContent className="p-3">
-          <div className="text-2xl font-mono font-medium text-foreground">{milestones.length}</div>
-          <div className="text-xs text-foreground-secondary">Active Milestones</div>
-        </CardContent>
-      </Card>
-      <Card padding="sm" glow={onTrack > 0 ? 'success' : 'none'}>
-        <CardContent className="p-3">
-          <div className="text-2xl font-mono font-medium text-status-success">{onTrack}</div>
-          <div className="text-xs text-foreground-secondary">On Track</div>
-        </CardContent>
-      </Card>
-      <Card padding="sm" glow={atRisk > 0 ? 'warning' : 'none'}>
-        <CardContent className="p-3">
-          <div className="text-2xl font-mono font-medium text-status-warning">{atRisk}</div>
-          <div className="text-xs text-foreground-secondary">At Risk</div>
-        </CardContent>
-      </Card>
-      <Card padding="sm" glow={delayed > 0 ? 'critical' : 'none'}>
-        <CardContent className="p-3">
-          <div className="text-2xl font-mono font-medium text-status-critical">{delayed}</div>
-          <div className="text-xs text-foreground-secondary">Delayed</div>
-        </CardContent>
-      </Card>
+    <div className="grid grid-cols-4 gap-3">
+      {stats.map((stat, i) => (
+        <div key={i} className="bg-[#0a0a0a] border border-[#1a1a1a] rounded-md p-3">
+          <div className="text-[20px] font-mono font-semibold" style={{ color: stat.color }}>{stat.value}</div>
+          <div className="text-[10px] font-mono uppercase tracking-[0.5px] text-[#555] mt-1">{stat.label}</div>
+        </div>
+      ))}
     </div>
   )
 }
 
-export function MilestonesTab() {
+interface MilestonesTabProps {
+  teamType?: TeamType
+}
+
+export function MilestonesTab({ teamType = 'launch' }: MilestonesTabProps) {
   const [milestones] = useState<Milestone[]>(mockMilestones)
   const [filter, setFilter] = useState<'all' | 'on-track' | 'at-risk' | 'delayed'>('all')
 
@@ -243,11 +238,11 @@ export function MilestonesTab() {
   )
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="space-y-4">
       {/* Header */}
       <div>
-        <h2 className="text-xl font-semibold text-foreground">Milestones</h2>
-        <p className="text-sm text-foreground-secondary mt-1">
+        <h2 className="text-[20px] font-semibold text-[#ededed] tracking-[-0.5px]">Milestones</h2>
+        <p className="text-[13px] text-[#888] mt-1">
           Track progress towards your key deliverables
         </p>
       </div>
@@ -256,16 +251,16 @@ export function MilestonesTab() {
       <MilestoneStats milestones={milestones} />
 
       {/* Filter tabs */}
-      <div className="flex items-center gap-1 p-1 bg-background-secondary rounded-lg w-fit">
+      <div className="flex items-center gap-1 pt-2">
         {(['all', 'on-track', 'at-risk', 'delayed'] as const).map(f => (
           <button
             key={f}
             onClick={() => setFilter(f)}
             className={cn(
-              'px-3 py-1.5 text-sm rounded-md transition-colors',
+              'px-3 py-1.5 text-[13px] rounded-md transition-colors',
               filter === f
-                ? 'bg-foreground text-background font-medium'
-                : 'text-foreground-secondary hover:text-foreground'
+                ? 'bg-[#ededed] text-[#000] font-medium'
+                : 'text-[#888] hover:text-[#ededed]'
             )}
           >
             {f === 'all' ? 'All' :
@@ -275,34 +270,29 @@ export function MilestonesTab() {
         ))}
       </div>
 
-      {/* Milestones grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      {/* Milestones grid - 2 columns */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
         {sortedMilestones.map(milestone => (
           <MilestoneCard key={milestone.id} milestone={milestone} />
         ))}
 
         {sortedMilestones.length === 0 && (
-          <Card padding="lg" className="md:col-span-2">
-            <CardContent className="p-8 text-center">
-              <div className="text-foreground-tertiary">
-                No milestones matching this filter
-              </div>
-            </CardContent>
-          </Card>
+          <div className="md:col-span-2 bg-[#0a0a0a] border border-[#1a1a1a] rounded-md p-8 text-center">
+            <div className="text-[#555]">No milestones matching this filter</div>
+          </div>
         )}
       </div>
 
-      {/* NexFlow insights */}
+      {/* NexFlow insights - minimal */}
       {milestones.some(m => m.riskLevel !== 'on-track') && (
-        <div className="p-4 bg-nf-muted border border-nf/20 rounded-lg">
+        <div className="p-4 border border-[#d4a574]/20 rounded-md">
           <div className="flex items-start gap-3">
-            <BreathingDot variant="nf" size="md" />
+            <span className="w-2 h-2 rounded-full bg-[#d4a574] mt-1.5 animate-pulse" />
             <div>
-              <h4 className="text-sm font-medium text-nf mb-1">Milestone Risk Analysis</h4>
-              <p className="text-xs text-foreground-secondary leading-relaxed">
+              <h4 className="text-[13px] font-medium text-[#d4a574] mb-1">Milestone Risk Analysis</h4>
+              <p className="text-[12px] text-[#555] leading-[1.5]">
                 NexFlow predicts completion dates by analyzing task velocity, blockers, and
-                historical patterns. The "Beta Onboarding Flow" milestone needs immediate attention
-                - consider cutting scope or reassigning resources.
+                historical patterns. Consider cutting scope or reassigning resources for at-risk milestones.
               </p>
             </div>
           </div>

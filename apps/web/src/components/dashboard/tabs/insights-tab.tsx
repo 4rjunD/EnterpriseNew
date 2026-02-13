@@ -2,11 +2,6 @@
 
 import { useState } from 'react'
 import { cn } from '@nexflow/ui/utils'
-import { Card, CardHeader, CardTitle, CardContent } from '@/components/nf/card'
-import { Badge } from '@/components/nf/badge'
-import { BreathingDot } from '@/components/nf/breathing-dot'
-import { AnimPercent, StatCounter } from '@/components/nf/anim-num'
-import { Progress } from '@/components/nf/progress'
 
 // Insight type
 interface Insight {
@@ -85,67 +80,65 @@ const mockInsights: Insight[] = [
 
 // Category config
 const CATEGORY_CONFIG = {
-  productivity: { label: 'Productivity', icon: '\\u25ce', color: '#50e3c2' },
-  process: { label: 'Process', icon: '\\u25c7', color: '#f5a623' },
-  team: { label: 'Team', icon: '\\u25a3', color: '#a78bfa' },
-  trend: { label: 'Trend', icon: '\\u25b3', color: '#0070f3' },
+  productivity: { label: 'Productivity', color: '#50e3c2' },
+  process: { label: 'Process', color: '#f5a623' },
+  team: { label: 'Team', color: '#a78bfa' },
+  trend: { label: 'Trend', color: '#0070f3' },
 }
 
-// Insight card
+// Insight card - clean, minimal
 function InsightCard({ insight }: { insight: Insight }) {
   const category = CATEGORY_CONFIG[insight.category]
   const [expanded, setExpanded] = useState(false)
 
-  const severityConfig = {
-    info: { border: 'border-l-foreground-tertiary', glow: 'none' as const },
-    warning: { border: 'border-l-status-warning', glow: 'warning' as const },
-    critical: { border: 'border-l-status-critical', glow: 'critical' as const },
+  const borderColor = {
+    info: 'border-l-[#555]',
+    warning: 'border-l-[#f5a623]',
+    critical: 'border-l-[#ff4444]',
   }[insight.severity]
 
   return (
-    <Card
-      hover
-      glow={insight.severity !== 'info' ? severityConfig.glow : 'none'}
+    <div
       className={cn(
-        'cursor-pointer transition-all border-l-4',
-        severityConfig.border
+        'bg-[#0a0a0a] border border-[#1a1a1a] rounded-md cursor-pointer transition-colors hover:border-[#252525]',
+        'border-l-2',
+        borderColor
       )}
       onClick={() => setExpanded(!expanded)}
     >
-      <CardContent className="p-4">
-        {/* Header */}
-        <div className="flex items-start justify-between mb-2">
+      <div className="p-4">
+        {/* Header row */}
+        <div className="flex items-start justify-between gap-4 mb-2">
           <div className="flex items-center gap-2">
-            <Badge
-              variant="default"
-              size="sm"
-              style={{
-                backgroundColor: `${category.color}20`,
-                color: category.color,
-              }}
+            {/* Category label - minimal, text only */}
+            <span
+              className="text-[10px] font-mono font-medium uppercase tracking-[0.5px]"
+              style={{ color: category.color }}
             >
               {category.label}
-            </Badge>
+            </span>
             {insight.actionable && (
-              <Badge variant="nf" size="sm">Actionable</Badge>
+              <span className="text-[10px] font-mono uppercase tracking-[0.5px] text-[#555] border border-[#1a1a1a] px-1.5 py-0.5 rounded">
+                Actionable
+              </span>
             )}
           </div>
 
-          {/* Metric */}
+          {/* Metric - right aligned */}
           {insight.metric && (
-            <div className="text-right">
-              <div className="text-lg font-mono font-medium text-foreground">
+            <div className="text-right flex-shrink-0">
+              <div className="text-base font-mono font-semibold text-[#ededed]">
                 {insight.metric.value}
               </div>
-              <div className="flex items-center gap-1 text-xs">
-                <span className="text-foreground-tertiary">{insight.metric.label}</span>
+              <div className="flex items-center justify-end gap-1 text-[11px] font-mono text-[#555]">
+                <span>{insight.metric.label}</span>
                 <span className={cn(
-                  insight.metric.trend === 'up' && insight.severity !== 'info' && '\\u2191 text-status-critical',
-                  insight.metric.trend === 'up' && insight.severity === 'info' && '\\u2191 text-status-success',
-                  insight.metric.trend === 'down' && '\\u2193 text-status-critical',
-                  insight.metric.trend === 'stable' && '\\u2192 text-foreground-tertiary'
+                  insight.metric.trend === 'up' && insight.severity !== 'info' && 'text-[#ff4444]',
+                  insight.metric.trend === 'up' && insight.severity === 'info' && 'text-[#50e3c2]',
+                  insight.metric.trend === 'down' && 'text-[#ff4444]',
+                  insight.metric.trend === 'stable' && 'text-[#555]'
                 )}>
-                  {insight.metric.trend === 'up' ? '\\u2191' : insight.metric.trend === 'down' ? '\\u2193' : '\\u2192'}
+                  {insight.metric.trend === 'up' ? '↑' : insight.metric.trend === 'down' ? '↓' : '→'}
                 </span>
               </div>
             </div>
@@ -153,11 +146,11 @@ function InsightCard({ insight }: { insight: Insight }) {
         </div>
 
         {/* Title */}
-        <h3 className="text-sm font-medium text-foreground mb-1">{insight.title}</h3>
+        <h3 className="text-[14px] font-medium text-[#ededed] mb-1">{insight.title}</h3>
 
         {/* Description */}
         <p className={cn(
-          'text-xs text-foreground-secondary',
+          'text-[13px] text-[#888] leading-[1.5]',
           !expanded && 'line-clamp-2'
         )}>
           {insight.description}
@@ -165,75 +158,44 @@ function InsightCard({ insight }: { insight: Insight }) {
 
         {/* Expanded action */}
         {expanded && insight.action && (
-          <div className="mt-3 p-3 bg-nf-muted border border-nf/20 rounded-md animate-fade-in-up">
+          <div className="mt-3 pt-3 border-t border-[#1a1a1a]">
             <div className="flex items-center gap-2 mb-1">
-              <BreathingDot variant="nf" size="sm" />
-              <span className="text-xs font-medium text-nf">Suggested Action</span>
+              <span className="w-1.5 h-1.5 rounded-full bg-[#d4a574]" />
+              <span className="text-[10px] font-mono uppercase tracking-[0.5px] text-[#d4a574]">Suggested Action</span>
             </div>
-            <p className="text-xs text-foreground-secondary">{insight.action}</p>
+            <p className="text-[13px] text-[#888]">{insight.action}</p>
           </div>
         )}
-      </CardContent>
-    </Card>
+      </div>
+    </div>
   )
 }
 
-// Stats overview
+// Stats overview - 4 columns max, clean
 function InsightsStats() {
+  const stats = [
+    { value: '78%', label: 'Team Health', trend: 'up', good: true },
+    { value: '4.2', label: 'Avg Velocity', trend: 'stable', good: true },
+    { value: '32%', label: 'Meeting Load', trend: 'up', good: false },
+    { value: '+18%', label: 'This Week', trend: 'up', good: true },
+  ]
+
   return (
-    <div className="grid grid-cols-4 gap-4">
-      <Card padding="sm">
-        <CardContent className="p-3">
-          <div className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-md bg-status-success-muted flex items-center justify-center">
-              <span className="text-status-success text-lg">\\u2191</span>
-            </div>
-            <div>
-              <div className="text-lg font-mono font-medium text-foreground">78%</div>
-              <div className="text-xs text-foreground-secondary">Team Health</div>
-            </div>
+    <div className="grid grid-cols-4 gap-3">
+      {stats.map((stat, i) => (
+        <div key={i} className="bg-[#0a0a0a] border border-[#1a1a1a] rounded-md p-3">
+          <div className="flex items-baseline gap-1.5">
+            <span className="text-[20px] font-mono font-semibold text-[#ededed]">{stat.value}</span>
+            <span className={cn(
+              'text-[11px] font-mono',
+              stat.good ? 'text-[#50e3c2]' : 'text-[#ff4444]'
+            )}>
+              {stat.trend === 'up' ? '↑' : stat.trend === 'down' ? '↓' : '→'}
+            </span>
           </div>
-        </CardContent>
-      </Card>
-      <Card padding="sm">
-        <CardContent className="p-3">
-          <div className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-md bg-purple-muted flex items-center justify-center">
-              <span className="text-purple text-lg">\\u25a3</span>
-            </div>
-            <div>
-              <div className="text-lg font-mono font-medium text-foreground">4.2</div>
-              <div className="text-xs text-foreground-secondary">Avg Velocity</div>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-      <Card padding="sm">
-        <CardContent className="p-3">
-          <div className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-md bg-status-warning-muted flex items-center justify-center">
-              <span className="text-status-warning text-lg">\\u25ce</span>
-            </div>
-            <div>
-              <div className="text-lg font-mono font-medium text-foreground">32%</div>
-              <div className="text-xs text-foreground-secondary">Meeting Load</div>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-      <Card padding="sm">
-        <CardContent className="p-3">
-          <div className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-md bg-status-info-muted flex items-center justify-center">
-              <span className="text-status-info text-lg">\\u25b3</span>
-            </div>
-            <div>
-              <div className="text-lg font-mono font-medium text-foreground">+18%</div>
-              <div className="text-xs text-foreground-secondary">This Week</div>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+          <div className="text-[10px] font-mono uppercase tracking-[0.5px] text-[#555] mt-1">{stat.label}</div>
+        </div>
+      ))}
     </div>
   )
 }
@@ -254,33 +216,34 @@ export function InsightsTab() {
   })
 
   return (
-    <div className="p-6 space-y-6">
-      {/* Header with co-founder badge */}
+    <div className="space-y-4">
+      {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <div className="flex items-center gap-2 mb-1">
-            <h2 className="text-xl font-semibold text-foreground">Strategic Insights</h2>
-            <Badge variant="purple" size="sm">Co-founder Only</Badge>
+          <div className="flex items-center gap-3 mb-1">
+            <h2 className="text-[20px] font-semibold text-[#ededed] tracking-[-0.5px]">Strategic Insights</h2>
+            <span className="text-[10px] font-mono uppercase tracking-[0.5px] text-[#a78bfa] border border-[#a78bfa]/30 bg-[#a78bfa]/10 px-2 py-0.5 rounded-full">
+              Co-founder Only
+            </span>
           </div>
-          <p className="text-sm text-foreground-secondary">
+          <p className="text-[13px] text-[#888]">
             Cross-team patterns, productivity signals, and process intelligence
           </p>
         </div>
-        <BreathingDot variant="nf" size="lg" />
       </div>
 
       {/* Stats */}
       <InsightsStats />
 
       {/* Category filters */}
-      <div className="flex items-center gap-2 flex-wrap">
+      <div className="flex items-center gap-2 pt-2">
         <button
           onClick={() => setCategoryFilter(null)}
           className={cn(
-            'px-3 py-1.5 text-sm rounded-full transition-colors',
+            'px-3 py-1.5 text-[13px] rounded-md transition-colors',
             categoryFilter === null
-              ? 'bg-foreground text-background font-medium'
-              : 'bg-background-secondary text-foreground-secondary hover:text-foreground'
+              ? 'bg-[#ededed] text-[#000] font-medium'
+              : 'text-[#888] hover:text-[#ededed]'
           )}
         >
           All
@@ -290,13 +253,13 @@ export function InsightsTab() {
             key={key}
             onClick={() => setCategoryFilter(key)}
             className={cn(
-              'px-3 py-1.5 text-sm rounded-full transition-colors',
+              'px-3 py-1.5 text-[13px] rounded-md transition-colors',
               categoryFilter === key
                 ? 'font-medium'
-                : 'text-foreground-secondary hover:text-foreground'
+                : 'text-[#888] hover:text-[#ededed]'
             )}
             style={{
-              backgroundColor: categoryFilter === key ? `${config.color}20` : undefined,
+              backgroundColor: categoryFilter === key ? `${config.color}15` : undefined,
               color: categoryFilter === key ? config.color : undefined,
             }}
           >
@@ -312,16 +275,15 @@ export function InsightsTab() {
         ))}
       </div>
 
-      {/* Explanation */}
-      <div className="p-4 bg-purple-muted border border-purple/20 rounded-lg">
+      {/* Explanation box - minimal */}
+      <div className="p-4 border border-[#a78bfa]/20 rounded-md">
         <div className="flex items-start gap-3">
-          <BreathingDot variant="purple" size="md" />
+          <span className="w-2 h-2 rounded-full bg-[#a78bfa] mt-1.5 animate-pulse" />
           <div>
-            <h4 className="text-sm font-medium text-purple mb-1">About Strategic Insights</h4>
-            <p className="text-xs text-foreground-secondary leading-relaxed">
+            <h4 className="text-[13px] font-medium text-[#a78bfa] mb-1">About Strategic Insights</h4>
+            <p className="text-[12px] text-[#555] leading-[1.5]">
               This tab shows intelligence that only co-founders can see: burnout signals,
               productivity patterns, process inefficiencies, and cross-team trends.
-              These insights help you make strategic decisions about team health and process.
             </p>
           </div>
         </div>
