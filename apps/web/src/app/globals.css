@@ -4,42 +4,53 @@
 
 @layer base {
   :root {
-    /* Backgrounds - Vercel dark theme */
-    --background: 0 0% 0%;             /* #000000 - primary */
-    --background-secondary: 0 0% 7%;   /* #111111 - secondary */
-    --background-tertiary: 0 0% 10%;   /* #1A1A1A - tertiary */
+    /* NexFlow Design System - Vercel-inspired Dark Theme */
 
-    /* Foreground - white with clear hierarchy */
-    --foreground: 0 0% 93%;            /* #EDEDED - primary text */
-    --foreground-secondary: 0 0% 63%;  /* #A1A1A1 - secondary text */
-    --foreground-muted: 0 0% 40%;      /* #666666 - muted text */
+    /* Backgrounds */
+    --background: 0 0% 0%;              /* #000000 - primary */
+    --background-card: 0 0% 4%;         /* #0a0a0a - card */
+    --background-secondary: 0 0% 7%;    /* #111111 - elevated */
+    --background-tertiary: 0 0% 10%;    /* #1a1a1a - tertiary */
 
-    /* Accent - white for CTAs (Vercel dark style) */
-    --accent: 0 0% 100%;               /* #FFFFFF - primary actions */
-    --accent-hover: 0 0% 85%;          /* #D9D9D9 - hover state */
-    --accent-light: 0 0% 10%;          /* #1A1A1A - light accent bg */
+    /* Text */
+    --foreground: 0 0% 93%;             /* #ededed - primary */
+    --foreground-secondary: 0 0% 53%;   /* #888888 - secondary */
+    --foreground-tertiary: 0 0% 33%;    /* #555555 - tertiary */
+    --foreground-muted: 0 0% 40%;       /* #666666 - muted */
 
-    /* Status - vibrant on dark background */
-    --status-critical: 0 72% 51%;      /* #E5484D - errors */
-    --status-warning: 35 100% 50%;     /* #FF9500 - warnings */
-    --status-healthy: 142 72% 46%;     /* #3ECF8E - success */
+    /* Borders */
+    --border: 0 0% 10%;                 /* #1a1a1a */
+    --border-hover: 0 0% 15%;           /* #252525 */
 
-    /* Status light variants (darker for dark mode) */
-    --status-critical-light: 0 72% 12%;    /* Dark red bg */
-    --status-warning-light: 35 100% 12%;   /* Dark orange bg */
-    --status-healthy-light: 142 72% 12%;   /* Dark green bg */
+    /* Status Colors */
+    --status-critical: 0 100% 64%;      /* #ff4444 */
+    --status-critical-muted: 0 60% 17%; /* #441111 */
+    --status-warning: 38 91% 55%;       /* #f5a623 */
+    --status-warning-muted: 38 71% 14%; /* #3d2e0a */
+    --status-success: 166 67% 60%;      /* #50e3c2 */
+    --status-success-muted: 166 67% 15%;/* #0d3d2e */
+    --status-info: 212 100% 48%;        /* #0070f3 */
+    --status-info-muted: 212 100% 12%;  /* #001a3d */
 
-    /* Borders - subtle on dark */
-    --border: 0 0% 15%;                /* #262626 */
-    --border-hover: 0 0% 25%;          /* #404040 */
+    /* Role Colors */
+    --purple: 263 70% 76%;              /* #a78bfa - co-founder */
+    --purple-muted: 263 38% 13%;        /* #1a1030 */
 
-    /* Cards - slightly elevated from background */
-    --card: 0 0% 7%;                   /* #111111 */
+    /* NexFlow AI Accent */
+    --nf: 30 45% 64%;                   /* #d4a574 - amber */
+    --nf-muted: 30 36% 12%;             /* #2a1f14 */
 
-    /* Radius - tighter, more professional */
-    --radius-card: 8px;
-    --radius-button: 6px;
-    --radius-input: 6px;
+    /* Accent (CTAs) */
+    --accent: 0 0% 100%;                /* #ffffff */
+    --accent-hover: 0 0% 85%;           /* #d9d9d9 */
+
+    /* Card */
+    --card: 0 0% 4%;                    /* #0a0a0a */
+
+    /* Radius */
+    --radius: 6px;
+    --radius-card: 6px;
+    --radius-pill: 9999px;
   }
 }
 
@@ -55,8 +66,8 @@
 
   /* Custom scrollbar */
   ::-webkit-scrollbar {
-    width: 8px;
-    height: 8px;
+    width: 6px;
+    height: 6px;
   }
 
   ::-webkit-scrollbar-track {
@@ -76,17 +87,166 @@
   .text-balance {
     text-wrap: balance;
   }
+}
 
-  .animation-delay-150 {
-    animation-delay: 150ms;
+/* ============================================
+   NexFlow Animations
+   ============================================ */
+
+/* Breathing Dot - NexFlow AI status indicator */
+@keyframes breathing {
+  0%, 100% { opacity: 0.3; }
+  50% { opacity: 0.8; }
+}
+
+.animate-breathing {
+  animation: breathing 2s ease-in-out infinite;
+}
+
+/* Pulse Glow - DO NOW urgency badges */
+@keyframes pulseGlow {
+  0%, 100% { opacity: 0.6; }
+  50% { opacity: 1; }
+}
+
+.animate-pulse-glow {
+  animation: pulseGlow 2.5s ease-in-out infinite;
+}
+
+/* Fade In with translate */
+@keyframes fadeInUp {
+  0% {
+    opacity: 0;
+    transform: translateY(8px);
   }
-
-  .animation-delay-300 {
-    animation-delay: 300ms;
+  100% {
+    opacity: 1;
+    transform: translateY(0);
   }
 }
 
-/* Satoshi font - if not available, falls back to Inter */
+.animate-fade-in-up {
+  animation: fadeInUp 0.35s ease-out forwards;
+}
+
+/* Stagger animation delays */
+.stagger-1 { animation-delay: 0ms; }
+.stagger-2 { animation-delay: 60ms; }
+.stagger-3 { animation-delay: 120ms; }
+.stagger-4 { animation-delay: 180ms; }
+.stagger-5 { animation-delay: 240ms; }
+.stagger-6 { animation-delay: 300ms; }
+.stagger-7 { animation-delay: 360ms; }
+.stagger-8 { animation-delay: 420ms; }
+
+/* Progress bar fill */
+@keyframes progressFill {
+  0% { width: 0%; }
+}
+
+.animate-progress-fill {
+  animation: progressFill 0.8s ease-out forwards;
+}
+
+/* Modal slide up */
+@keyframes modalSlideUp {
+  0% {
+    opacity: 0;
+    transform: translateY(12px) scale(0.98);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.animate-modal {
+  animation: modalSlideUp 0.3s ease-out forwards;
+}
+
+/* Tab content transition */
+@keyframes tabSlideIn {
+  0% {
+    opacity: 0;
+    transform: translateX(6px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+.animate-tab-in {
+  animation: tabSlideIn 0.25s ease-out forwards;
+}
+
+/* Number counting animation helper */
+@keyframes countUp {
+  0% { opacity: 0.5; }
+  100% { opacity: 1; }
+}
+
+/* Scale in */
+@keyframes scaleIn {
+  0% {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.animate-scale-in {
+  animation: scaleIn 0.2s ease-out forwards;
+}
+
+/* Spin for loading */
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+.animate-spin {
+  animation: spin 1s linear infinite;
+}
+
+/* ============================================
+   Typography
+   ============================================ */
+
+/* Labels - mono, uppercase, tertiary */
+.label {
+  @apply text-[10px] uppercase tracking-[0.5px] font-mono text-foreground-tertiary;
+}
+
+/* Headings with tight letter-spacing */
+.heading-tight {
+  letter-spacing: -0.5px;
+}
+
+/* ============================================
+   Fonts
+   ============================================ */
+
+@font-face {
+  font-family: 'Geist';
+  src: url('/fonts/Geist-Variable.woff2') format('woff2');
+  font-weight: 100 900;
+  font-display: swap;
+  font-style: normal;
+}
+
+@font-face {
+  font-family: 'Geist Mono';
+  src: url('/fonts/GeistMono-Variable.woff2') format('woff2');
+  font-weight: 100 900;
+  font-display: swap;
+  font-style: normal;
+}
+
+/* Fallback to Satoshi if Geist not available */
 @font-face {
   font-family: 'Satoshi';
   src: url('/fonts/Satoshi-Variable.woff2') format('woff2');

@@ -34,6 +34,7 @@ model Organization {
   heartbeatConfig     HeartbeatConfig?
   tasks               Task[]
   pullRequests        PullRequest[]
+  integrationData     IntegrationData[]
 
   @@map("organizations")
 }
@@ -91,6 +92,7 @@ model User {
   focusTimeBlocks FocusTimeBlock[]
   calendarPreference CalendarSyncPreference?
   agentConversations AgentConversation[]
+  integrationData IntegrationData[]
 
   @@index([organizationId])
   @@map("users")
@@ -407,6 +409,28 @@ enum IntegrationStatus {
   DISCONNECTED
   ERROR
   SYNCING
+}
+
+// Raw integration data from scraped events
+model IntegrationData {
+  id             String          @id @default(cuid())
+  provider       IntegrationType
+  eventType      String          // 'commit', 'pr_opened', 'pr_merged', 'message', 'issue', etc.
+  userIdentifier String?         // GitHub username, Slack user ID, etc.
+  data           Json            // Raw event payload
+  eventAt        DateTime?       // When the event occurred
+  syncedAt       DateTime        @default(now())
+
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  // Optional link to matched team member
+  memberId String?
+  member   User?   @relation(fields: [memberId], references: [id], onDelete: SetNull)
+
+  @@index([organizationId, provider, eventAt(sort: Desc)])
+  @@index([organizationId, eventType])
+  @@map("integration_data")
 }
 
 // ============================================================================
