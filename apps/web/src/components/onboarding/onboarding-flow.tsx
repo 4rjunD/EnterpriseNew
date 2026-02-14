@@ -116,13 +116,13 @@ export function OnboardingFlow() {
       case 2:
         return data.teamType !== null && data.teamSize >= 2 && data.teamSize <= 1000
       case 3:
-        // Type-specific validation
+        // Type-specific validation - only launch date is required for launch type
         if (data.teamType === 'launch') {
-          return data.launchDate && data.launchDescription
+          return !!data.launchDate && data.launchDate.trim() !== ''
         }
         return true // Other types have optional fields
       case 4:
-        return data.connectedIntegrations.length >= 1
+        return true // Integrations are optional - can connect later
       case 5:
         return true // Invites are optional
       case 6:

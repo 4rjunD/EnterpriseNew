@@ -89,7 +89,7 @@ export function StepConfigure({ data, updateData }: StepConfigureProps) {
 function LaunchConfig({ data, updateData }: StepConfigureProps) {
   return (
     <>
-      <FormField label="Launch date" required>
+      <FormField label="Launch date" required hint="This is the key date NexFlow predicts against">
         <Input
           type="date"
           value={data.launchDate || ''}
@@ -97,7 +97,7 @@ function LaunchConfig({ data, updateData }: StepConfigureProps) {
         />
       </FormField>
 
-      <FormField label="What are you launching?" required>
+      <FormField label="What are you launching?" hint="Helps NexFlow understand your context">
         <Input
           value={data.launchDescription || ''}
           onChange={(e) => updateData({ launchDescription: e.target.value })}
