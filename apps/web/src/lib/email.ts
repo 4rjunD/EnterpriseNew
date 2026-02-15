@@ -1,9 +1,18 @@
 import { Resend } from 'resend'
 
-const resend = new Resend(process.env.RESEND_API_KEY)
+// Lazy-initialize Resend client to avoid build-time errors
+let resendClient: Resend | null = null
 
-const FROM_EMAIL = process.env.EMAIL_FROM || 'NexFlow <notifications@nexflow.dev>'
-const APP_URL = process.env.NEXTAUTH_URL || 'http://localhost:3000'
+function getResendClient(): Resend {
+  if (!resendClient) {
+    const apiKey = process.env.RESEND_API_KEY
+    if (!apiKey) {
+      throw new Error('RESEND_API_KEY environment variable is not set')
+    }
+    resendClient = new Resend(apiKey)
+  }
+  return resendClient
+}
 
 interface EmailOptions {
   to: string
@@ -13,7 +22,10 @@ interface EmailOptions {
 }
 
 export async function sendEmail({ to, subject, html, text }: EmailOptions) {
+  const FROM_EMAIL = process.env.EMAIL_FROM || 'NexFlow <notifications@nexflow.dev>'
+
   try {
+    const resend = getResendClient()
     const result = await resend.emails.send({
       from: FROM_EMAIL,
       to,
@@ -30,7 +42,8 @@ export async function sendEmail({ to, subject, html, text }: EmailOptions) {
 
 // Password Reset Email
 export async function sendPasswordResetEmail(email: string, token: string, userName?: string) {
-  const resetUrl = `${APP_URL}/reset-password?token=${token}`
+  const appUrl = process.env.NEXTAUTH_URL || 'http://localhost:3000'
+  const resetUrl = `${appUrl}/reset-password?token=${token}`
 
   const html = `
     <!DOCTYPE html>
@@ -73,7 +86,8 @@ export async function sendPasswordResetEmail(email: string, token: string, userN
 
 // Email Verification
 export async function sendVerificationEmail(email: string, token: string, userName?: string) {
-  const verifyUrl = `${APP_URL}/verify-email?token=${token}`
+  const appUrl = process.env.NEXTAUTH_URL || 'http://localhost:3000'
+  const verifyUrl = `${appUrl}/verify-email?token=${token}`
 
   const html = `
     <!DOCTYPE html>
@@ -121,7 +135,8 @@ export async function sendInvitationEmail(
   orgName: string,
   role: string
 ) {
-  const inviteUrl = `${APP_URL}/invite/${token}`
+  const appUrl = process.env.NEXTAUTH_URL || 'http://localhost:3000'
+  const inviteUrl = `${appUrl}/invite/${token}`
 
   const html = `
     <!DOCTYPE html>
