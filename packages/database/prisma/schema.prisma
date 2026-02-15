@@ -66,6 +66,7 @@ model ProjectContext {
 model User {
   id             String   @id @default(cuid())
   email          String   @unique
+  emailVerified  DateTime?
   name           String?
   password       String?
   image          String?
@@ -73,6 +74,7 @@ model User {
   status         UserStatus @default(OFFLINE)
   timezone       String?
   onboardingCompleted Boolean @default(false)
+  deletedAt      DateTime?
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 
@@ -128,6 +130,35 @@ model UserNotificationPreferences {
   updatedAt DateTime @updatedAt
 
   @@map("user_notification_preferences")
+}
+
+// Password reset tokens
+model PasswordResetToken {
+  id        String   @id @default(cuid())
+  token     String   @unique
+  userId    String
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime @default(now())
+
+  @@index([token])
+  @@index([userId])
+  @@map("password_reset_tokens")
+}
+
+// Email verification tokens
+model EmailVerificationToken {
+  id        String   @id @default(cuid())
+  token     String   @unique
+  email     String
+  userId    String?
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime @default(now())
+
+  @@index([token])
+  @@index([email])
+  @@map("email_verification_tokens")
 }
 
 enum UserRole {

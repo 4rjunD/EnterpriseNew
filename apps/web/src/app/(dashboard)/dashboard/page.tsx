@@ -36,27 +36,34 @@ export type CardType =
 // Feature flag for new UI
 const USE_NEW_UI = process.env.NEXT_PUBLIC_USE_NEW_UI === 'true'
 
-// Demo mode
-const DEMO_MODE = process.env.NEXT_PUBLIC_DEMO_MODE === 'true'
-
 export default function DashboardPage() {
-  const { data: session } = useSession()
+  const { data: session, status } = useSession()
   const [activeCard, setActiveCard] = useState<CardType>(USE_NEW_UI ? 'today' : 'dashboard')
+
+  // Show loading state while session is being fetched
+  if (status === 'loading') {
+    return (
+      <div className="min-h-screen bg-black flex items-center justify-center">
+        <div className="w-8 h-8 border-2 border-[#333] border-t-[#ededed] rounded-full animate-spin" />
+      </div>
+    )
+  }
 
   // For new UI with full header, use DashboardWrapper
   if (USE_NEW_UI) {
-    const user = session?.user || {
-      id: 'demo-user',
-      name: DEMO_MODE ? 'Demo User' : 'User',
-      email: DEMO_MODE ? 'demo@nexflow.io' : 'user@example.com',
-      image: null,
-      role: 'cofounder',
+    // Use session data - the (dashboard) layout should redirect if no session
+    const user = {
+      id: session?.user?.id || '',
+      name: session?.user?.name || null,
+      email: session?.user?.email || '',
+      image: session?.user?.image || null,
+      role: (session?.user as { role?: string })?.role || 'member',
     }
 
     const workspace = {
-      name: DEMO_MODE ? 'Acme Startup' : (session?.user?.name?.split(' ')[0] || 'My') + "'s Workspace",
+      name: (session?.user?.name?.split(' ')[0] || 'My') + "'s Workspace",
       teamType: 'launch' as const,
-      targetDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30 days from now
+      targetDate: undefined, // Will be fetched from project context if set
     }
 
     return <DashboardWrapper user={user} workspace={workspace} />

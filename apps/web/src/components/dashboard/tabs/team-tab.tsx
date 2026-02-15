@@ -2,218 +2,105 @@
 
 import { useState } from 'react'
 import { cn } from '@nexflow/ui/utils'
-import { ROLES, type UserRole } from '@/lib/theme'
+import { trpc } from '@/lib/trpc'
+import { Users, UserPlus, Mail } from 'lucide-react'
+import Link from 'next/link'
 
-// Team member type
 interface TeamMember {
   id: string
-  name: string
-  role: UserRole
-  avatar?: string
+  name: string | null
   email: string
-  velocity: number      // 0-100
-  load: number          // Current workload 0-100
-  tasksCompleted: number
-  prsReviewed: number
-  avgReviewTime: number // hours
-  status: 'online' | 'away' | 'offline'
-  focus?: string        // What they're working on
-  blockers: number
+  image: string | null
+  role: string
+  status: string
+  teams: Array<{ id: string; name: string; role: string }>
+  workload: {
+    activeTasks: number
+    openPRs: number
+  }
 }
 
-// Mock team data
-const mockTeam: TeamMember[] = [
-  {
-    id: '1',
-    name: 'Alex Chen',
-    role: 'cofounder',
-    email: 'alex@startup.io',
-    velocity: 92,
-    load: 85,
-    tasksCompleted: 24,
-    prsReviewed: 18,
-    avgReviewTime: 4.2,
-    status: 'online',
-    focus: 'Auth system refactor',
-    blockers: 0,
-  },
-  {
-    id: '2',
-    name: 'Maya Johnson',
-    role: 'admin',
-    email: 'maya@startup.io',
-    velocity: 88,
-    load: 65,
-    tasksCompleted: 19,
-    prsReviewed: 8,
-    avgReviewTime: 2.1,
-    status: 'online',
-    focus: 'Payment integration',
-    blockers: 1,
-  },
-  {
-    id: '3',
-    name: 'Jordan Lee',
-    role: 'member',
-    email: 'jordan@startup.io',
-    velocity: 75,
-    load: 110,
-    tasksCompleted: 12,
-    prsReviewed: 4,
-    avgReviewTime: 6.5,
-    status: 'away',
-    focus: 'Onboarding flow',
-    blockers: 2,
-  },
-  {
-    id: '4',
-    name: 'Sam Rivera',
-    role: 'member',
-    email: 'sam@startup.io',
-    velocity: 95,
-    load: 45,
-    tasksCompleted: 28,
-    prsReviewed: 12,
-    avgReviewTime: 1.8,
-    status: 'online',
-    focus: 'API documentation',
-    blockers: 0,
-  },
-]
-
-// Member card component - clean, minimal
 function MemberCard({ member }: { member: TeamMember }) {
-  const isOverloaded = member.load > 100
-  const hasBlockers = member.blockers > 0
-
-  // Determine card accent
-  const accentColor = isOverloaded ? '#f5a623' : hasBlockers ? '#ff4444' : undefined
+  const totalWork = member.workload.activeTasks + member.workload.openPRs
+  const isOverloaded = totalWork > 10
+  const hasWork = totalWork > 0
 
   return (
     <div
       className={cn(
         'bg-[#0a0a0a] border border-[#1a1a1a] rounded-md transition-colors hover:border-[#252525]',
-        accentColor && 'border-l-2'
+        isOverloaded && 'border-l-2 border-l-[#f5a623]'
       )}
-      style={accentColor ? { borderLeftColor: accentColor } : undefined}
     >
       <div className="p-4">
-        {/* Header */}
         <div className="flex items-start gap-3 mb-3">
-          {/* Avatar with status */}
           <div className="relative flex-shrink-0">
-            <div className="w-9 h-9 rounded-full bg-[#1a1a1a] flex items-center justify-center text-[13px] font-medium text-[#ededed]">
-              {member.name.charAt(0)}
-            </div>
+            {member.image ? (
+              <img
+                src={member.image}
+                alt={member.name || ''}
+                className="w-9 h-9 rounded-full object-cover"
+              />
+            ) : (
+              <div className="w-9 h-9 rounded-full bg-[#1a1a1a] flex items-center justify-center text-[13px] font-medium text-[#ededed]">
+                {(member.name || member.email).charAt(0).toUpperCase()}
+              </div>
+            )}
             <div className={cn(
               'absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full border-2 border-[#0a0a0a]',
-              member.status === 'online' && 'bg-[#50e3c2]',
-              member.status === 'away' && 'bg-[#f5a623]',
-              member.status === 'offline' && 'bg-[#555]'
+              member.status === 'ONLINE' && 'bg-[#50e3c2]',
+              member.status === 'AWAY' && 'bg-[#f5a623]',
+              member.status === 'OFFLINE' && 'bg-[#555]'
             )} />
           </div>
 
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2">
-              <span className="text-[13px] font-medium text-[#ededed] truncate">{member.name}</span>
-              {/* Role - minimal text label */}
+              <span className="text-[13px] font-medium text-[#ededed] truncate">
+                {member.name || member.email.split('@')[0]}
+              </span>
               <span className={cn(
                 'text-[10px] font-mono uppercase tracking-[0.5px]',
-                member.role === 'cofounder' && 'text-[#a78bfa]',
-                member.role === 'admin' && 'text-[#50e3c2]',
-                member.role === 'member' && 'text-[#555]'
+                member.role === 'ADMIN' && 'text-[#50e3c2]',
+                member.role === 'MANAGER' && 'text-[#a78bfa]',
+                member.role === 'IC' && 'text-[#555]'
               )}>
-                {member.role === 'cofounder' ? 'Co-founder' : member.role === 'admin' ? 'Admin' : 'Member'}
+                {member.role}
               </span>
             </div>
             <p className="text-[11px] font-mono text-[#555] truncate">{member.email}</p>
           </div>
-
-          {/* Blockers - small dot indicator */}
-          {hasBlockers && (
-            <div className="flex items-center gap-1 text-[11px] font-mono text-[#ff4444]">
-              <span className="w-1.5 h-1.5 rounded-full bg-[#ff4444]" />
-              <span>{member.blockers}</span>
-            </div>
-          )}
         </div>
 
-        {/* Focus - subtle */}
-        {member.focus && (
-          <div className="mb-3 text-[12px]">
-            <span className="text-[#555]">Working on: </span>
-            <span className="text-[#888]">{member.focus}</span>
+        {member.teams.length > 0 && (
+          <div className="flex flex-wrap gap-1 mb-3">
+            {member.teams.map(team => (
+              <span
+                key={team.id}
+                className="px-2 py-0.5 bg-[#1a1a1a] rounded text-[10px] text-[#888]"
+              >
+                {team.name}
+              </span>
+            ))}
           </div>
         )}
 
-        {/* Stats bars */}
-        <div className="space-y-2">
-          {/* Velocity */}
-          <div>
-            <div className="flex justify-between text-[11px] font-mono mb-1">
-              <span className="text-[#555]">Velocity</span>
-              <span className={cn(
-                member.velocity >= 80 ? 'text-[#50e3c2]' :
-                member.velocity >= 60 ? 'text-[#f5a623]' :
-                'text-[#ff4444]'
-              )}>{member.velocity}%</span>
-            </div>
-            <div className="h-1 bg-[#1a1a1a] rounded-full overflow-hidden">
-              <div
-                className={cn(
-                  'h-full rounded-full',
-                  member.velocity >= 80 ? 'bg-[#50e3c2]' :
-                  member.velocity >= 60 ? 'bg-[#f5a623]' :
-                  'bg-[#ff4444]'
-                )}
-                style={{ width: `${member.velocity}%` }}
-              />
-            </div>
-          </div>
-
-          {/* Workload */}
-          <div>
-            <div className="flex justify-between text-[11px] font-mono mb-1">
-              <span className="text-[#555]">Workload</span>
-              <span className={cn(
-                member.load <= 80 ? 'text-[#50e3c2]' :
-                member.load <= 100 ? 'text-[#f5a623]' :
-                'text-[#ff4444]'
-              )}>{member.load}%</span>
-            </div>
-            <div className="h-1 bg-[#1a1a1a] rounded-full overflow-hidden">
-              <div
-                className={cn(
-                  'h-full rounded-full',
-                  member.load <= 80 ? 'bg-[#50e3c2]' :
-                  member.load <= 100 ? 'bg-[#f5a623]' :
-                  'bg-[#ff4444]'
-                )}
-                style={{ width: `${Math.min(member.load, 100)}%` }}
-              />
-            </div>
-          </div>
-        </div>
-
-        {/* Quick stats - grid with border dividers */}
-        <div className="mt-3 pt-3 border-t border-[#1a1a1a]">
-          <div className="grid grid-cols-3 gap-px bg-[#1a1a1a] rounded overflow-hidden">
-            <div className="bg-[#0a0a0a] p-2 text-center">
-              <div className="text-[16px] font-mono font-semibold text-[#ededed]">{member.tasksCompleted}</div>
-              <div className="text-[10px] font-mono uppercase tracking-[0.5px] text-[#555]">Tasks</div>
-            </div>
-            <div className="bg-[#0a0a0a] p-2 text-center">
-              <div className="text-[16px] font-mono font-semibold text-[#ededed]">{member.prsReviewed}</div>
-              <div className="text-[10px] font-mono uppercase tracking-[0.5px] text-[#555]">Reviews</div>
-            </div>
+        <div className="pt-3 border-t border-[#1a1a1a]">
+          <div className="grid grid-cols-2 gap-px bg-[#1a1a1a] rounded overflow-hidden">
             <div className="bg-[#0a0a0a] p-2 text-center">
               <div className={cn(
                 'text-[16px] font-mono font-semibold',
-                member.avgReviewTime <= 4 ? 'text-[#50e3c2]' :
-                member.avgReviewTime <= 8 ? 'text-[#f5a623]' :
-                'text-[#ff4444]'
-              )}>{member.avgReviewTime}h</div>
-              <div className="text-[10px] font-mono uppercase tracking-[0.5px] text-[#555]">Avg Review</div>
+                member.workload.activeTasks > 5 ? 'text-[#f5a623]' : 'text-[#ededed]'
+              )}>
+                {member.workload.activeTasks}
+              </div>
+              <div className="text-[10px] font-mono uppercase tracking-[0.5px] text-[#555]">Tasks</div>
+            </div>
+            <div className="bg-[#0a0a0a] p-2 text-center">
+              <div className="text-[16px] font-mono font-semibold text-[#ededed]">
+                {member.workload.openPRs}
+              </div>
+              <div className="text-[10px] font-mono uppercase tracking-[0.5px] text-[#555]">Open PRs</div>
             </div>
           </div>
         </div>
@@ -222,18 +109,17 @@ function MemberCard({ member }: { member: TeamMember }) {
   )
 }
 
-// Team stats - 4 column grid
-function TeamStats({ team }: { team: TeamMember[] }) {
-  const avgVelocity = Math.round(team.reduce((acc, m) => acc + m.velocity, 0) / team.length)
-  const overloaded = team.filter(m => m.load > 100).length
-  const totalBlockers = team.reduce((acc, m) => acc + m.blockers, 0)
-  const online = team.filter(m => m.status === 'online').length
+function TeamStats({ members }: { members: TeamMember[] }) {
+  const totalTasks = members.reduce((acc, m) => acc + m.workload.activeTasks, 0)
+  const totalPRs = members.reduce((acc, m) => acc + m.workload.openPRs, 0)
+  const online = members.filter(m => m.status === 'ONLINE').length
+  const overloaded = members.filter(m => m.workload.activeTasks + m.workload.openPRs > 10).length
 
   const stats = [
-    { value: `${avgVelocity}%`, label: 'Team Velocity', color: '#ededed' },
-    { value: overloaded.toString(), label: 'Overloaded', color: overloaded > 0 ? '#f5a623' : '#ededed' },
-    { value: totalBlockers.toString(), label: 'Total Blockers', color: totalBlockers > 0 ? '#ff4444' : '#ededed' },
-    { value: `${online}/${team.length}`, label: 'Online Now', color: '#50e3c2' },
+    { value: members.length.toString(), label: 'Team Members', color: '#ededed' },
+    { value: totalTasks.toString(), label: 'Active Tasks', color: '#ededed' },
+    { value: totalPRs.toString(), label: 'Open PRs', color: '#ededed' },
+    { value: `${online}/${members.length}`, label: 'Online', color: '#50e3c2' },
   ]
 
   return (
@@ -248,68 +134,120 @@ function TeamStats({ team }: { team: TeamMember[] }) {
   )
 }
 
+function EmptyState() {
+  return (
+    <div className="flex flex-col items-center justify-center py-16 px-4">
+      <div className="w-16 h-16 rounded-full bg-[#1a1a1a] flex items-center justify-center mb-4">
+        <Users className="w-8 h-8 text-[#555]" />
+      </div>
+      <h3 className="text-[16px] font-medium text-[#ededed] mb-2">No team members yet</h3>
+      <p className="text-[13px] text-[#888] text-center max-w-md mb-6">
+        Invite your team to start collaborating. Team members will appear here once they accept their invitations.
+      </p>
+      <Link
+        href="/dashboard/invite"
+        className="inline-flex items-center gap-2 px-4 py-2 bg-[#ededed] text-[#000] rounded-md text-[13px] font-medium hover:bg-[#fff] transition-colors"
+      >
+        <UserPlus className="w-4 h-4" />
+        Invite Team Members
+      </Link>
+    </div>
+  )
+}
+
+function LoadingSkeleton() {
+  return (
+    <div className="space-y-4 animate-pulse">
+      <div className="h-8 bg-[#1a1a1a] rounded w-48" />
+      <div className="grid grid-cols-4 gap-3">
+        {[1, 2, 3, 4].map(i => (
+          <div key={i} className="h-20 bg-[#1a1a1a] rounded" />
+        ))}
+      </div>
+      <div className="grid grid-cols-2 gap-3">
+        {[1, 2, 3, 4].map(i => (
+          <div key={i} className="h-40 bg-[#1a1a1a] rounded" />
+        ))}
+      </div>
+    </div>
+  )
+}
+
 export function TeamTab() {
-  const [team] = useState<TeamMember[]>(mockTeam)
-  const [sortBy, setSortBy] = useState<'name' | 'velocity' | 'load'>('load')
+  const { data: members, isLoading } = trpc.team.listMembers.useQuery({})
+  const [sortBy, setSortBy] = useState<'name' | 'tasks' | 'status'>('tasks')
+
+  if (isLoading) {
+    return <LoadingSkeleton />
+  }
+
+  const teamMembers = members || []
+
+  // Show empty state if only one member (the current user)
+  if (teamMembers.length <= 1) {
+    return (
+      <div className="space-y-4">
+        <div>
+          <h2 className="text-[20px] font-semibold text-[#ededed] tracking-[-0.5px]">Team</h2>
+          <p className="text-[13px] text-[#888] mt-1">
+            View team capacity and workload distribution
+          </p>
+        </div>
+        <EmptyState />
+      </div>
+    )
+  }
 
   // Sort team
-  const sortedTeam = [...team].sort((a, b) => {
-    if (sortBy === 'name') return a.name.localeCompare(b.name)
-    if (sortBy === 'velocity') return b.velocity - a.velocity
-    return b.load - a.load
+  const sortedTeam = [...teamMembers].sort((a, b) => {
+    if (sortBy === 'name') return (a.name || a.email).localeCompare(b.name || b.email)
+    if (sortBy === 'tasks') return b.workload.activeTasks - a.workload.activeTasks
+    // Sort by status: online first, then away, then offline
+    const statusOrder = { ONLINE: 0, AWAY: 1, OFFLINE: 2 }
+    return (statusOrder[a.status as keyof typeof statusOrder] || 2) - (statusOrder[b.status as keyof typeof statusOrder] || 2)
   })
 
   return (
     <div className="space-y-4">
-      {/* Header */}
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-[20px] font-semibold text-[#ededed] tracking-[-0.5px]">Team</h2>
           <p className="text-[13px] text-[#888] mt-1">
-            Real-time team capacity and performance
+            View team capacity and workload distribution
           </p>
         </div>
 
-        {/* Sort control - minimal select */}
-        <div className="flex items-center gap-2">
-          <span className="text-[12px] text-[#555]">Sort by:</span>
-          <select
-            value={sortBy}
-            onChange={(e) => setSortBy(e.target.value as typeof sortBy)}
-            className="bg-[#0a0a0a] border border-[#1a1a1a] rounded-md px-2 py-1 text-[13px] text-[#ededed] hover:border-[#252525] focus:border-[#252525] outline-none"
+        <div className="flex items-center gap-4">
+          <div className="flex items-center gap-2">
+            <span className="text-[12px] text-[#555]">Sort by:</span>
+            <select
+              value={sortBy}
+              onChange={(e) => setSortBy(e.target.value as typeof sortBy)}
+              className="bg-[#0a0a0a] border border-[#1a1a1a] rounded-md px-2 py-1 text-[13px] text-[#ededed] hover:border-[#252525] focus:border-[#252525] outline-none"
+            >
+              <option value="tasks">Workload</option>
+              <option value="status">Status</option>
+              <option value="name">Name</option>
+            </select>
+          </div>
+
+          <Link
+            href="/dashboard/invite"
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 border border-[#1a1a1a] rounded-md text-[12px] text-[#888] hover:text-[#ededed] hover:border-[#252525] transition-colors"
           >
-            <option value="load">Workload</option>
-            <option value="velocity">Velocity</option>
-            <option value="name">Name</option>
-          </select>
+            <UserPlus className="w-3.5 h-3.5" />
+            Invite
+          </Link>
         </div>
       </div>
 
-      {/* Stats */}
-      <TeamStats team={team} />
+      <TeamStats members={teamMembers} />
 
-      {/* Team grid - 2 columns on larger screens for better readability */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
         {sortedTeam.map(member => (
           <MemberCard key={member.id} member={member} />
         ))}
       </div>
-
-      {/* Load balancing suggestion - minimal */}
-      {team.some(m => m.load > 100) && team.some(m => m.load < 60) && (
-        <div className="p-4 border border-[#d4a574]/20 rounded-md">
-          <div className="flex items-start gap-3">
-            <span className="w-2 h-2 rounded-full bg-[#d4a574] mt-1.5 animate-pulse" />
-            <div>
-              <h4 className="text-[13px] font-medium text-[#d4a574] mb-1">Load Balancing Opportunity</h4>
-              <p className="text-[12px] text-[#555] leading-[1.5]">
-                NexFlow detected uneven workload distribution. Consider reassigning tasks from
-                overloaded team members to those with capacity.
-              </p>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   )
 }

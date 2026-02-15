@@ -16,6 +16,7 @@ function LoginForm() {
   const searchParams = useSearchParams()
   const callbackUrl = searchParams.get('callbackUrl') || '/dashboard'
   const error = searchParams.get('error')
+  const message = searchParams.get('message')
 
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -57,10 +58,21 @@ function LoginForm() {
       </CardHeader>
 
       <CardContent>
+        {message && (
+          <div className="mb-4 rounded-lg bg-green-50 p-3 text-sm text-green-700">
+            {message === 'password_reset' && 'Password reset successfully. You can now sign in.'}
+            {message === 'email_verified' && 'Email verified successfully. You can now sign in.'}
+            {message === 'already_verified' && 'Your email is already verified.'}
+          </div>
+        )}
         {error && (
           <div className="mb-4 rounded-lg bg-status-critical-light p-3 text-sm text-status-critical">
             {error === 'CredentialsSignin'
               ? 'Invalid email or password'
+              : error === 'invalid_token'
+              ? 'Invalid verification link'
+              : error === 'token_expired'
+              ? 'Verification link has expired'
               : 'An error occurred during sign in'}
           </div>
         )}
@@ -79,7 +91,12 @@ function LoginForm() {
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="password">Password</Label>
+            <div className="flex items-center justify-between">
+              <Label htmlFor="password">Password</Label>
+              <Link href="/forgot-password" className="text-xs text-foreground-muted hover:text-foreground">
+                Forgot password?
+              </Link>
+            </div>
             <Input
               id="password"
               type="password"

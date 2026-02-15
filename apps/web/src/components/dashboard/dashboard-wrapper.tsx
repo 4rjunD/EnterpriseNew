@@ -18,13 +18,7 @@ import {
   ProjectsTab,
 } from '@/components/dashboard/tabs'
 import { type TeamType } from '@/lib/theme'
-
-// Tab badges (would come from real data)
-const DEFAULT_TAB_BADGES: Record<string, number> = {
-  today: 3,
-  predictions: 2,
-  risks: 1,
-}
+import { trpc } from '@/lib/trpc'
 
 type UserRole = 'cofounder' | 'admin' | 'member'
 
@@ -53,6 +47,24 @@ export function DashboardWrapper({ user, workspace }: DashboardWrapperProps) {
 
   const teamType = workspace?.teamType || 'launch'
   const [activeTab, setActiveTab] = useState('today')
+
+  // Fetch real badge counts from the database
+  const { data: tasksData } = trpc.tasks.list.useQuery({ status: ['TODO', 'IN_PROGRESS', 'BLOCKED'], limit: 100 }, { retry: false })
+  const { data: predictions } = trpc.predictions.list.useQuery({}, { retry: false })
+  const { data: bottlenecks } = trpc.bottlenecks.list.useQuery({}, { retry: false })
+
+  // Calculate real badge counts
+  const tabBadges = useMemo(() => {
+    const urgentTasks = tasksData?.tasks?.filter(t => t.priority === 'URGENT' || t.priority === 'HIGH').length || 0
+    const activePredictions = predictions?.filter(p => p.status === 'ACTIVE' && p.impact === 'HIGH').length || 0
+    const activeRisks = bottlenecks?.filter(r => r.status === 'ACTIVE' && (r.severity === 'CRITICAL' || r.severity === 'HIGH')).length || 0
+
+    return {
+      today: urgentTasks,
+      predictions: activePredictions,
+      risks: activeRisks,
+    }
+  }, [tasksData, predictions, bottlenecks])
 
   // Parse workspace target date if string
   const workspaceWithDate = useMemo(() => {
@@ -112,7 +124,7 @@ export function DashboardWrapper({ user, workspace }: DashboardWrapperProps) {
         workspace={workspaceWithDate}
         activeTab={activeTab}
         onTabChange={setActiveTab}
-        tabBadges={DEFAULT_TAB_BADGES}
+        tabBadges={tabBadges}
       />
 
       {/* Main content - Vercel-style centered layout */}

@@ -4,8 +4,7 @@ import { useSession } from 'next-auth/react'
 import { cn } from '@nexflow/ui/utils'
 import type { CardType } from '@/app/(dashboard)/dashboard/page'
 
-// Feature flags
-const DEMO_MODE = process.env.NEXT_PUBLIC_DEMO_MODE === 'true'
+// Feature flag for new UI
 const USE_NEW_UI = process.env.NEXT_PUBLIC_USE_NEW_UI === 'true'
 
 interface SummaryCardRowProps {

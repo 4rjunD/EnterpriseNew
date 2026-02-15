@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { signOut } from 'next-auth/react'
 import { cn } from '@nexflow/ui/utils'
@@ -15,6 +15,7 @@ import {
 import { Settings, LogOut, User, Plus } from 'lucide-react'
 import type { TeamType } from '@/lib/theme'
 import { TEAM_TYPES, getTabsForRole } from '@/lib/theme'
+import { trpc } from '@/lib/trpc'
 
 // Role colors - minimal, just text colors
 const ROLE_COLORS = {
@@ -24,13 +25,6 @@ const ROLE_COLORS = {
 } as const
 
 type UserRole = keyof typeof ROLE_COLORS
-
-// Mock team members
-const MOCK_TEAM = [
-  { id: '1', name: 'You', role: 'cofounder' as UserRole },
-  { id: '2', name: 'Sarah', role: 'admin' as UserRole },
-  { id: '3', name: 'Mike', role: 'member' as UserRole },
-]
 
 // Logo - simple triangle
 function NexFlowLogo() {
@@ -102,40 +96,41 @@ function DaysCounter({ targetDate }: { targetDate?: Date }) {
   )
 }
 
-// Role switcher - minimal segmented control
-function RoleSwitcher({
-  members,
-  viewAsRole,
-  onRoleChange
-}: {
-  members: typeof MOCK_TEAM
-  viewAsRole: UserRole
-  onRoleChange: (role: UserRole) => void
-}) {
+// Team members display - shows real team from database
+function TeamMembersBadge() {
+  const { data: members, isLoading } = trpc.team.listMembers.useQuery({})
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center gap-1.5 px-2 py-1 border border-[#1a1a1a] rounded">
+        <div className="w-12 h-3 bg-[#1a1a1a] rounded animate-pulse" />
+      </div>
+    )
+  }
+
+  const memberCount = members?.length || 0
+
+  // Don't show anything if just the current user
+  if (memberCount <= 1) {
+    return null
+  }
+
   return (
-    <div className="flex items-center border border-[#1a1a1a] rounded overflow-hidden">
-      {members.map((member) => {
-        const roleConfig = ROLE_COLORS[member.role]
-        const isActive = member.role === viewAsRole
-        return (
-          <button
+    <div className="flex items-center gap-1.5 px-2 py-1 border border-[#1a1a1a] rounded">
+      <div className="flex -space-x-1.5">
+        {members?.slice(0, 3).map((member) => (
+          <div
             key={member.id}
-            onClick={() => onRoleChange(member.role)}
-            className={cn(
-              'flex items-center gap-1.5 px-2 py-1 text-[11px] transition-colors',
-              isActive ? 'bg-[#1a1a1a]' : 'bg-transparent hover:bg-[#0a0a0a]'
-            )}
+            className="w-5 h-5 rounded-full bg-[#1a1a1a] border border-black flex items-center justify-center text-[8px] font-medium text-[#888]"
+            title={member.name || member.email}
           >
-            <span className="text-[#ededed]">{member.name}</span>
-            <span
-              className="text-[9px] font-mono font-medium uppercase"
-              style={{ color: roleConfig.color }}
-            >
-              {member.role === 'cofounder' ? 'CF' : member.role === 'admin' ? 'A' : 'M'}
-            </span>
-          </button>
-        )
-      })}
+            {(member.name || member.email).charAt(0).toUpperCase()}
+          </div>
+        ))}
+      </div>
+      <span className="text-[10px] font-mono text-[#555]">
+        {memberCount} member{memberCount !== 1 ? 's' : ''}
+      </span>
     </div>
   )
 }
@@ -173,13 +168,17 @@ export function NexFlowHeader({
   onTabChange,
   tabBadges = {},
 }: NexFlowHeaderProps) {
-  const [viewAsRole, setViewAsRole] = useState<UserRole>(user.role)
   const teamType = workspace?.teamType || 'launch'
-  const tabs = getTabsForRole(teamType, viewAsRole)
+  // Use the user's actual role for tab visibility
+  const tabs = getTabsForRole(teamType, user.role)
   const teamConfig = TEAM_TYPES[teamType]
 
-  // Mock metric value
-  const metricValue = teamType === 'engineering' ? 7 : 78
+  // Fetch real health score or show default for new users
+  const { data: healthData } = trpc.dashboard.getHealthScore.useQuery(undefined, {
+    // Don't error if dashboard isn't ready yet
+    retry: false,
+  })
+  const metricValue = healthData?.overall ?? 0
 
   const initials = user.name
     ?.split(' ')
@@ -206,11 +205,7 @@ export function NexFlowHeader({
             {workspace?.name || 'Workspace'}
           </span>
 
-          <RoleSwitcher
-            members={MOCK_TEAM}
-            viewAsRole={viewAsRole}
-            onRoleChange={setViewAsRole}
-          />
+          <TeamMembersBadge />
         </div>
 
         {/* Right */}
@@ -221,21 +216,21 @@ export function NexFlowHeader({
             <span className="text-[11px] font-mono text-[#d4a574]">AI</span>
           </div>
 
-          {/* Metric pill */}
-          <div className="flex items-center gap-1.5 px-2 py-1 border border-[#1a1a1a] rounded">
-            <AnimatedMetric
-              value={metricValue}
-              unit={teamConfig.primaryMetricUnit}
-              color={
-                teamType === 'engineering'
-                  ? metricValue >= 5 ? '#50e3c2' : metricValue >= 3 ? '#f5a623' : '#ff4444'
-                  : metricValue >= 70 ? '#50e3c2' : metricValue >= 50 ? '#f5a623' : '#ff4444'
-              }
-            />
-            <span className="text-[10px] font-mono text-[#555] uppercase">
-              {teamType === 'launch' ? 'launch' : teamType === 'product' ? 'sprint' : teamType === 'agency' ? 'util' : 'deploys'}
-            </span>
-          </div>
+          {/* Health Score pill - only show if we have data */}
+          {metricValue > 0 && (
+            <div className="flex items-center gap-1.5 px-2 py-1 border border-[#1a1a1a] rounded">
+              <AnimatedMetric
+                value={metricValue}
+                unit="%"
+                color={
+                  metricValue >= 70 ? '#50e3c2' : metricValue >= 50 ? '#f5a623' : '#ff4444'
+                }
+              />
+              <span className="text-[10px] font-mono text-[#555] uppercase">
+                health
+              </span>
+            </div>
+          )}
 
           <DaysCounter targetDate={workspace?.targetDate} />
 
@@ -319,8 +314,8 @@ export function NexFlowHeader({
           })}
         </nav>
 
-        {/* Invite button */}
-        {(viewAsRole === 'cofounder' || viewAsRole === 'admin') && (
+        {/* Invite button - only show for admins/cofounders */}
+        {(user.role === 'cofounder' || user.role === 'admin') && (
           <Link
             href="/dashboard/invite"
             className="flex items-center gap-1 px-2 py-1 text-[11px] text-[#555] hover:text-[#888] border border-[#1a1a1a] rounded hover:border-[#252525] transition-colors"

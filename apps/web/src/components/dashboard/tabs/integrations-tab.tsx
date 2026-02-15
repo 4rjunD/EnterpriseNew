@@ -1,25 +1,12 @@
 'use client'
 
-import { useState } from 'react'
 import { cn } from '@nexflow/ui/utils'
-import { Card, CardHeader, CardTitle, CardContent } from '@/components/nf/card'
+import { Card, CardContent } from '@/components/nf/card'
 import { Badge } from '@/components/nf/badge'
 import { Button } from '@/components/nf/button'
 import { BreathingDot } from '@/components/nf/breathing-dot'
-
-// Core integrations for internal team tracking
-interface Integration {
-  id: string
-  name: string
-  icon: React.ReactNode
-  description: string
-  dataTypes: string[]
-  connected: boolean
-  lastSync?: Date
-  itemsCount?: number
-  status?: 'syncing' | 'synced' | 'error'
-  oauthUrl?: string
-}
+import { trpc } from '@/lib/trpc'
+import { Plug, RefreshCw, AlertCircle, CheckCircle2 } from 'lucide-react'
 
 // Integration icons
 const GitHubIcon = () => (
@@ -46,55 +33,50 @@ const DiscordIcon = () => (
   </svg>
 )
 
-// Mock integration data
-const mockIntegrations: Integration[] = [
-  {
-    id: 'github',
-    name: 'GitHub',
-    icon: <GitHubIcon />,
+const integrationIcons: Record<string, React.ReactNode> = {
+  GITHUB: <GitHubIcon />,
+  LINEAR: <LinearIcon />,
+  SLACK: <SlackIcon />,
+  DISCORD: <DiscordIcon />,
+}
+
+const integrationDescriptions: Record<string, { description: string; dataTypes: string[] }> = {
+  GITHUB: {
     description: 'Sync repos, PRs, commits, and code reviews',
     dataTypes: ['Repositories', 'Pull Requests', 'Commits', 'Reviews'],
-    connected: true,
-    lastSync: new Date(Date.now() - 15 * 60000),
-    itemsCount: 1247,
-    status: 'synced',
-    oauthUrl: '/api/integrations/github/authorize',
   },
-  {
-    id: 'linear',
-    name: 'Linear',
-    icon: <LinearIcon />,
+  LINEAR: {
     description: 'Sync issues, sprints, and project tracking',
     dataTypes: ['Issues', 'Sprints', 'Projects', 'Labels'],
-    connected: true,
-    lastSync: new Date(Date.now() - 8 * 60000),
-    itemsCount: 342,
-    status: 'synced',
-    oauthUrl: '/api/integrations/linear/authorize',
   },
-  {
-    id: 'slack',
-    name: 'Slack',
-    icon: <SlackIcon />,
+  SLACK: {
     description: 'Monitor team communication and response times',
     dataTypes: ['Messages', 'Channels', 'Response Times'],
-    connected: false,
-    oauthUrl: '/api/integrations/slack/authorize',
   },
-  {
-    id: 'discord',
-    name: 'Discord',
-    icon: <DiscordIcon />,
+  DISCORD: {
     description: 'Track team discussions and voice activity',
     dataTypes: ['Messages', 'Channels', 'Voice Activity'],
-    connected: false,
-    oauthUrl: '/api/integrations/discord/authorize',
   },
-]
+  JIRA: {
+    description: 'Sync issues, epics, and sprints from Jira',
+    dataTypes: ['Issues', 'Epics', 'Sprints', 'Boards'],
+  },
+  NOTION: {
+    description: 'Sync documentation and project pages',
+    dataTypes: ['Pages', 'Databases', 'Documents'],
+  },
+}
 
-// Format relative time
-function timeAgo(date: Date): string {
-  const seconds = Math.floor((new Date().getTime() - date.getTime()) / 1000)
+const oauthUrls: Record<string, string> = {
+  GITHUB: '/api/integrations/github/authorize',
+  LINEAR: '/api/integrations/linear/authorize',
+  SLACK: '/api/integrations/slack/authorize',
+  DISCORD: '/api/integrations/discord/authorize',
+}
+
+function timeAgo(date: Date | string): string {
+  const d = typeof date === 'string' ? new Date(date) : date
+  const seconds = Math.floor((new Date().getTime() - d.getTime()) / 1000)
   if (seconds < 60) return 'Just now'
   const minutes = Math.floor(seconds / 60)
   if (minutes < 60) return `${minutes}m ago`
@@ -104,97 +86,110 @@ function timeAgo(date: Date): string {
   return `${days}d ago`
 }
 
-// Integration card
+interface IntegrationCardProps {
+  type: string
+  name: string
+  status: string
+  lastSyncAt?: string | null
+  syncError?: string | null
+  onConnect: () => void
+  onSync: () => void
+  isSyncing: boolean
+}
+
 function IntegrationCard({
-  integration,
+  type,
+  name,
+  status,
+  lastSyncAt,
+  syncError,
   onConnect,
   onSync,
-}: {
-  integration: Integration
-  onConnect: (id: string) => void
-  onSync: (id: string) => void
-}) {
+  isSyncing,
+}: IntegrationCardProps) {
+  const isConnected = status === 'CONNECTED' || status === 'SYNCING'
+  const hasError = status === 'ERROR'
+  const info = integrationDescriptions[type] || { description: '', dataTypes: [] }
+
   return (
-    <Card hover glow={integration.connected && integration.status === 'error' ? 'critical' : 'none'}>
+    <Card hover glow={hasError ? 'critical' : 'none'}>
       <CardContent className="p-5">
-        {/* Header */}
         <div className="flex items-start gap-4 mb-4">
           <div className={cn(
             'w-12 h-12 rounded-lg flex items-center justify-center',
-            integration.connected
+            isConnected
               ? 'bg-status-success/10 text-status-success'
               : 'bg-background-tertiary text-foreground-tertiary'
           )}>
-            {integration.icon}
+            {integrationIcons[type] || <Plug className="w-5 h-5" />}
           </div>
 
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 mb-1">
-              <h3 className="text-base font-medium text-foreground">{integration.name}</h3>
-              {integration.connected && (
+              <h3 className="text-base font-medium text-foreground">{name}</h3>
+              {isConnected && (
                 <Badge variant="success" size="sm">Connected</Badge>
               )}
+              {hasError && (
+                <Badge variant="critical" size="sm">Error</Badge>
+              )}
             </div>
-            <p className="text-sm text-foreground-secondary">{integration.description}</p>
+            <p className="text-sm text-foreground-secondary">{info.description}</p>
           </div>
         </div>
 
-        {/* Data types */}
         <div className="flex flex-wrap gap-1.5 mb-4">
-          {integration.dataTypes.map(type => (
+          {info.dataTypes.map(dataType => (
             <span
-              key={type}
+              key={dataType}
               className="px-2 py-1 bg-background-secondary rounded text-xs text-foreground-tertiary"
             >
-              {type}
+              {dataType}
             </span>
           ))}
         </div>
 
-        {/* Status / Action */}
-        {integration.connected ? (
+        {isConnected || hasError ? (
           <div className="flex items-center justify-between pt-3 border-t border-border">
             <div className="flex items-center gap-2">
-              {integration.status === 'syncing' ? (
+              {isSyncing || status === 'SYNCING' ? (
                 <>
                   <BreathingDot variant="nf" size="sm" />
                   <span className="text-sm text-nf">Syncing...</span>
                 </>
-              ) : integration.status === 'error' ? (
+              ) : hasError ? (
                 <>
-                  <span className="w-2 h-2 rounded-full bg-status-critical" />
-                  <span className="text-sm text-status-critical">Sync failed</span>
+                  <AlertCircle className="w-4 h-4 text-status-critical" />
+                  <span className="text-sm text-status-critical truncate max-w-[200px]">
+                    {syncError || 'Sync failed'}
+                  </span>
                 </>
               ) : (
                 <>
-                  <span className="w-2 h-2 rounded-full bg-status-success" />
+                  <CheckCircle2 className="w-4 h-4 text-status-success" />
                   <span className="text-sm text-foreground-secondary">
-                    {integration.itemsCount?.toLocaleString()} items
+                    {lastSyncAt ? timeAgo(lastSyncAt) : 'Connected'}
                   </span>
-                  {integration.lastSync && (
-                    <span className="text-sm text-foreground-tertiary">
-                      · {timeAgo(integration.lastSync)}
-                    </span>
-                  )}
                 </>
               )}
             </div>
             <Button
               variant="ghost"
               size="sm"
-              onClick={() => onSync(integration.id)}
-              disabled={integration.status === 'syncing'}
+              onClick={onSync}
+              disabled={isSyncing || status === 'SYNCING'}
             >
-              Sync now
+              <RefreshCw className={cn('w-4 h-4 mr-1', (isSyncing || status === 'SYNCING') && 'animate-spin')} />
+              Sync
             </Button>
           </div>
         ) : (
           <Button
             variant="primary"
             className="w-full"
-            onClick={() => onConnect(integration.id)}
+            onClick={onConnect}
           >
-            Connect {integration.name}
+            Connect {name}
           </Button>
         )}
       </CardContent>
@@ -202,34 +197,55 @@ function IntegrationCard({
   )
 }
 
-// Stats
-function IntegrationStats({ integrations }: { integrations: Integration[] }) {
-  const connected = integrations.filter(i => i.connected).length
-  const totalItems = integrations.reduce((acc, i) => acc + (i.itemsCount || 0), 0)
+function EmptyState() {
+  return (
+    <div className="flex flex-col items-center justify-center py-16 px-4">
+      <div className="w-16 h-16 rounded-full bg-background-secondary flex items-center justify-center mb-4">
+        <Plug className="w-8 h-8 text-foreground-tertiary" />
+      </div>
+      <h3 className="text-lg font-medium text-foreground mb-2">Connect your first integration</h3>
+      <p className="text-sm text-foreground-secondary text-center max-w-md mb-6">
+        NexFlow needs access to your tools to detect bottlenecks, predict risks, and provide actionable insights.
+        Start by connecting GitHub or Linear.
+      </p>
+      <div className="flex gap-3">
+        <Button variant="primary" onClick={() => window.location.href = oauthUrls.GITHUB}>
+          <GitHubIcon />
+          <span className="ml-2">Connect GitHub</span>
+        </Button>
+        <Button variant="secondary" onClick={() => window.location.href = oauthUrls.LINEAR}>
+          <LinearIcon />
+          <span className="ml-2">Connect Linear</span>
+        </Button>
+      </div>
+    </div>
+  )
+}
+
+function IntegrationStats({ connected, total }: { connected: number; total: number }) {
+  const percentage = total > 0 ? Math.round((connected / total) * 100) : 0
 
   return (
     <div className="grid grid-cols-3 gap-4">
       <Card padding="sm">
         <CardContent className="p-4">
-          <div className="text-3xl font-mono font-medium text-foreground">{connected}/{integrations.length}</div>
+          <div className="text-3xl font-mono font-medium text-foreground">{connected}/{total}</div>
           <div className="text-sm text-foreground-secondary">Connected</div>
         </CardContent>
       </Card>
       <Card padding="sm">
         <CardContent className="p-4">
-          <div className="text-3xl font-mono font-medium text-foreground">
-            {totalItems.toLocaleString()}
-          </div>
+          <div className="text-3xl font-mono font-medium text-foreground">-</div>
           <div className="text-sm text-foreground-secondary">Items Synced</div>
         </CardContent>
       </Card>
-      <Card padding="sm" glow={connected < integrations.length ? 'warning' : 'success'}>
+      <Card padding="sm" glow={connected === 0 ? 'warning' : connected < total ? 'warning' : 'success'}>
         <CardContent className="p-4">
           <div className={cn(
             'text-3xl font-mono font-medium',
-            connected === integrations.length ? 'text-status-success' : 'text-status-warning'
+            connected === 0 ? 'text-foreground-tertiary' : connected === total ? 'text-status-success' : 'text-status-warning'
           )}>
-            {Math.round((connected / integrations.length) * 100)}%
+            {percentage}%
           </div>
           <div className="text-sm text-foreground-secondary">Coverage</div>
         </CardContent>
@@ -239,48 +255,91 @@ function IntegrationStats({ integrations }: { integrations: Integration[] }) {
 }
 
 export function IntegrationsTab() {
-  const [integrations, setIntegrations] = useState<Integration[]>(mockIntegrations)
+  const utils = trpc.useUtils()
+  const { data, isLoading } = trpc.integrations.list.useQuery()
+  const syncMutation = trpc.integrations.triggerSync.useMutation({
+    onSuccess: () => {
+      utils.integrations.list.invalidate()
+    },
+  })
 
-  const handleConnect = (id: string) => {
-    const integration = integrations.find(i => i.id === id)
-    if (integration?.oauthUrl) {
-      // In production, redirect to OAuth flow
-      window.location.href = integration.oauthUrl
+  const handleConnect = (type: string) => {
+    const url = oauthUrls[type]
+    if (url) {
+      window.location.href = url
     }
-
-    // Demo: simulate connection
-    setIntegrations(prev => prev.map(i =>
-      i.id === id
-        ? { ...i, connected: true, status: 'syncing' as const, lastSync: new Date() }
-        : i
-    ))
-
-    setTimeout(() => {
-      setIntegrations(prev => prev.map(i =>
-        i.id === id
-          ? { ...i, status: 'synced' as const, itemsCount: Math.floor(Math.random() * 500) + 100 }
-          : i
-      ))
-    }, 2000)
   }
 
-  const handleSync = (id: string) => {
-    setIntegrations(prev => prev.map(i =>
-      i.id === id ? { ...i, status: 'syncing' as const } : i
-    ))
+  const handleSync = (type: string) => {
+    syncMutation.mutate({ type })
+  }
 
-    setTimeout(() => {
-      setIntegrations(prev => prev.map(i =>
-        i.id === id
-          ? { ...i, status: 'synced' as const, lastSync: new Date() }
-          : i
-      ))
-    }, 2000)
+  if (isLoading) {
+    return (
+      <div className="p-6 space-y-6">
+        <div className="animate-pulse space-y-4">
+          <div className="h-8 bg-background-secondary rounded w-48" />
+          <div className="grid grid-cols-3 gap-4">
+            {[1, 2, 3].map(i => (
+              <div key={i} className="h-24 bg-background-secondary rounded" />
+            ))}
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            {[1, 2, 3, 4].map(i => (
+              <div key={i} className="h-48 bg-background-secondary rounded" />
+            ))}
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  const connected = data?.connected || []
+  const available = data?.available || []
+  const allIntegrations = [
+    ...connected.map(i => ({ ...i, isConnected: true })),
+    ...available.map(i => ({ ...i, isConnected: false, lastSyncAt: null, syncError: null })),
+  ]
+
+  // Filter to show only supported integrations
+  const supportedTypes = ['GITHUB', 'LINEAR', 'SLACK', 'DISCORD']
+  const filteredIntegrations = allIntegrations.filter(i => supportedTypes.includes(i.type))
+
+  const connectedCount = connected.filter(i => supportedTypes.includes(i.type)).length
+  const totalCount = supportedTypes.length
+
+  // Show empty state if no integrations connected
+  if (connectedCount === 0) {
+    return (
+      <div className="p-6 space-y-6">
+        <div>
+          <h2 className="text-xl font-semibold text-foreground">Integrations</h2>
+          <p className="text-sm text-foreground-secondary mt-1">
+            Connect your tools to enable predictions and team tracking
+          </p>
+        </div>
+
+        <EmptyState />
+
+        <div className="p-4 bg-nf-muted border border-nf/20 rounded-lg">
+          <div className="flex items-start gap-3">
+            <BreathingDot variant="nf" size="md" />
+            <div>
+              <h4 className="text-sm font-medium text-nf mb-1">Better predictions with more data</h4>
+              <p className="text-xs text-foreground-secondary leading-relaxed">
+                NexFlow analyzes data from all connected integrations to detect bottlenecks,
+                predict sprint risks, and generate actionable insights. Connect all your tools
+                for the most accurate predictions.
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+    )
   }
 
   return (
     <div className="p-6 space-y-6">
-      {/* Header */}
       <div>
         <h2 className="text-xl font-semibold text-foreground">Integrations</h2>
         <p className="text-sm text-foreground-secondary mt-1">
@@ -288,22 +347,24 @@ export function IntegrationsTab() {
         </p>
       </div>
 
-      {/* Stats */}
-      <IntegrationStats integrations={integrations} />
+      <IntegrationStats connected={connectedCount} total={totalCount} />
 
-      {/* Integrations grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        {integrations.map(integration => (
+        {filteredIntegrations.map(integration => (
           <IntegrationCard
-            key={integration.id}
-            integration={integration}
-            onConnect={handleConnect}
-            onSync={handleSync}
+            key={integration.type}
+            type={integration.type}
+            name={integration.name}
+            status={integration.status}
+            lastSyncAt={integration.lastSyncAt}
+            syncError={integration.syncError}
+            onConnect={() => handleConnect(integration.type)}
+            onSync={() => handleSync(integration.type)}
+            isSyncing={syncMutation.isLoading && syncMutation.variables?.type === integration.type}
           />
         ))}
       </div>
 
-      {/* Info */}
       <div className="p-4 bg-nf-muted border border-nf/20 rounded-lg">
         <div className="flex items-start gap-3">
           <BreathingDot variant="nf" size="md" />
