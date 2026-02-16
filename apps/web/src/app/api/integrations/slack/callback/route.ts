@@ -29,32 +29,34 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    const redirectPath = returnTo === 'onboarding' ? '/onboarding' : '/dashboard?card=integrations'
-    const separator = returnTo === 'onboarding' ? '?' : '&'
+    // For onboarding, redirect back to integrations step
+    const redirectPath = returnTo === 'onboarding'
+      ? '/onboarding?step=integrations'
+      : '/dashboard?card=integrations'
 
     // Handle OAuth errors
     if (error) {
       console.error('Slack OAuth error:', error)
-      return NextResponse.redirect(`${baseUrl}${redirectPath}${separator}error=slack_cancelled`)
+      return NextResponse.redirect(`${baseUrl}${redirectPath}&error=slack_cancelled`)
     }
 
     if (!code || !state || !stateData) {
-      return NextResponse.redirect(`${baseUrl}${redirectPath}${separator}error=invalid_params`)
+      return NextResponse.redirect(`${baseUrl}${redirectPath}&error=invalid_params`)
     }
 
     // Check state timestamp (10 minute expiry)
     if (Date.now() - stateData.timestamp > 10 * 60 * 1000) {
-      return NextResponse.redirect(`${baseUrl}${redirectPath}${separator}error=session_expired`)
+      return NextResponse.redirect(`${baseUrl}${redirectPath}&error=session_expired`)
     }
 
     // Exchange code for token
     const result = await SlackClient.handleOAuthCallback(code, stateData.organizationId)
 
     if (!result.success) {
-      return NextResponse.redirect(`${baseUrl}${redirectPath}${separator}error=slack_failed`)
+      return NextResponse.redirect(`${baseUrl}${redirectPath}&error=slack_failed`)
     }
 
-    return NextResponse.redirect(`${baseUrl}${redirectPath}${separator}success=slack_connected`)
+    return NextResponse.redirect(`${baseUrl}${redirectPath}&success=slack_connected`)
   } catch (error) {
     console.error('Error handling Slack OAuth callback:', error)
     return NextResponse.redirect(`${baseUrl}/onboarding?error=slack_error`)

@@ -28,8 +28,10 @@ export async function GET(req: NextRequest) {
     organizationId = state
   }
 
-  const redirectPath = returnTo === 'onboarding' ? '/onboarding' : '/dashboard?card=integrations'
-  const separator = returnTo === 'onboarding' ? '?' : '&'
+  // For onboarding, redirect back to integrations step
+  const redirectPath = returnTo === 'onboarding'
+    ? '/onboarding?step=integrations'
+    : '/dashboard?card=integrations'
 
   try {
     await GitHubClient.handleOAuthCallback(code, organizationId)
@@ -44,9 +46,9 @@ export async function GET(req: NextRequest) {
       // Don't fail the OAuth flow if sync fails - it will retry later
     }
 
-    return NextResponse.redirect(`${baseUrl}${redirectPath}${separator}success=github_connected`)
+    return NextResponse.redirect(`${baseUrl}${redirectPath}&success=github_connected`)
   } catch (error) {
     console.error('GitHub OAuth error:', error)
-    return NextResponse.redirect(`${baseUrl}${redirectPath}${separator}error=github_failed`)
+    return NextResponse.redirect(`${baseUrl}${redirectPath}&error=github_failed`)
   }
 }

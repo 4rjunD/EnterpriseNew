@@ -28,14 +28,16 @@ export async function GET(req: NextRequest) {
     organizationId = state
   }
 
-  const redirectPath = returnTo === 'onboarding' ? '/onboarding' : '/dashboard?card=integrations'
-  const separator = returnTo === 'onboarding' ? '?' : '&'
+  // For onboarding, redirect back to integrations step
+  const redirectPath = returnTo === 'onboarding'
+    ? '/onboarding?step=integrations'
+    : '/dashboard?card=integrations'
 
   try {
     await DiscordClient.handleOAuthCallback(code, organizationId)
-    return NextResponse.redirect(`${baseUrl}${redirectPath}${separator}success=discord_connected`)
+    return NextResponse.redirect(`${baseUrl}${redirectPath}&success=discord_connected`)
   } catch (error) {
     console.error('Discord OAuth error:', error)
-    return NextResponse.redirect(`${baseUrl}${redirectPath}${separator}error=discord_failed`)
+    return NextResponse.redirect(`${baseUrl}${redirectPath}&error=discord_failed`)
   }
 }

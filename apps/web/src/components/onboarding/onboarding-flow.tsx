@@ -71,18 +71,22 @@ export function OnboardingFlow() {
   const searchParams = useSearchParams()
   const { data: session, status } = useSession()
 
-  // Check if we're returning from OAuth (step=scanning in URL)
-  const isReturningFromAuth = searchParams.get('step') === 'scanning'
+  // Check URL params for step navigation
+  const stepParam = searchParams.get('step')
+  const isReturningFromAuth = stepParam === 'scanning'
+  const isReturningFromIntegration = stepParam === 'integrations'
 
   const [step, setStep] = useState(() => {
+    // If returning from integration OAuth, go to step 4
+    if (isReturningFromIntegration) return 4
     // If returning from auth and signed in, go to scanning
     if (isReturningFromAuth) return 7
     return 1
   })
 
   const [data, setData] = useState<OnboardingData>(() => {
-    // If returning from OAuth, load saved data
-    if (typeof window !== 'undefined' && isReturningFromAuth) {
+    // If returning from OAuth (integration or auth), load saved data
+    if (typeof window !== 'undefined' && (isReturningFromAuth || isReturningFromIntegration)) {
       const savedData = loadOnboardingData()
       if (savedData) return savedData
     }
@@ -104,6 +108,17 @@ export function OnboardingFlow() {
       }
     }
   }, [isReturningFromAuth, status])
+
+  // If returning from integration OAuth, restore data and go to step 4
+  useEffect(() => {
+    if (isReturningFromIntegration) {
+      const savedData = loadOnboardingData()
+      if (savedData) {
+        setData(savedData)
+        setStep(4) // Go to integrations step
+      }
+    }
+  }, [isReturningFromIntegration])
 
   const updateData = useCallback((updates: Partial<OnboardingData>) => {
     setData((prev) => ({ ...prev, ...updates }))

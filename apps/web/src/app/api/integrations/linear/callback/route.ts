@@ -30,8 +30,10 @@ export async function GET(req: NextRequest) {
     organizationId = state
   }
 
-  const redirectPath = returnTo === 'onboarding' ? '/onboarding' : '/dashboard?card=integrations'
-  const separator = returnTo === 'onboarding' ? '?' : '&'
+  // For onboarding, redirect back to integrations step
+  const redirectPath = returnTo === 'onboarding'
+    ? '/onboarding?step=integrations'
+    : '/dashboard?card=integrations'
 
   try {
     await LinearClient.handleOAuthCallback(code, organizationId)
@@ -46,9 +48,9 @@ export async function GET(req: NextRequest) {
       // Don't fail the OAuth flow if sync fails - it will retry later
     }
 
-    return NextResponse.redirect(`${baseUrl}${redirectPath}${separator}success=linear_connected`)
+    return NextResponse.redirect(`${baseUrl}${redirectPath}&success=linear_connected`)
   } catch (error) {
     console.error('Linear OAuth error:', error)
-    return NextResponse.redirect(`${baseUrl}${redirectPath}${separator}error=linear_failed`)
+    return NextResponse.redirect(`${baseUrl}${redirectPath}&error=linear_failed`)
   }
 }
