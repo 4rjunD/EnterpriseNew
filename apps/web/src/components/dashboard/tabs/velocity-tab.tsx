@@ -1,172 +1,89 @@
 'use client'
 
-import { useState } from 'react'
 import { cn } from '@nexflow/ui/utils'
-import { Card, CardHeader, CardTitle, CardContent } from '@/components/nf/card'
-import { Badge } from '@/components/nf/badge'
-import { BreathingDot } from '@/components/nf/breathing-dot'
-import { AnimPercent } from '@/components/nf/anim-num'
+import { trpc } from '@/lib/trpc'
+import { TrendingUp, Plug } from 'lucide-react'
+import Link from 'next/link'
 
-// Velocity metric type
-interface VelocityMetric {
-  label: string
-  value: number
-  unit: string
-  trend: 'up' | 'down' | 'stable'
-  target?: number
-  good: 'high' | 'low'
-}
-
-// Mock velocity data
-const mockMetrics: VelocityMetric[] = [
-  { label: 'Deploy Frequency', value: 4.2, unit: '/day', trend: 'up', target: 5, good: 'high' },
-  { label: 'PR Cycle Time', value: 18, unit: 'hours', trend: 'down', target: 24, good: 'low' },
-  { label: 'Review Turnaround', value: 4.5, unit: 'hours', trend: 'stable', target: 4, good: 'low' },
-  { label: 'Commit Frequency', value: 12.3, unit: '/day', trend: 'up', good: 'high' },
-  { label: 'Lead Time', value: 2.1, unit: 'days', trend: 'down', target: 3, good: 'low' },
-  { label: 'Change Failure Rate', value: 8, unit: '%', trend: 'down', target: 15, good: 'low' },
-]
-
-// Team velocity history (last 4 weeks)
-const mockHistory = [
-  { week: 'Week 1', points: 28, deploys: 18 },
-  { week: 'Week 2', points: 32, deploys: 22 },
-  { week: 'Week 3', points: 35, deploys: 19 },
-  { week: 'Week 4', points: 38, deploys: 25 },
-]
-
-// Metric card
-function MetricCard({ metric }: { metric: VelocityMetric }) {
-  const isGood = metric.good === 'high'
-    ? metric.trend === 'up'
-    : metric.trend === 'down'
-  const meetsTarget = metric.target
-    ? metric.good === 'high'
-      ? metric.value >= metric.target
-      : metric.value <= metric.target
-    : true
+function EmptyState({ hasIntegrations }: { hasIntegrations: boolean }) {
+  if (!hasIntegrations) {
+    return (
+      <div className="flex flex-col items-center justify-center py-16 px-4">
+        <div className="w-16 h-16 rounded-full bg-[#1a1a1a] flex items-center justify-center mb-4">
+          <Plug className="w-8 h-8 text-[#555]" />
+        </div>
+        <h3 className="text-[16px] font-medium text-[#ededed] mb-2">Connect GitHub to track velocity</h3>
+        <p className="text-[13px] text-[#888] text-center max-w-md mb-6">
+          NexFlow calculates DORA metrics from your GitHub data including deploy frequency,
+          lead time, and change failure rate.
+        </p>
+        <Link
+          href="/api/integrations/github/authorize"
+          className="inline-flex items-center gap-2 px-4 py-2 bg-[#ededed] text-[#000] rounded-md text-[13px] font-medium hover:bg-[#fff] transition-colors"
+        >
+          Connect GitHub
+        </Link>
+      </div>
+    )
+  }
 
   return (
-    <Card hover glow={meetsTarget ? 'success' : 'warning'}>
-      <CardContent className="p-4">
-        <div className="flex items-start justify-between mb-2">
-          <span className="text-xs text-foreground-tertiary">{metric.label}</span>
-          <span className={cn(
-            'text-xs',
-            isGood ? 'text-status-success' : 'text-status-warning'
-          )}>
-            {metric.trend === 'up' ? '\\u2191' : metric.trend === 'down' ? '\\u2193' : '\\u2192'}
-          </span>
-        </div>
-        <div className="flex items-baseline gap-1">
-          <span className="text-2xl font-mono font-medium text-foreground">{metric.value}</span>
-          <span className="text-sm text-foreground-tertiary">{metric.unit}</span>
-        </div>
-        {metric.target && (
-          <div className="mt-2 text-xs text-foreground-secondary">
-            Target: {metric.target}{metric.unit}
-          </div>
-        )}
-      </CardContent>
-    </Card>
+    <div className="flex flex-col items-center justify-center py-16 px-4">
+      <div className="w-16 h-16 rounded-full bg-[#50e3c2]/10 flex items-center justify-center mb-4">
+        <TrendingUp className="w-8 h-8 text-[#50e3c2]" />
+      </div>
+      <h3 className="text-[16px] font-medium text-[#ededed] mb-2">Calculating velocity metrics</h3>
+      <p className="text-[13px] text-[#888] text-center max-w-md">
+        NexFlow needs more commit and deploy data to calculate meaningful velocity metrics.
+        Keep pushing code and metrics will appear automatically.
+      </p>
+    </div>
   )
 }
 
-// Velocity chart (simplified bar chart)
-function VelocityChart({ data }: { data: typeof mockHistory }) {
-  const maxPoints = Math.max(...data.map(d => d.points))
-
+function LoadingSkeleton() {
   return (
-    <Card>
-      <CardHeader className="p-4 pb-2">
-        <CardTitle className="text-base">Weekly Velocity</CardTitle>
-      </CardHeader>
-      <CardContent className="p-4 pt-0">
-        <div className="flex items-end gap-2 h-32">
-          {data.map((week, i) => (
-            <div key={i} className="flex-1 flex flex-col items-center gap-1">
-              <div
-                className="w-full bg-status-success rounded-t transition-all"
-                style={{ height: `${(week.points / maxPoints) * 100}%` }}
-              />
-              <span className="text-xs text-foreground-tertiary">{week.week.split(' ')[1]}</span>
-              <span className="text-xs font-mono text-foreground">{week.points}pts</span>
-            </div>
-          ))}
-        </div>
-      </CardContent>
-    </Card>
-  )
-}
-
-// Stats overview
-function VelocityStats() {
-  return (
-    <div className="grid grid-cols-4 gap-4">
-      <Card padding="sm">
-        <CardContent className="p-3">
-          <div className="text-2xl font-mono font-medium text-foreground">38</div>
-          <div className="text-xs text-foreground-secondary">Points This Week</div>
-        </CardContent>
-      </Card>
-      <Card padding="sm" glow="success">
-        <CardContent className="p-3">
-          <div className="text-2xl font-mono font-medium text-status-success">+18%</div>
-          <div className="text-xs text-foreground-secondary">vs Last Week</div>
-        </CardContent>
-      </Card>
-      <Card padding="sm">
-        <CardContent className="p-3">
-          <div className="text-2xl font-mono font-medium text-foreground">25</div>
-          <div className="text-xs text-foreground-secondary">Deploys This Week</div>
-        </CardContent>
-      </Card>
-      <Card padding="sm">
-        <CardContent className="p-3">
-          <div className="text-2xl font-mono font-medium text-foreground">92%</div>
-          <div className="text-xs text-foreground-secondary">Uptime</div>
-        </CardContent>
-      </Card>
+    <div className="space-y-4 animate-pulse">
+      <div className="h-8 bg-[#1a1a1a] rounded w-48" />
+      <div className="grid grid-cols-4 gap-3">
+        {[1, 2, 3, 4].map(i => (
+          <div key={i} className="h-20 bg-[#1a1a1a] rounded" />
+        ))}
+      </div>
+      <div className="h-40 bg-[#1a1a1a] rounded" />
     </div>
   )
 }
 
 export function VelocityTab() {
-  const [metrics] = useState<VelocityMetric[]>(mockMetrics)
+  const { data: integrations, isLoading } = trpc.integrations.list.useQuery()
+
+  if (isLoading) {
+    return <LoadingSkeleton />
+  }
+
+  const hasIntegrations = (integrations?.connected?.length || 0) > 0
+  const hasGitHub = integrations?.connected?.some(i => i.type === 'GITHUB') || false
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="space-y-4">
       {/* Header */}
       <div>
-        <h2 className="text-xl font-semibold text-foreground">Velocity</h2>
-        <p className="text-sm text-foreground-secondary mt-1">
+        <h2 className="text-[20px] font-semibold text-[#ededed] tracking-[-0.5px]">Velocity</h2>
+        <p className="text-[13px] text-[#888] mt-1">
           Engineering performance metrics and DORA insights
         </p>
       </div>
 
-      {/* Stats */}
-      <VelocityStats />
-
-      {/* Velocity chart */}
-      <VelocityChart data={mockHistory} />
-
-      {/* Metrics grid */}
-      <div>
-        <h3 className="text-sm font-medium text-foreground mb-3">Key Metrics</h3>
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
-          {metrics.map(metric => (
-            <MetricCard key={metric.label} metric={metric} />
-          ))}
-        </div>
-      </div>
+      <EmptyState hasIntegrations={hasGitHub} />
 
       {/* DORA explanation */}
-      <div className="p-4 bg-nf-muted border border-nf/20 rounded-lg">
+      <div className="p-4 border border-[#d4a574]/20 rounded-md">
         <div className="flex items-start gap-3">
-          <BreathingDot variant="nf" size="md" />
+          <span className="w-2 h-2 rounded-full bg-[#d4a574] mt-1.5 animate-pulse" />
           <div>
-            <h4 className="text-sm font-medium text-nf mb-1">About Velocity Metrics</h4>
-            <p className="text-xs text-foreground-secondary leading-relaxed">
+            <h4 className="text-[13px] font-medium text-[#d4a574] mb-1">About Velocity Metrics</h4>
+            <p className="text-[12px] text-[#555] leading-[1.5]">
               These metrics are based on DORA (DevOps Research and Assessment) research.
               Elite teams deploy multiple times per day with less than 1 hour lead time
               and under 15% change failure rate. NexFlow tracks these automatically from
