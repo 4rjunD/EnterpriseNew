@@ -10,7 +10,7 @@
   },
   "scripts": {
     "generate": "prisma generate",
-    "push": "prisma db push",
+    "push": "prisma db push --accept-data-loss",
     "migrate": "prisma migrate dev",
     "studio": "prisma studio",
     "seed": "echo 'Use seed:demo for demo data' && exit 1",
