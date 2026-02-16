@@ -1,9 +1,23 @@
 import { Resend } from 'resend'
 
-const resend = process.env.RESEND_API_KEY ? new Resend(process.env.RESEND_API_KEY) : null
+// Lazy-initialize Resend client to avoid build-time errors
+let resendClient: Resend | null = null
 
-const FROM_EMAIL = process.env.EMAIL_FROM || 'NexFlow <noreply@nexflow.dev>'
-const APP_URL = process.env.NEXTAUTH_URL || 'https://nexflow-web-rse3.onrender.com'
+function getResendClient(): Resend | null {
+  if (resendClient) return resendClient
+  const apiKey = process.env.RESEND_API_KEY
+  if (!apiKey) return null
+  resendClient = new Resend(apiKey)
+  return resendClient
+}
+
+function getFromEmail(): string {
+  return process.env.EMAIL_FROM || 'NexFlow <noreply@nexflow.dev>'
+}
+
+function getAppUrl(): string {
+  return process.env.NEXTAUTH_URL || 'https://nexflow-web-rse3.onrender.com'
+}
 
 export interface SendEmailOptions {
   to: string
@@ -13,6 +27,7 @@ export interface SendEmailOptions {
 }
 
 export async function sendEmail(options: SendEmailOptions): Promise<{ success: boolean; error?: string }> {
+  const resend = getResendClient()
   if (!resend) {
     console.warn('Email not configured: RESEND_API_KEY not set')
     return { success: false, error: 'Email not configured' }
@@ -20,7 +35,7 @@ export async function sendEmail(options: SendEmailOptions): Promise<{ success: b
 
   try {
     const { error } = await resend.emails.send({
-      from: FROM_EMAIL,
+      from: getFromEmail(),
       to: options.to,
       subject: options.subject,
       html: options.html,
@@ -45,7 +60,7 @@ export async function sendInvitationEmail(options: {
   organizationName: string
   inviteToken: string
 }): Promise<{ success: boolean; error?: string }> {
-  const inviteUrl = `${APP_URL}/invite/${options.inviteToken}`
+  const inviteUrl = `${getAppUrl()}/invite/${options.inviteToken}`
 
   const html = `
 <!DOCTYPE html>
