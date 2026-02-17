@@ -347,4 +347,174 @@ export class GitHubClient implements IntegrationClient {
       throw e
     }
   }
+
+  /**
+   * Fetch recent commit history for a repository.
+   * Returns commit metadata for velocity and pattern analysis.
+   */
+  async getCommitHistory(owner: string, repo: string, options?: {
+    since?: string  // ISO date
+    perPage?: number
+  }): Promise<Array<{
+    sha: string
+    message: string
+    author: string | null
+    date: string
+    additions: number
+    deletions: number
+    filesChanged: number
+  }>> {
+    const client = await this.getClient()
+
+    try {
+      const since = options?.since || new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString()
+      const perPage = options?.perPage || 100
+
+      const { data: commits } = await client.repos.listCommits({
+        owner,
+        repo,
+        since,
+        per_page: perPage,
+      })
+
+      return commits.map(c => ({
+        sha: c.sha,
+        message: (c.commit.message || '').split('\n')[0].slice(0, 200),
+        author: c.commit.author?.name || c.author?.login || null,
+        date: c.commit.author?.date || new Date().toISOString(),
+        additions: 0, // Not available in list endpoint
+        deletions: 0,
+        filesChanged: 0,
+      }))
+    } catch (e) {
+      console.error(`Failed to fetch commits for ${owner}/${repo}:`, e)
+      return []
+    }
+  }
+
+  /**
+   * Analyze commit patterns across selected repos.
+   * Returns aggregated metrics for AI predictions.
+   */
+  async analyzeCommitPatterns(repos: Array<{ fullName: string }>): Promise<{
+    totalCommits: number
+    commitsPerDay: number
+    activeContributors: number
+    recentActivity: 'high' | 'medium' | 'low' | 'none'
+    commitsByDay: Record<string, number>
+    topContributors: Array<{ name: string; commits: number }>
+    commitPatterns: {
+      fixCommits: number
+      featureCommits: number
+      refactorCommits: number
+      docsCommits: number
+      afterHoursCommits: number
+      weekendCommits: number
+    }
+    velocityTrend: 'accelerating' | 'stable' | 'decelerating'
+    repoBreakdown: Array<{
+      repo: string
+      commits: number
+      lastCommitDate: string
+      topFiles: string[]
+    }>
+  }> {
+    const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString()
+    const allCommits: Array<{ message: string; author: string | null; date: string; repo: string }> = []
+
+    for (const repo of repos.slice(0, 10)) { // Limit to 10 repos
+      const [owner, name] = repo.fullName.split('/')
+      if (!owner || !name) continue
+
+      const commits = await this.getCommitHistory(owner, name, { since: thirtyDaysAgo, perPage: 100 })
+      allCommits.push(...commits.map(c => ({ ...c, repo: repo.fullName })))
+    }
+
+    if (allCommits.length === 0) {
+      return {
+        totalCommits: 0,
+        commitsPerDay: 0,
+        activeContributors: 0,
+        recentActivity: 'none',
+        commitsByDay: {},
+        topContributors: [],
+        commitPatterns: { fixCommits: 0, featureCommits: 0, refactorCommits: 0, docsCommits: 0, afterHoursCommits: 0, weekendCommits: 0 },
+        velocityTrend: 'stable',
+        repoBreakdown: [],
+      }
+    }
+
+    // Commits per day
+    const commitsByDay: Record<string, number> = {}
+    const contributorMap = new Map<string, number>()
+    const patterns = { fixCommits: 0, featureCommits: 0, refactorCommits: 0, docsCommits: 0, afterHoursCommits: 0, weekendCommits: 0 }
+    const repoMap = new Map<string, { commits: number; lastDate: string }>()
+
+    for (const commit of allCommits) {
+      // Day bucket
+      const day = commit.date.split('T')[0]
+      commitsByDay[day] = (commitsByDay[day] || 0) + 1
+
+      // Contributors
+      if (commit.author) {
+        contributorMap.set(commit.author, (contributorMap.get(commit.author) || 0) + 1)
+      }
+
+      // Message patterns
+      const msg = commit.message.toLowerCase()
+      if (msg.match(/\b(fix|bug|patch|hotfix|resolve)\b/)) patterns.fixCommits++
+      if (msg.match(/\b(feat|feature|add|implement|new)\b/)) patterns.featureCommits++
+      if (msg.match(/\b(refactor|cleanup|clean up|reorganize|restructure)\b/)) patterns.refactorCommits++
+      if (msg.match(/\b(doc|readme|comment|changelog)\b/)) patterns.docsCommits++
+
+      // Time patterns
+      const commitDate = new Date(commit.date)
+      const hour = commitDate.getUTCHours()
+      if (hour < 7 || hour > 20) patterns.afterHoursCommits++
+      const dayOfWeek = commitDate.getUTCDay()
+      if (dayOfWeek === 0 || dayOfWeek === 6) patterns.weekendCommits++
+
+      // Repo breakdown
+      const repoEntry = repoMap.get(commit.repo) || { commits: 0, lastDate: '' }
+      repoEntry.commits++
+      if (!repoEntry.lastDate || commit.date > repoEntry.lastDate) repoEntry.lastDate = commit.date
+      repoMap.set(commit.repo, repoEntry)
+    }
+
+    // Velocity trend: compare first half vs second half
+    const sortedDays = Object.keys(commitsByDay).sort()
+    const midpoint = Math.floor(sortedDays.length / 2)
+    const firstHalf = sortedDays.slice(0, midpoint).reduce((sum, d) => sum + (commitsByDay[d] || 0), 0)
+    const secondHalf = sortedDays.slice(midpoint).reduce((sum, d) => sum + (commitsByDay[d] || 0), 0)
+    const velocityTrend = secondHalf > firstHalf * 1.2 ? 'accelerating' : secondHalf < firstHalf * 0.8 ? 'decelerating' : 'stable'
+
+    const commitsPerDay = allCommits.length / 30
+    const recentActivity = commitsPerDay >= 5 ? 'high' : commitsPerDay >= 1 ? 'medium' : commitsPerDay > 0 ? 'low' : 'none'
+
+    const topContributors = Array.from(contributorMap.entries())
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 10)
+      .map(([name, commits]) => ({ name, commits }))
+
+    const repoBreakdown = Array.from(repoMap.entries())
+      .map(([repo, data]) => ({
+        repo,
+        commits: data.commits,
+        lastCommitDate: data.lastDate,
+        topFiles: [],
+      }))
+      .sort((a, b) => b.commits - a.commits)
+
+    return {
+      totalCommits: allCommits.length,
+      commitsPerDay: Math.round(commitsPerDay * 10) / 10,
+      activeContributors: contributorMap.size,
+      recentActivity,
+      commitsByDay,
+      topContributors,
+      commitPatterns: patterns,
+      velocityTrend,
+      repoBreakdown,
+    }
+  }
 }

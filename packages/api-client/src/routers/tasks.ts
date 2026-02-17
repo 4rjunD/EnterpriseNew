@@ -126,6 +126,7 @@ export const tasksRouter = router({
       tasks: tasks.map(t => ({
         id: t.id,
         title: t.title,
+        description: t.description,
         status: t.status,
         priority: t.priority,
         dueDate: t.dueDate,

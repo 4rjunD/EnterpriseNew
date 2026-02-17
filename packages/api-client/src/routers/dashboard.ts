@@ -466,6 +466,136 @@ export const dashboardRouter = router({
         } catch (e) {
           results.errors.push(`Repo analysis failed: ${String(e)}`)
         }
+
+        // Step 3c: Analyze Git commit history for data-driven predictions
+        try {
+          const ghClient = new GitHubClient(ctx.organizationId)
+          const commitPatterns = await ghClient.analyzeCommitPatterns(
+            selectedRepos.map(r => ({ fullName: r.fullName }))
+          )
+
+          if (commitPatterns.totalCommits > 0) {
+            // Velocity prediction from real commit data
+            await prisma.prediction.create({
+              data: {
+                projectId: defaultProject.id,
+                type: 'VELOCITY_FORECAST',
+                confidence: Math.min(0.9, 0.5 + (commitPatterns.totalCommits / 200)),
+                value: {
+                  title: `Development velocity: ${commitPatterns.commitsPerDay} commits/day`,
+                  description: `Analyzed ${commitPatterns.totalCommits} commits across ${commitPatterns.repoBreakdown.length} repos over the last 30 days. ${commitPatterns.activeContributors} active contributors. Velocity trend: ${commitPatterns.velocityTrend}.`,
+                  suggestedAction: commitPatterns.velocityTrend === 'decelerating'
+                    ? 'Velocity is decreasing — review blockers, reduce context switching, and consider reducing WIP.'
+                    : commitPatterns.velocityTrend === 'accelerating'
+                    ? 'Velocity is increasing — maintain momentum and watch for quality trade-offs.'
+                    : 'Velocity is stable — consider process improvements to boost throughput.',
+                  metrics: {
+                    commitsPerDay: commitPatterns.commitsPerDay,
+                    totalCommits: commitPatterns.totalCommits,
+                    activeContributors: commitPatterns.activeContributors,
+                    velocityTrend: commitPatterns.velocityTrend,
+                    recentActivity: commitPatterns.recentActivity,
+                    featureCommits: commitPatterns.commitPatterns.featureCommits,
+                    fixCommits: commitPatterns.commitPatterns.fixCommits,
+                    refactorCommits: commitPatterns.commitPatterns.refactorCommits,
+                  },
+                },
+                reasoning: `Based on ${commitPatterns.totalCommits} commits over 30 days (${commitPatterns.commitsPerDay}/day). Top contributors: ${commitPatterns.topContributors.slice(0, 3).map(c => `${c.name} (${c.commits})`).join(', ')}. Trend: ${commitPatterns.velocityTrend}.`,
+                isActive: true,
+                validUntil: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+              },
+            })
+            results.predictionsCreated++
+
+            // Burnout risk from after-hours/weekend commits
+            const totalCommits = commitPatterns.totalCommits
+            const afterHoursRatio = totalCommits > 0 ? commitPatterns.commitPatterns.afterHoursCommits / totalCommits : 0
+            const weekendRatio = totalCommits > 0 ? commitPatterns.commitPatterns.weekendCommits / totalCommits : 0
+
+            if (afterHoursRatio > 0.15 || weekendRatio > 0.1) {
+              const burnoutConfidence = Math.min(0.85, 0.4 + afterHoursRatio + weekendRatio)
+              await prisma.prediction.create({
+                data: {
+                  projectId: defaultProject.id,
+                  type: 'BURNOUT_INDICATOR',
+                  confidence: burnoutConfidence,
+                  value: {
+                    title: 'After-hours work pattern detected',
+                    description: `${Math.round(afterHoursRatio * 100)}% of commits are outside business hours, ${Math.round(weekendRatio * 100)}% on weekends. This may indicate workload pressure or timezone distribution.`,
+                    suggestedAction: 'Review workload distribution, consider async work policies, and check if deadlines are realistic.',
+                    metrics: {
+                      afterHoursPercent: Math.round(afterHoursRatio * 100),
+                      weekendPercent: Math.round(weekendRatio * 100),
+                      afterHoursCommits: commitPatterns.commitPatterns.afterHoursCommits,
+                      weekendCommits: commitPatterns.commitPatterns.weekendCommits,
+                    },
+                  },
+                  reasoning: `${commitPatterns.commitPatterns.afterHoursCommits} commits outside business hours (${Math.round(afterHoursRatio * 100)}%) and ${commitPatterns.commitPatterns.weekendCommits} weekend commits (${Math.round(weekendRatio * 100)}%). Sustained off-hours work is a leading indicator of burnout.`,
+                  isActive: true,
+                  validUntil: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000),
+                },
+              })
+              results.predictionsCreated++
+            }
+
+            // Technical debt / scope creep from fix-heavy commit patterns
+            const fixRatio = totalCommits > 0 ? commitPatterns.commitPatterns.fixCommits / totalCommits : 0
+            const featureRatio = totalCommits > 0 ? commitPatterns.commitPatterns.featureCommits / totalCommits : 0
+
+            if (fixRatio > 0.3 || (fixRatio > featureRatio && totalCommits > 20)) {
+              await prisma.prediction.create({
+                data: {
+                  projectId: defaultProject.id,
+                  type: 'SCOPE_CREEP',
+                  confidence: Math.min(0.8, 0.4 + fixRatio),
+                  value: {
+                    title: 'Bug-fix heavy development cycle',
+                    description: `${Math.round(fixRatio * 100)}% of commits are bug fixes vs ${Math.round(featureRatio * 100)}% feature work. High fix ratios suggest accumulating technical debt.`,
+                    suggestedAction: 'Allocate dedicated time for test coverage, code review improvements, and refactoring to reduce bug introduction rate.',
+                    metrics: {
+                      fixPercent: Math.round(fixRatio * 100),
+                      featurePercent: Math.round(featureRatio * 100),
+                      refactorPercent: Math.round((commitPatterns.commitPatterns.refactorCommits / totalCommits) * 100),
+                      fixCommits: commitPatterns.commitPatterns.fixCommits,
+                      featureCommits: commitPatterns.commitPatterns.featureCommits,
+                    },
+                  },
+                  reasoning: `${commitPatterns.commitPatterns.fixCommits} fix/bug commits (${Math.round(fixRatio * 100)}%) vs ${commitPatterns.commitPatterns.featureCommits} feature commits (${Math.round(featureRatio * 100)}%). When fixes outpace features, delivery velocity degrades.`,
+                  isActive: true,
+                  validUntil: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000),
+                },
+              })
+              results.predictionsCreated++
+            }
+
+            // Deadline risk from decelerating velocity
+            if (commitPatterns.velocityTrend === 'decelerating') {
+              await prisma.prediction.create({
+                data: {
+                  projectId: defaultProject.id,
+                  type: 'DEADLINE_RISK',
+                  confidence: 0.7,
+                  value: {
+                    title: 'Delivery velocity is declining',
+                    description: `Commit frequency has decreased in the last 2 weeks compared to the prior 2 weeks. Current rate: ${commitPatterns.commitsPerDay} commits/day with ${commitPatterns.activeContributors} active contributors.`,
+                    suggestedAction: 'Review recent blockers, check for scope changes, and consider a team retrospective to identify friction points.',
+                    metrics: {
+                      commitsPerDay: commitPatterns.commitsPerDay,
+                      velocityTrend: commitPatterns.velocityTrend,
+                      activeContributors: commitPatterns.activeContributors,
+                    },
+                  },
+                  reasoning: `Velocity trend is decelerating — the second half of the 30-day window has significantly fewer commits than the first half. This pattern often precedes deadline misses.`,
+                  isActive: true,
+                  validUntil: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+                },
+              })
+              results.predictionsCreated++
+            }
+          }
+        } catch (e) {
+          results.errors.push(`Commit analysis failed: ${String(e)}`)
+        }
       }
 
       // Step 4: Run context-based analysis (ALWAYS runs - works even without repos)

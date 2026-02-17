@@ -200,6 +200,8 @@ export function NexFlowHeader({
         utils.predictions.invalidate()
         utils.bottlenecks.invalidate()
         utils.team.invalidate()
+        utils.onboarding.invalidate()
+        utils.integrations.invalidate()
       } else {
         toast({
           title: 'Refresh completed with errors',

@@ -1,5 +1,6 @@
 'use client'
 
+import { useState } from 'react'
 import { cn } from '@nexflow/ui/utils'
 import { trpc } from '@/lib/trpc'
 import {
@@ -14,6 +15,7 @@ import {
   Plug,
   ExternalLink,
   ChevronRight,
+  ChevronDown,
   Lightbulb,
   ShieldAlert,
   Zap,
@@ -65,8 +67,10 @@ function TaskRow({ task }: {
     externalUrl?: string | null
     labels: string[]
     project?: { id: string; name: string; key: string } | null
+    description?: string | null
   }
 }) {
+  const [expanded, setExpanded] = useState(false)
   const isOverdue = task.dueDate && new Date(task.dueDate) < new Date()
   const isDueToday = task.dueDate && new Date(task.dueDate).toDateString() === new Date().toDateString()
 
@@ -81,59 +85,91 @@ function TaskRow({ task }: {
     : { label: 'NORMAL', color: '#555', bg: 'transparent' }
 
   return (
-    <div className={cn(
-      'flex items-center gap-3 p-4 border-b border-[#1a1a1a] last:border-b-0 hover:bg-[#111] transition-colors group',
-      isOverdue && 'bg-[#ff4444]/5'
-    )}>
-      <div className="w-5 h-5 rounded-full border border-[#333] flex items-center justify-center flex-shrink-0">
-        {task.status === 'DONE' ? (
-          <CheckCircle2 className="w-4 h-4 text-[#50e3c2]" />
-        ) : (
-          <Circle className="w-4 h-4 text-[#555]" />
-        )}
-      </div>
+    <div
+      className={cn(
+        'border-b border-[#1a1a1a] last:border-b-0 hover:bg-[#111] transition-colors cursor-pointer',
+        isOverdue && 'bg-[#ff4444]/5'
+      )}
+      onClick={() => setExpanded(!expanded)}
+    >
+      <div className="flex items-center gap-3 p-4">
+        <div className="w-5 h-5 rounded-full border border-[#333] flex items-center justify-center flex-shrink-0">
+          {task.status === 'DONE' ? (
+            <CheckCircle2 className="w-4 h-4 text-[#50e3c2]" />
+          ) : (
+            <Circle className="w-4 h-4 text-[#555]" />
+          )}
+        </div>
 
-      <div className="flex-1 min-w-0">
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2">
+            <span
+              className="text-[10px] font-mono font-medium uppercase tracking-[0.5px] px-1.5 py-0.5 rounded"
+              style={{ color: urgencyConfig.color, backgroundColor: urgencyConfig.bg }}
+            >
+              {urgencyConfig.label}
+            </span>
+            <span className="text-[13px] text-[#ededed] truncate">{task.title}</span>
+          </div>
+          <div className="flex items-center gap-2 mt-1">
+            <span className="text-[11px] text-[#555] font-mono uppercase">{task.source}</span>
+            {task.project && (
+              <>
+                <span className="text-[#333]">·</span>
+                <span className="text-[11px] text-[#555]">{task.project.key}</span>
+              </>
+            )}
+            {task.dueDate && (
+              <>
+                <span className="text-[#333]">·</span>
+                <span className={cn(
+                  'text-[11px] font-mono',
+                  isOverdue ? 'text-[#ff4444]' : 'text-[#555]'
+                )}>
+                  {new Date(task.dueDate).toLocaleDateString()}
+                </span>
+              </>
+            )}
+          </div>
+        </div>
+
         <div className="flex items-center gap-2">
-          <span
-            className="text-[10px] font-mono font-medium uppercase tracking-[0.5px] px-1.5 py-0.5 rounded"
-            style={{ color: urgencyConfig.color, backgroundColor: urgencyConfig.bg }}
-          >
-            {urgencyConfig.label}
+          {task.externalUrl && (
+            <a
+              href={task.externalUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-[#555] hover:text-[#ededed] transition-all"
+              onClick={e => e.stopPropagation()}
+            >
+              <ExternalLink className="w-4 h-4" />
+            </a>
+          )}
+          <span className="text-[#555]">
+            {expanded ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
           </span>
-          <span className="text-[13px] text-[#ededed] truncate">{task.title}</span>
-        </div>
-        <div className="flex items-center gap-2 mt-1">
-          <span className="text-[11px] text-[#555] font-mono uppercase">{task.source}</span>
-          {task.project && (
-            <>
-              <span className="text-[#333]">·</span>
-              <span className="text-[11px] text-[#555]">{task.project.key}</span>
-            </>
-          )}
-          {task.dueDate && (
-            <>
-              <span className="text-[#333]">·</span>
-              <span className={cn(
-                'text-[11px] font-mono',
-                isOverdue ? 'text-[#ff4444]' : 'text-[#555]'
-              )}>
-                {new Date(task.dueDate).toLocaleDateString()}
-              </span>
-            </>
-          )}
         </div>
       </div>
 
-      {task.externalUrl && (
-        <a
-          href={task.externalUrl}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="opacity-0 group-hover:opacity-100 text-[#555] hover:text-[#ededed] transition-all"
-        >
-          <ExternalLink className="w-4 h-4" />
-        </a>
+      {expanded && (
+        <div className="px-4 pb-4 border-t border-[#1a1a1a]">
+          <div className="pt-3 ml-8 space-y-2">
+            {task.description && (
+              <p className="text-[12px] text-[#888]">{task.description}</p>
+            )}
+            <div className="flex flex-wrap gap-2">
+              {task.labels.map(label => (
+                <span key={label} className="text-[10px] font-mono px-2 py-0.5 bg-[#1a1a1a] rounded text-[#888]">
+                  {label}
+                </span>
+              ))}
+            </div>
+            <div className="flex items-center gap-3 text-[11px] text-[#555]">
+              <span>Status: <span className="text-[#888]">{task.status}</span></span>
+              <span>Priority: <span style={{ color: urgencyConfig.color }}>{task.priority}</span></span>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   )
@@ -250,6 +286,7 @@ function PredictionCard({ prediction }: {
     project: { id: string; name: string; key: string } | null
   }
 }) {
+  const [expanded, setExpanded] = useState(false)
   const typeConfig: Record<string, { label: string; color: string; icon: React.ReactNode }> = {
     DEADLINE_RISK: { label: 'Deadline Risk', color: '#ff4444', icon: <Clock className="w-4 h-4" /> },
     BURNOUT_INDICATOR: { label: 'Burnout Risk', color: '#f5a623', icon: <AlertTriangle className="w-4 h-4" /> },
@@ -261,34 +298,57 @@ function PredictionCard({ prediction }: {
   const confidence = Math.round(prediction.confidence * 100)
 
   return (
-    <div className="p-3 border-b border-[#1a1a1a] last:border-b-0 hover:bg-[#111] transition-colors">
-      <div className="flex items-start gap-3">
-        <div className="flex-shrink-0 mt-0.5" style={{ color: config.color }}>
-          {config.icon}
-        </div>
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2">
-            <span
-              className="text-[10px] font-mono font-medium uppercase tracking-[0.5px] px-1.5 py-0.5 rounded"
-              style={{ color: config.color, backgroundColor: `${config.color}15` }}
-            >
-              {config.label}
-            </span>
-            <span className="text-[10px] font-mono text-[#555]">{confidence}% confidence</span>
+    <div
+      className="border-b border-[#1a1a1a] last:border-b-0 hover:bg-[#111] transition-colors cursor-pointer"
+      onClick={() => setExpanded(!expanded)}
+    >
+      <div className="p-3">
+        <div className="flex items-start gap-3">
+          <div className="flex-shrink-0 mt-0.5" style={{ color: config.color }}>
+            {config.icon}
           </div>
-          <p className="text-[13px] text-[#ededed] mt-1">
-            {prediction.value?.title || prediction.reasoning}
-          </p>
-          {prediction.value?.description && (
-            <p className="text-[11px] text-[#888] mt-1">{prediction.value.description}</p>
-          )}
-          {prediction.value?.suggestedAction && (
-            <p className="text-[11px] text-[#50e3c2] mt-1">
-              → {prediction.value.suggestedAction}
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2">
+              <span
+                className="text-[10px] font-mono font-medium uppercase tracking-[0.5px] px-1.5 py-0.5 rounded"
+                style={{ color: config.color, backgroundColor: `${config.color}15` }}
+              >
+                {config.label}
+              </span>
+              <span className="text-[10px] font-mono text-[#555]">{confidence}% confidence</span>
+            </div>
+            <p className="text-[13px] text-[#ededed] mt-1">
+              {prediction.value?.title || prediction.reasoning}
             </p>
-          )}
+            {!expanded && prediction.value?.description && (
+              <p className="text-[11px] text-[#888] mt-1 line-clamp-1">{prediction.value.description}</p>
+            )}
+          </div>
+          <span className="text-[#555] flex-shrink-0">
+            {expanded ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
+          </span>
         </div>
       </div>
+      {expanded && (
+        <div className="px-3 pb-3 border-t border-[#1a1a1a]">
+          <div className="pt-2 ml-7 space-y-2">
+            {prediction.value?.description && (
+              <p className="text-[12px] text-[#888]">{prediction.value.description}</p>
+            )}
+            {prediction.reasoning && prediction.reasoning !== prediction.value?.title && (
+              <div className="bg-[#0a0a0a] rounded p-2">
+                <span className="text-[10px] text-[#555] uppercase tracking-wide block mb-1">Reasoning</span>
+                <p className="text-[11px] text-[#888]">{prediction.reasoning}</p>
+              </div>
+            )}
+            {prediction.value?.suggestedAction && (
+              <p className="text-[11px] text-[#50e3c2]">
+                → {prediction.value.suggestedAction}
+              </p>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   )
 }
@@ -304,6 +364,7 @@ function BottleneckCard({ bottleneck }: {
     project: { id: string; name: string; key: string } | null
   }
 }) {
+  const [expanded, setExpanded] = useState(false)
   const severityConfig: Record<string, { color: string; bg: string }> = {
     CRITICAL: { color: '#ff4444', bg: 'rgba(255,68,68,0.1)' },
     HIGH: { color: '#f5a623', bg: 'rgba(245,166,35,0.1)' },
@@ -314,32 +375,52 @@ function BottleneckCard({ bottleneck }: {
   const config = severityConfig[bottleneck.severity] || severityConfig.MEDIUM
 
   return (
-    <div className={cn(
-      'p-3 border-b border-[#1a1a1a] last:border-b-0 hover:bg-[#111] transition-colors',
-      bottleneck.severity === 'CRITICAL' && 'border-l-2 border-l-[#ff4444]',
-      bottleneck.severity === 'HIGH' && 'border-l-2 border-l-[#f5a623]'
-    )}>
-      <div className="flex items-start gap-3">
-        <AlertCircle className="w-4 h-4 flex-shrink-0 mt-0.5" style={{ color: config.color }} />
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2">
-            <span
-              className="text-[10px] font-mono font-medium uppercase tracking-[0.5px] px-1.5 py-0.5 rounded"
-              style={{ color: config.color, backgroundColor: config.bg }}
-            >
-              {bottleneck.severity}
-            </span>
-            <span className="text-[10px] font-mono text-[#555] uppercase">{bottleneck.type.replace('_', ' ')}</span>
+    <div
+      className={cn(
+        'border-b border-[#1a1a1a] last:border-b-0 hover:bg-[#111] transition-colors cursor-pointer',
+        bottleneck.severity === 'CRITICAL' && 'border-l-2 border-l-[#ff4444]',
+        bottleneck.severity === 'HIGH' && 'border-l-2 border-l-[#f5a623]'
+      )}
+      onClick={() => setExpanded(!expanded)}
+    >
+      <div className="p-3">
+        <div className="flex items-start gap-3">
+          <AlertCircle className="w-4 h-4 flex-shrink-0 mt-0.5" style={{ color: config.color }} />
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2">
+              <span
+                className="text-[10px] font-mono font-medium uppercase tracking-[0.5px] px-1.5 py-0.5 rounded"
+                style={{ color: config.color, backgroundColor: config.bg }}
+              >
+                {bottleneck.severity}
+              </span>
+              <span className="text-[10px] font-mono text-[#555] uppercase">{bottleneck.type.replace('_', ' ')}</span>
+            </div>
+            <p className="text-[13px] text-[#ededed] mt-1">{bottleneck.title}</p>
+            {!expanded && bottleneck.description && (
+              <p className="text-[11px] text-[#888] mt-1 line-clamp-1">{bottleneck.description}</p>
+            )}
           </div>
-          <p className="text-[13px] text-[#ededed] mt-1">{bottleneck.title}</p>
-          {bottleneck.description && (
-            <p className="text-[11px] text-[#888] mt-1">{bottleneck.description}</p>
-          )}
-          {bottleneck.impact && (
-            <p className="text-[11px] text-[#f5a623] mt-1">Impact: {bottleneck.impact}</p>
-          )}
+          <span className="text-[#555] flex-shrink-0">
+            {expanded ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
+          </span>
         </div>
       </div>
+      {expanded && (
+        <div className="px-3 pb-3 border-t border-[#1a1a1a]">
+          <div className="pt-2 ml-7 space-y-2">
+            {bottleneck.description && (
+              <p className="text-[12px] text-[#888]">{bottleneck.description}</p>
+            )}
+            {bottleneck.impact && (
+              <div className="bg-[#f5a623]/5 border border-[#f5a623]/20 rounded p-2">
+                <span className="text-[10px] text-[#f5a623] uppercase tracking-wide block mb-1">Impact</span>
+                <p className="text-[11px] text-[#f5a623]">{bottleneck.impact}</p>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   )
 }
