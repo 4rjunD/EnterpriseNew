@@ -3,9 +3,9 @@ import { router, protectedProcedure, managerProcedure } from '../trpc'
 import { prisma, TaskStatus, TaskPriority, TaskSource } from '@nexflow/database'
 
 export const tasksRouter = router({
-  // Unified TODOs for dashboard - combines tasks, PRs, and repo insights
+  // Unified TODOs for dashboard - combines tasks, PRs, repo insights, predictions, bottlenecks, risks
   getUnifiedTodos: protectedProcedure.query(async ({ ctx }) => {
-    const [tasks, prsToReview, selectedRepos] = await Promise.all([
+    const [tasks, prsToReview, selectedRepos, predictions, bottlenecks, knowledgeBase] = await Promise.all([
       // User's assigned tasks (not done)
       prisma.task.findMany({
         where: {
@@ -52,7 +52,55 @@ export const tasksRouter = router({
         },
         orderBy: { updatedAt: 'desc' },
       }),
+
+      // Active predictions
+      prisma.prediction.findMany({
+        where: {
+          project: { organizationId: ctx.organizationId },
+          isActive: true,
+        },
+        orderBy: [{ confidence: 'desc' }, { createdAt: 'desc' }],
+        take: 10,
+        include: {
+          project: { select: { id: true, name: true, key: true } },
+        },
+      }),
+
+      // Active bottlenecks
+      prisma.bottleneck.findMany({
+        where: {
+          project: { organizationId: ctx.organizationId },
+          status: 'ACTIVE',
+        },
+        orderBy: [{ severity: 'desc' }, { detectedAt: 'desc' }],
+        take: 10,
+        include: {
+          project: { select: { id: true, name: true, key: true } },
+        },
+      }),
+
+      // Knowledge base for risks and recommendations
+      prisma.organizationKnowledgeBase.findUnique({
+        where: { organizationId: ctx.organizationId },
+      }),
     ])
+
+    // Extract risks and recommendations from knowledge base
+    const risks = (knowledgeBase?.goalProgress as { risks?: Array<{
+      category: string
+      title: string
+      description: string
+      likelihood: string
+      impact: string
+      mitigation: string
+    }> })?.risks || []
+
+    const recommendations = (knowledgeBase?.recommendations as Array<{
+      title: string
+      description: string
+      priority: string
+      category: string
+    }>) || []
 
     // Calculate summary stats
     const totalTasks = tasks.length
@@ -60,6 +108,10 @@ export const tasksRouter = router({
     const overdueTasks = tasks.filter(t => t.dueDate && new Date(t.dueDate) < new Date()).length
     const totalPRs = prsToReview.length
     const totalTodos = selectedRepos.reduce((sum, r) => sum + r.todoCount, 0)
+
+    // Content is available if we have any insights
+    const hasContent = totalTasks > 0 || totalPRs > 0 || selectedRepos.length > 0 ||
+      predictions.length > 0 || bottlenecks.length > 0 || risks.length > 0
 
     return {
       tasks: tasks.map(t => ({
@@ -97,13 +149,37 @@ export const tasksRouter = router({
         todoCount: r.todoCount,
         lastAnalyzedAt: r.lastAnalyzedAt,
       })),
+      predictions: predictions.map(p => ({
+        id: p.id,
+        type: p.type,
+        confidence: p.confidence,
+        reasoning: p.reasoning,
+        value: p.value as { title?: string; description?: string; suggestedAction?: string } | null,
+        project: p.project,
+        createdAt: p.createdAt,
+      })),
+      bottlenecks: bottlenecks.map(b => ({
+        id: b.id,
+        type: b.type,
+        severity: b.severity,
+        title: b.title,
+        description: b.description,
+        impact: b.impact,
+        project: b.project,
+        detectedAt: b.detectedAt,
+      })),
+      risks,
+      recommendations,
       summary: {
         totalTasks,
         urgentTasks,
         overdueTasks,
         totalPRs,
         totalTodos,
-        hasContent: totalTasks > 0 || totalPRs > 0 || selectedRepos.length > 0,
+        totalPredictions: predictions.length,
+        totalBottlenecks: bottlenecks.length,
+        totalRisks: risks.length,
+        hasContent,
       },
     }
   }),

@@ -388,6 +388,25 @@ export const dashboardRouter = router({
         }
       }
 
+      // Step 1.5: Ensure a default project exists for predictions
+      let defaultProject = await prisma.project.findFirst({
+        where: { organizationId: ctx.organizationId },
+      })
+
+      if (!defaultProject) {
+        const org = await prisma.organization.findUnique({
+          where: { id: ctx.organizationId },
+        })
+        defaultProject = await prisma.project.create({
+          data: {
+            organizationId: ctx.organizationId,
+            name: org?.name || 'General',
+            key: 'GEN',
+            description: 'Default project for organization-wide insights',
+          },
+        })
+      }
+
       // Step 2: Clear old predictions and bottlenecks to regenerate fresh ones
       await prisma.prediction.updateMany({
         where: {

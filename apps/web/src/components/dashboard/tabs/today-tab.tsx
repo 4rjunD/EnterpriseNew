@@ -8,10 +8,15 @@ import {
   GitPullRequest,
   GitBranch,
   AlertCircle,
+  AlertTriangle,
+  TrendingUp,
   Clock,
   Plug,
   ExternalLink,
   ChevronRight,
+  Lightbulb,
+  ShieldAlert,
+  Zap,
 } from 'lucide-react'
 import Link from 'next/link'
 
@@ -235,6 +240,187 @@ function RepoHealthCard({ repo }: {
   )
 }
 
+function PredictionCard({ prediction }: {
+  prediction: {
+    id: string
+    type: string
+    confidence: number
+    reasoning: string | null
+    value: { title?: string; description?: string; suggestedAction?: string } | null
+    project: { id: string; name: string; key: string } | null
+  }
+}) {
+  const typeConfig: Record<string, { label: string; color: string; icon: React.ReactNode }> = {
+    DEADLINE_RISK: { label: 'Deadline Risk', color: '#ff4444', icon: <Clock className="w-4 h-4" /> },
+    BURNOUT_INDICATOR: { label: 'Burnout Risk', color: '#f5a623', icon: <AlertTriangle className="w-4 h-4" /> },
+    VELOCITY_FORECAST: { label: 'Velocity', color: '#50e3c2', icon: <TrendingUp className="w-4 h-4" /> },
+    SCOPE_CREEP: { label: 'Scope Creep', color: '#a78bfa', icon: <Zap className="w-4 h-4" /> },
+  }
+
+  const config = typeConfig[prediction.type] || { label: prediction.type, color: '#888', icon: <AlertCircle className="w-4 h-4" /> }
+  const confidence = Math.round(prediction.confidence * 100)
+
+  return (
+    <div className="p-3 border-b border-[#1a1a1a] last:border-b-0 hover:bg-[#111] transition-colors">
+      <div className="flex items-start gap-3">
+        <div className="flex-shrink-0 mt-0.5" style={{ color: config.color }}>
+          {config.icon}
+        </div>
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2">
+            <span
+              className="text-[10px] font-mono font-medium uppercase tracking-[0.5px] px-1.5 py-0.5 rounded"
+              style={{ color: config.color, backgroundColor: `${config.color}15` }}
+            >
+              {config.label}
+            </span>
+            <span className="text-[10px] font-mono text-[#555]">{confidence}% confidence</span>
+          </div>
+          <p className="text-[13px] text-[#ededed] mt-1">
+            {prediction.value?.title || prediction.reasoning}
+          </p>
+          {prediction.value?.description && (
+            <p className="text-[11px] text-[#888] mt-1">{prediction.value.description}</p>
+          )}
+          {prediction.value?.suggestedAction && (
+            <p className="text-[11px] text-[#50e3c2] mt-1">
+              → {prediction.value.suggestedAction}
+            </p>
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function BottleneckCard({ bottleneck }: {
+  bottleneck: {
+    id: string
+    type: string
+    severity: string
+    title: string
+    description: string | null
+    impact: string | null
+    project: { id: string; name: string; key: string } | null
+  }
+}) {
+  const severityConfig: Record<string, { color: string; bg: string }> = {
+    CRITICAL: { color: '#ff4444', bg: 'rgba(255,68,68,0.1)' },
+    HIGH: { color: '#f5a623', bg: 'rgba(245,166,35,0.1)' },
+    MEDIUM: { color: '#888', bg: 'rgba(136,136,136,0.1)' },
+    LOW: { color: '#555', bg: 'transparent' },
+  }
+
+  const config = severityConfig[bottleneck.severity] || severityConfig.MEDIUM
+
+  return (
+    <div className={cn(
+      'p-3 border-b border-[#1a1a1a] last:border-b-0 hover:bg-[#111] transition-colors',
+      bottleneck.severity === 'CRITICAL' && 'border-l-2 border-l-[#ff4444]',
+      bottleneck.severity === 'HIGH' && 'border-l-2 border-l-[#f5a623]'
+    )}>
+      <div className="flex items-start gap-3">
+        <AlertCircle className="w-4 h-4 flex-shrink-0 mt-0.5" style={{ color: config.color }} />
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2">
+            <span
+              className="text-[10px] font-mono font-medium uppercase tracking-[0.5px] px-1.5 py-0.5 rounded"
+              style={{ color: config.color, backgroundColor: config.bg }}
+            >
+              {bottleneck.severity}
+            </span>
+            <span className="text-[10px] font-mono text-[#555] uppercase">{bottleneck.type.replace('_', ' ')}</span>
+          </div>
+          <p className="text-[13px] text-[#ededed] mt-1">{bottleneck.title}</p>
+          {bottleneck.description && (
+            <p className="text-[11px] text-[#888] mt-1">{bottleneck.description}</p>
+          )}
+          {bottleneck.impact && (
+            <p className="text-[11px] text-[#f5a623] mt-1">Impact: {bottleneck.impact}</p>
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function RiskCard({ risk }: {
+  risk: {
+    category: string
+    title: string
+    description: string
+    likelihood: string
+    impact: string
+    mitigation: string
+  }
+}) {
+  const impactConfig: Record<string, { color: string }> = {
+    HIGH: { color: '#ff4444' },
+    MEDIUM: { color: '#f5a623' },
+    LOW: { color: '#50e3c2' },
+  }
+
+  const config = impactConfig[risk.impact] || impactConfig.MEDIUM
+
+  return (
+    <div className="p-3 border-b border-[#1a1a1a] last:border-b-0 hover:bg-[#111] transition-colors">
+      <div className="flex items-start gap-3">
+        <ShieldAlert className="w-4 h-4 flex-shrink-0 mt-0.5" style={{ color: config.color }} />
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2">
+            <span className="text-[10px] font-mono text-[#555] uppercase">{risk.category}</span>
+            <span className="text-[#333]">·</span>
+            <span className="text-[10px] font-mono" style={{ color: config.color }}>
+              {risk.likelihood} likelihood
+            </span>
+          </div>
+          <p className="text-[13px] text-[#ededed] mt-1">{risk.title}</p>
+          <p className="text-[11px] text-[#888] mt-1">{risk.description}</p>
+          <p className="text-[11px] text-[#50e3c2] mt-1">→ {risk.mitigation}</p>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function RecommendationCard({ recommendation }: {
+  recommendation: {
+    title: string
+    description: string
+    priority: string
+    category: string
+  }
+}) {
+  const priorityConfig: Record<string, { color: string }> = {
+    HIGH: { color: '#ff4444' },
+    MEDIUM: { color: '#f5a623' },
+    LOW: { color: '#50e3c2' },
+  }
+
+  const config = priorityConfig[recommendation.priority] || priorityConfig.MEDIUM
+
+  return (
+    <div className="p-3 border-b border-[#1a1a1a] last:border-b-0 hover:bg-[#111] transition-colors">
+      <div className="flex items-start gap-3">
+        <Lightbulb className="w-4 h-4 flex-shrink-0 mt-0.5 text-[#f5a623]" />
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2">
+            <span
+              className="text-[10px] font-mono font-medium uppercase tracking-[0.5px] px-1.5 py-0.5 rounded"
+              style={{ color: config.color, backgroundColor: `${config.color}15` }}
+            >
+              {recommendation.priority}
+            </span>
+            <span className="text-[10px] font-mono text-[#555] uppercase">{recommendation.category}</span>
+          </div>
+          <p className="text-[13px] text-[#ededed] mt-1">{recommendation.title}</p>
+          <p className="text-[11px] text-[#888] mt-1">{recommendation.description}</p>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 function Section({ title, icon, children, count }: {
   title: string
   icon: React.ReactNode
@@ -303,7 +489,7 @@ export function TodayTab() {
     )
   }
 
-  const { tasks, prsToReview, repoStats, summary } = unifiedData
+  const { tasks, prsToReview, repoStats, predictions, bottlenecks, risks, recommendations, summary } = unifiedData
 
   return (
     <div className="space-y-6">
@@ -320,30 +506,79 @@ export function TodayTab() {
         <div className="bg-[#0a0a0a] border border-[#1a1a1a] rounded-md p-3">
           <div className={cn(
             'text-[20px] font-mono font-semibold',
-            summary.overdueTasks > 0 ? 'text-[#ff4444]' : 'text-[#ededed]'
+            (summary.totalBottlenecks || 0) > 0 ? 'text-[#ff4444]' : 'text-[#ededed]'
           )}>
-            {summary.overdueTasks}
+            {summary.totalBottlenecks || 0}
           </div>
-          <div className="text-[10px] font-mono uppercase tracking-[0.5px] text-[#555] mt-1">Overdue</div>
+          <div className="text-[10px] font-mono uppercase tracking-[0.5px] text-[#555] mt-1">Bottlenecks</div>
         </div>
         <div className="bg-[#0a0a0a] border border-[#1a1a1a] rounded-md p-3">
           <div className={cn(
             'text-[20px] font-mono font-semibold',
-            summary.urgentTasks > 0 ? 'text-[#f5a623]' : 'text-[#ededed]'
+            (summary.totalPredictions || 0) > 0 ? 'text-[#f5a623]' : 'text-[#ededed]'
           )}>
-            {summary.urgentTasks}
+            {summary.totalPredictions || 0}
           </div>
-          <div className="text-[10px] font-mono uppercase tracking-[0.5px] text-[#555] mt-1">High Priority</div>
+          <div className="text-[10px] font-mono uppercase tracking-[0.5px] text-[#555] mt-1">Predictions</div>
+        </div>
+        <div className="bg-[#0a0a0a] border border-[#1a1a1a] rounded-md p-3">
+          <div className={cn(
+            'text-[20px] font-mono font-semibold',
+            (summary.totalRisks || 0) > 0 ? 'text-[#a78bfa]' : 'text-[#ededed]'
+          )}>
+            {summary.totalRisks || 0}
+          </div>
+          <div className="text-[10px] font-mono uppercase tracking-[0.5px] text-[#555] mt-1">Risks</div>
         </div>
         <div className="bg-[#0a0a0a] border border-[#1a1a1a] rounded-md p-3">
           <div className="text-[20px] font-mono font-semibold text-[#ededed]">{summary.totalPRs}</div>
           <div className="text-[10px] font-mono uppercase tracking-[0.5px] text-[#555] mt-1">Open PRs</div>
         </div>
-        <div className="bg-[#0a0a0a] border border-[#1a1a1a] rounded-md p-3">
-          <div className="text-[20px] font-mono font-semibold text-[#ededed]">{summary.totalTodos}</div>
-          <div className="text-[10px] font-mono uppercase tracking-[0.5px] text-[#555] mt-1">Code TODOs</div>
-        </div>
       </div>
+
+      {/* Bottlenecks - highest priority */}
+      {bottlenecks && bottlenecks.length > 0 && (
+        <Section title="Active Bottlenecks" icon={<AlertCircle className="w-4 h-4" />} count={bottlenecks.length}>
+          <div className="border border-[#1a1a1a] rounded-md overflow-hidden">
+            {bottlenecks.slice(0, 5).map(bottleneck => (
+              <BottleneckCard key={bottleneck.id} bottleneck={bottleneck} />
+            ))}
+          </div>
+        </Section>
+      )}
+
+      {/* Predictions */}
+      {predictions && predictions.length > 0 && (
+        <Section title="AI Predictions" icon={<TrendingUp className="w-4 h-4" />} count={predictions.length}>
+          <div className="border border-[#1a1a1a] rounded-md overflow-hidden">
+            {predictions.slice(0, 5).map(prediction => (
+              <PredictionCard key={prediction.id} prediction={prediction} />
+            ))}
+          </div>
+        </Section>
+      )}
+
+      {/* Risks */}
+      {risks && risks.length > 0 && (
+        <Section title="Risk Analysis" icon={<ShieldAlert className="w-4 h-4" />} count={risks.length}>
+          <div className="border border-[#1a1a1a] rounded-md overflow-hidden">
+            {risks.slice(0, 4).map((risk, idx) => (
+              <RiskCard key={idx} risk={risk} />
+            ))}
+          </div>
+        </Section>
+      )}
+
+      {/* Recommendations */}
+      {recommendations && recommendations.length > 0 && (
+        <Section title="Recommendations" icon={<Lightbulb className="w-4 h-4" />} count={recommendations.length}>
+          <div className="border border-[#1a1a1a] rounded-md overflow-hidden">
+            {recommendations.slice(0, 4).map((rec, idx) => (
+              <RecommendationCard key={idx} recommendation={rec} />
+            ))}
+          </div>
+        </Section>
+      )}
 
       {/* PRs needing attention */}
       {prsToReview.length > 0 && (
