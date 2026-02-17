@@ -175,12 +175,15 @@ export function NexFlowHeader({
   const tabs = getTabsForRole(teamType, user.role)
   const teamConfig = TEAM_TYPES[teamType]
 
+  // Get trpc utils for query invalidation
+  const utils = trpc.useUtils()
+
   // Fetch real health score or show default for new users
   const { data: healthData, refetch: refetchHealth } = trpc.dashboard.getHealthScore.useQuery(undefined, {
     // Don't error if dashboard isn't ready yet
     retry: false,
   })
-  const metricValue = healthData?.overall ?? 0
+  const metricValue = healthData?.healthScore ?? 0
 
   // Refresh analysis mutation
   const refreshMutation = trpc.dashboard.refreshAnalysis.useMutation({
@@ -189,10 +192,14 @@ export function NexFlowHeader({
       if (data.success) {
         toast({
           title: 'Analysis refreshed',
-          description: `Synced ${data.totalItemsSynced} items, created ${data.predictionsCreated} predictions`,
+          description: `Synced ${data.totalItemsSynced} items, created ${data.predictionsCreated} predictions, ${data.bottlenecksCreated} bottlenecks`,
         })
-        // Refetch dashboard data
-        refetchHealth()
+        // Invalidate all dashboard-related queries to refresh the UI
+        utils.dashboard.invalidate()
+        utils.tasks.getUnifiedTodos.invalidate()
+        utils.predictions.invalidate()
+        utils.bottlenecks.invalidate()
+        utils.team.invalidate()
       } else {
         toast({
           title: 'Refresh completed with errors',
