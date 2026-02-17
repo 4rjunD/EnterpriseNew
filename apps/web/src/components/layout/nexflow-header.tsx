@@ -189,19 +189,29 @@ export function NexFlowHeader({
   const refreshMutation = trpc.dashboard.refreshAnalysis.useMutation({
     onSuccess: (data) => {
       setIsRefreshing(false)
-      if (data.success) {
+
+      // Always invalidate queries so UI updates with whatever content was generated
+      utils.dashboard.invalidate()
+      utils.tasks.getUnifiedTodos.invalidate()
+      utils.predictions.invalidate()
+      utils.bottlenecks.invalidate()
+      utils.team.invalidate()
+      utils.onboarding.invalidate()
+      utils.integrations.invalidate()
+
+      // Check for rate limit errors
+      const hasRateLimit = data.errors?.some((e: string) => e.toLowerCase().includes('rate limit'))
+
+      if (data.success && !hasRateLimit) {
         toast({
           title: 'Analysis refreshed',
           description: `Synced ${data.totalItemsSynced} items, created ${data.predictionsCreated} predictions, ${data.bottlenecksCreated} bottlenecks`,
         })
-        // Invalidate all dashboard-related queries to refresh the UI
-        utils.dashboard.invalidate()
-        utils.tasks.getUnifiedTodos.invalidate()
-        utils.predictions.invalidate()
-        utils.bottlenecks.invalidate()
-        utils.team.invalidate()
-        utils.onboarding.invalidate()
-        utils.integrations.invalidate()
+      } else if (hasRateLimit) {
+        toast({
+          title: 'GitHub rate limit reached',
+          description: `AI analysis still ran. ${data.predictionsCreated} predictions, ${data.bottlenecksCreated} bottlenecks created. GitHub data will sync when rate limit resets.`,
+        })
       } else {
         toast({
           title: 'Refresh completed with errors',

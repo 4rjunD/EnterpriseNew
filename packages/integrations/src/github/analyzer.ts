@@ -84,6 +84,34 @@ export class GitHubRepoAnalyzer {
     return this.octokit
   }
 
+  /**
+   * Analyze only specific selected repos (much fewer API calls).
+   * Use this instead of analyzeAllRepos() when the user has selected repos.
+   */
+  async analyzeSelectedRepos(repos: Array<{ fullName: string }>): Promise<RepoAnalysis[]> {
+    const analyses: RepoAnalysis[] = []
+
+    // Limit to 5 repos to conserve API calls (~14 calls per repo)
+    for (const repo of repos.slice(0, 5)) {
+      const [owner, name] = repo.fullName.split('/')
+      if (!owner || !name) continue
+
+      try {
+        const analysis = await this.analyzeRepo(owner, name)
+        analyses.push(analysis)
+      } catch (e) {
+        const errStr = String(e)
+        if (errStr.includes('rate limit')) {
+          console.error('GitHub rate limit hit during repo analysis, stopping')
+          break
+        }
+        console.error(`Failed to analyze ${repo.fullName}:`, e)
+      }
+    }
+
+    return analyses
+  }
+
   async analyzeAllRepos(): Promise<RepoAnalysis[]> {
     const client = await this.getClient()
     const analyses: RepoAnalysis[] = []
@@ -91,7 +119,7 @@ export class GitHubRepoAnalyzer {
     // Get repos the user has access to
     const { data: repos } = await client.repos.listForAuthenticatedUser({
       sort: 'pushed',
-      per_page: 20, // Analyze top 20 most recently pushed
+      per_page: 10, // Reduced from 20 to conserve API calls
     })
 
     for (const repo of repos) {
@@ -99,6 +127,11 @@ export class GitHubRepoAnalyzer {
         const analysis = await this.analyzeRepo(repo.owner.login, repo.name)
         analyses.push(analysis)
       } catch (e) {
+        const errStr = String(e)
+        if (errStr.includes('rate limit')) {
+          console.error('GitHub rate limit hit during repo analysis, stopping')
+          break
+        }
         console.error(`Failed to analyze ${repo.full_name}:`, e)
       }
     }

@@ -314,7 +314,15 @@ export const dashboardRouter = router({
       errors: [] as string[],
     }
 
+    // Track if GitHub is rate-limited so we skip heavy API calls
+    let githubRateLimited = false
+
     try {
+      // Step 0: Pre-check - get selected repos early (needed for smart sync)
+      const selectedRepos = await prisma.selectedRepository.findMany({
+        where: { organizationId: ctx.organizationId, syncEnabled: true },
+      })
+
       // Step 1: Sync all connected integrations
       const integrations = await prisma.integration.findMany({
         where: {
@@ -330,7 +338,38 @@ export const dashboardRouter = router({
           switch (integration.type) {
             case 'GITHUB': {
               const client = new GitHubClient(ctx.organizationId)
-              syncResult = await client.sync()
+
+              // Check rate limit before making calls
+              try {
+                const rateLimit = await client.getRateLimit()
+                if (rateLimit.remaining < 20) {
+                  githubRateLimited = true
+                  const resetMin = Math.ceil((rateLimit.resetAt.getTime() - Date.now()) / 60000)
+                  results.errors.push(`GitHub rate limit low (${rateLimit.remaining} remaining). Resets in ${resetMin} min. Skipping GitHub sync.`)
+                  results.syncResults.push({
+                    type: 'GITHUB',
+                    success: false,
+                    itemsSynced: 0,
+                    error: `Rate limit: ${rateLimit.remaining}/${rateLimit.limit} remaining. Resets in ${resetMin} min.`,
+                  })
+                  continue
+                }
+              } catch (e) {
+                // If even rate limit check fails, we're definitely rate limited
+                if (String(e).includes('rate limit')) {
+                  githubRateLimited = true
+                  results.errors.push('GitHub API rate limit exceeded. Skipping GitHub sync.')
+                  results.syncResults.push({ type: 'GITHUB', success: false, itemsSynced: 0, error: 'Rate limit exceeded' })
+                  continue
+                }
+              }
+
+              // Use smart sync: only sync selected repos (fewer API calls)
+              if (selectedRepos.length > 0) {
+                syncResult = await client.syncSelected(selectedRepos.map(r => ({ fullName: r.fullName })))
+              } else {
+                syncResult = await client.sync()
+              }
               break
             }
             case 'LINEAR': {
@@ -367,6 +406,11 @@ export const dashboardRouter = router({
             itemsSynced: syncResult.itemsSynced,
           })
         } catch (e) {
+          const errStr = String(e)
+          if (errStr.includes('rate limit')) {
+            githubRateLimited = true
+          }
+
           await prisma.integration.update({
             where: {
               organizationId_type: {
@@ -376,14 +420,14 @@ export const dashboardRouter = router({
             },
             data: {
               status: 'ERROR',
-              syncError: String(e),
+              syncError: errStr,
             },
           })
           results.syncResults.push({
             type: integration.type,
             success: false,
             itemsSynced: 0,
-            error: String(e),
+            error: errStr,
           })
         }
       }
@@ -408,7 +452,6 @@ export const dashboardRouter = router({
       }
 
       // Step 2: Clear old predictions and bottlenecks to regenerate fresh ones
-      // Also catch orphaned records (null projectId) from previous buggy runs
       await prisma.prediction.updateMany({
         where: {
           OR: [
@@ -431,20 +474,19 @@ export const dashboardRouter = router({
         data: { status: 'RESOLVED' },
       })
 
-      // Step 3: Check if we have GitHub repos to analyze
+      // Step 3: Repo analysis + commit analysis (only when GitHub is NOT rate-limited)
       const hasGitHub = results.syncResults.some(r => r.type === 'GITHUB' && r.success)
-      const selectedRepos = await prisma.selectedRepository.findMany({
-        where: { organizationId: ctx.organizationId, syncEnabled: true },
-      })
+      const hasGitHubIntegration = integrations.some(i => i.type === 'GITHUB')
 
-      if (hasGitHub && selectedRepos.length > 0) {
-        // Analyze repos with GitHub
+      if (!githubRateLimited && hasGitHub && selectedRepos.length > 0) {
+        // Repo analysis — use selected repos to minimize API calls
         try {
           const repoAnalyzer = new GitHubRepoAnalyzer(ctx.organizationId)
-          const repoAnalyses = await repoAnalyzer.analyzeAllRepos()
+          const repoAnalyses = await repoAnalyzer.analyzeSelectedRepos(
+            selectedRepos.map(r => ({ fullName: r.fullName }))
+          )
           results.reposAnalyzed = repoAnalyses.length
 
-          // Generate AI insights from repo analysis
           const autonomousAnalyzer = new AutonomousAnalyzer(ctx.organizationId)
           const analysisResult = await autonomousAnalyzer.analyzeAndGenerate(repoAnalyses)
 
@@ -452,7 +494,7 @@ export const dashboardRouter = router({
           results.bottlenecksCreated += analysisResult.bottlenecksCreated || 0
           results.tasksCreated += analysisResult.tasksCreated || 0
 
-          // Step 3b: Generate milestones from repo analysis
+          // Generate milestones from repo analysis
           try {
             const milestonesCreated = await generateMilestonesFromRepos(
               ctx.organizationId,
@@ -464,14 +506,24 @@ export const dashboardRouter = router({
             results.errors.push(`Milestone generation failed: ${String(e)}`)
           }
         } catch (e) {
-          results.errors.push(`Repo analysis failed: ${String(e)}`)
+          const errStr = String(e)
+          if (errStr.includes('rate limit')) {
+            githubRateLimited = true
+            results.errors.push('GitHub rate limit hit during repo analysis. Skipping commit analysis.')
+          } else {
+            results.errors.push(`Repo analysis failed: ${errStr}`)
+          }
         }
+      }
 
-        // Step 3c: Analyze Git commit history for data-driven predictions
+      // Step 3c: Commit pattern analysis (lighter API usage - 1 call per repo)
+      // Runs independently: even if sync failed, we try if GitHub integration exists
+      if (!githubRateLimited && hasGitHubIntegration && selectedRepos.length > 0) {
         try {
           const ghClient = new GitHubClient(ctx.organizationId)
+          // Limit to 5 repos for commit analysis to conserve API calls
           const commitPatterns = await ghClient.analyzeCommitPatterns(
-            selectedRepos.map(r => ({ fullName: r.fullName }))
+            selectedRepos.slice(0, 5).map(r => ({ fullName: r.fullName }))
           )
 
           if (commitPatterns.totalCommits > 0) {
@@ -594,7 +646,12 @@ export const dashboardRouter = router({
             }
           }
         } catch (e) {
-          results.errors.push(`Commit analysis failed: ${String(e)}`)
+          const errStr = String(e)
+          if (errStr.includes('rate limit')) {
+            results.errors.push('GitHub rate limit hit during commit analysis. Predictions will use context analysis instead.')
+          } else {
+            results.errors.push(`Commit analysis failed: ${errStr}`)
+          }
         }
       }
 

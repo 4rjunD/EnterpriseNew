@@ -41,6 +41,89 @@ export class GitHubClient implements IntegrationClient {
     }
   }
 
+  /**
+   * Check remaining GitHub API rate limit.
+   * Returns remaining calls and reset time.
+   */
+  async getRateLimit(): Promise<{ remaining: number; limit: number; resetAt: Date }> {
+    const client = await this.getClient()
+    const { data } = await client.rateLimit.get()
+    return {
+      remaining: data.rate.remaining,
+      limit: data.rate.limit,
+      resetAt: new Date(data.rate.reset * 1000),
+    }
+  }
+
+  /**
+   * Sync only selected repositories (much fewer API calls than full sync).
+   * Use this instead of sync() when the user has selected specific repos.
+   */
+  async syncSelected(repos: Array<{ fullName: string }>): Promise<SyncResult> {
+    const client = await this.getClient()
+    let itemsSynced = 0
+    const errors: string[] = []
+
+    try {
+      for (const repo of repos.slice(0, 10)) { // Limit to 10 repos max
+        const [owner, name] = repo.fullName.split('/')
+        if (!owner || !name) continue
+
+        try {
+          const { data: prs } = await client.pulls.list({
+            owner,
+            repo: name,
+            state: 'all',
+            per_page: 20, // Reduced from 50
+          })
+
+          for (const pr of prs) {
+            const unifiedPR = this.mapToUnifiedPR(pr, repo.fullName)
+            await this.upsertPullRequest(unifiedPR)
+            itemsSynced++
+          }
+        } catch (e) {
+          const errStr = String(e)
+          if (errStr.includes('rate limit')) {
+            errors.push(`GitHub rate limit hit while syncing ${repo.fullName}`)
+            break // Stop syncing more repos
+          }
+          errors.push(`Failed to sync repo ${repo.fullName}: ${e}`)
+        }
+      }
+
+      await prisma.integration.update({
+        where: {
+          organizationId_type: {
+            organizationId: this.organizationId,
+            type: IntegrationType.GITHUB,
+          },
+        },
+        data: {
+          lastSyncAt: new Date(),
+          syncError: errors.length > 0 ? errors.join('; ') : null,
+          status: 'CONNECTED',
+        },
+      })
+
+      return { success: true, itemsSynced, errors: errors.length > 0 ? errors : undefined }
+    } catch (e) {
+      await prisma.integration.update({
+        where: {
+          organizationId_type: {
+            organizationId: this.organizationId,
+            type: IntegrationType.GITHUB,
+          },
+        },
+        data: {
+          syncError: String(e),
+          status: 'ERROR',
+        },
+      })
+      throw e
+    }
+  }
+
   async sync(): Promise<SyncResult> {
     const client = await this.getClient()
     let itemsSynced = 0
