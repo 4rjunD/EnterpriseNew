@@ -1,7 +1,8 @@
 import { z } from 'zod'
 import { router, protectedProcedure } from '../trpc'
 import { prisma } from '@nexflow/database'
-import { BottleneckDetector, PredictionEngine, GuaranteedAnalyzer, ContextBasedAnalyzer } from '@nexflow/ai'
+import { BottleneckDetector, PredictionEngine, GuaranteedAnalyzer, ContextBasedAnalyzer, AutonomousAnalyzer } from '@nexflow/ai'
+import { GitHubClient, LinearClient, DiscordClient, GitHubRepoAnalyzer } from '@nexflow/integrations'
 
 // Cache for ensureContent to avoid running on every request
 const contentEnsureCache = new Map<string, number>()
@@ -62,6 +63,216 @@ export const dashboardRouter = router({
         bottlenecksCreated: 0,
         risksGenerated: 0,
         recommendationsGenerated: 0,
+      }
+    }
+  }),
+
+  // Full refresh: sync all integrations + run AI analysis
+  // This is the main "refresh" button action
+  refreshAnalysis: protectedProcedure.mutation(async ({ ctx }) => {
+    const startTime = Date.now()
+    const results = {
+      syncResults: [] as Array<{ type: string; success: boolean; itemsSynced: number; error?: string }>,
+      reposAnalyzed: 0,
+      predictionsCreated: 0,
+      bottlenecksCreated: 0,
+      tasksCreated: 0,
+      errors: [] as string[],
+    }
+
+    try {
+      // Step 1: Sync all connected integrations
+      const integrations = await prisma.integration.findMany({
+        where: {
+          organizationId: ctx.organizationId,
+          status: { in: ['CONNECTED', 'SYNCING', 'ERROR'] },
+        },
+      })
+
+      for (const integration of integrations) {
+        try {
+          let syncResult: { success: boolean; itemsSynced: number }
+
+          switch (integration.type) {
+            case 'GITHUB': {
+              const client = new GitHubClient(ctx.organizationId)
+              syncResult = await client.sync()
+              break
+            }
+            case 'LINEAR': {
+              const client = new LinearClient(ctx.organizationId)
+              syncResult = await client.sync()
+              break
+            }
+            case 'DISCORD': {
+              const client = new DiscordClient(ctx.organizationId)
+              syncResult = await client.sync()
+              break
+            }
+            default:
+              syncResult = { success: true, itemsSynced: 0 }
+          }
+
+          await prisma.integration.update({
+            where: {
+              organizationId_type: {
+                organizationId: ctx.organizationId,
+                type: integration.type,
+              },
+            },
+            data: {
+              status: 'CONNECTED',
+              lastSyncAt: new Date(),
+              syncError: null,
+            },
+          })
+
+          results.syncResults.push({
+            type: integration.type,
+            success: syncResult.success,
+            itemsSynced: syncResult.itemsSynced,
+          })
+        } catch (e) {
+          await prisma.integration.update({
+            where: {
+              organizationId_type: {
+                organizationId: ctx.organizationId,
+                type: integration.type,
+              },
+            },
+            data: {
+              status: 'ERROR',
+              syncError: String(e),
+            },
+          })
+          results.syncResults.push({
+            type: integration.type,
+            success: false,
+            itemsSynced: 0,
+            error: String(e),
+          })
+        }
+      }
+
+      // Step 2: Clear old predictions and bottlenecks to regenerate fresh ones
+      await prisma.prediction.updateMany({
+        where: {
+          project: { organizationId: ctx.organizationId },
+          isActive: true,
+        },
+        data: { isActive: false },
+      })
+
+      await prisma.bottleneck.updateMany({
+        where: {
+          project: { organizationId: ctx.organizationId },
+          status: 'ACTIVE',
+        },
+        data: { status: 'RESOLVED' },
+      })
+
+      // Step 3: Check if we have GitHub repos to analyze
+      const hasGitHub = results.syncResults.some(r => r.type === 'GITHUB' && r.success)
+      const selectedRepos = await prisma.selectedRepository.findMany({
+        where: { organizationId: ctx.organizationId, syncEnabled: true },
+      })
+
+      if (hasGitHub && selectedRepos.length > 0) {
+        // Analyze repos with GitHub
+        try {
+          const repoAnalyzer = new GitHubRepoAnalyzer(ctx.organizationId)
+          const repoAnalyses = await repoAnalyzer.analyzeAllRepos()
+          results.reposAnalyzed = repoAnalyses.length
+
+          // Generate AI insights from repo analysis
+          const autonomousAnalyzer = new AutonomousAnalyzer(ctx.organizationId)
+          const analysisResult = await autonomousAnalyzer.analyzeAndGenerate(repoAnalyses)
+
+          results.predictionsCreated += analysisResult.predictionsCreated || 0
+          results.bottlenecksCreated += analysisResult.bottlenecksCreated || 0
+          results.tasksCreated += analysisResult.tasksCreated || 0
+        } catch (e) {
+          results.errors.push(`Repo analysis failed: ${String(e)}`)
+        }
+      }
+
+      // Step 4: Run context-based analysis (works even without repos)
+      try {
+        const contextAnalyzer = new ContextBasedAnalyzer(ctx.organizationId)
+        const contextResult = await contextAnalyzer.run()
+
+        results.predictionsCreated += contextResult.predictionsCreated
+        results.bottlenecksCreated += contextResult.bottlenecksCreated
+      } catch (e) {
+        results.errors.push(`Context analysis failed: ${String(e)}`)
+      }
+
+      // Step 5: Run bottleneck detection
+      try {
+        const detector = new BottleneckDetector(ctx.organizationId)
+        await detector.runDetection()
+      } catch (e) {
+        results.errors.push(`Bottleneck detection failed: ${String(e)}`)
+      }
+
+      // Step 6: Run prediction engine
+      try {
+        const engine = new PredictionEngine({ organizationId: ctx.organizationId })
+        await engine.runAllPredictions()
+
+        // Run for each active project
+        const projects = await prisma.project.findMany({
+          where: { organizationId: ctx.organizationId, status: 'ACTIVE' },
+          select: { id: true },
+        })
+
+        for (const project of projects) {
+          const projectEngine = new PredictionEngine({
+            organizationId: ctx.organizationId,
+            projectId: project.id,
+          })
+          await projectEngine.runAllPredictions()
+        }
+      } catch (e) {
+        results.errors.push(`Prediction engine failed: ${String(e)}`)
+      }
+
+      // Step 7: Ensure minimum content exists
+      try {
+        const guaranteedAnalyzer = new GuaranteedAnalyzer(ctx.organizationId)
+        const ensureResult = await guaranteedAnalyzer.ensureContent()
+
+        results.tasksCreated += ensureResult.tasksCreated
+        results.bottlenecksCreated += ensureResult.bottlenecksCreated
+        results.predictionsCreated += ensureResult.predictionsCreated
+      } catch (e) {
+        results.errors.push(`Guaranteed content failed: ${String(e)}`)
+      }
+
+      const duration = Date.now() - startTime
+
+      return {
+        success: results.errors.length === 0,
+        duration,
+        totalItemsSynced: results.syncResults.reduce((sum, r) => sum + r.itemsSynced, 0),
+        integrationsRefreshed: results.syncResults.filter(r => r.success).length,
+        reposAnalyzed: results.reposAnalyzed,
+        predictionsCreated: results.predictionsCreated,
+        bottlenecksCreated: results.bottlenecksCreated,
+        tasksCreated: results.tasksCreated,
+        errors: results.errors,
+      }
+    } catch (error) {
+      return {
+        success: false,
+        duration: Date.now() - startTime,
+        totalItemsSynced: 0,
+        integrationsRefreshed: 0,
+        reposAnalyzed: 0,
+        predictionsCreated: 0,
+        bottlenecksCreated: 0,
+        tasksCreated: 0,
+        errors: [String(error)],
       }
     }
   }),

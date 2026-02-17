@@ -12,7 +12,8 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@nexflow/ui/dropdown-menu'
-import { Settings, LogOut, User, Plus } from 'lucide-react'
+import { Settings, LogOut, User, Plus, RefreshCw } from 'lucide-react'
+import { toast } from '@nexflow/ui/toast'
 import type { TeamType } from '@/lib/theme'
 import { TEAM_TYPES, getTabsForRole } from '@/lib/theme'
 import { trpc } from '@/lib/trpc'
@@ -168,17 +169,52 @@ export function NexFlowHeader({
   onTabChange,
   tabBadges = {},
 }: NexFlowHeaderProps) {
+  const [isRefreshing, setIsRefreshing] = useState(false)
   const teamType = workspace?.teamType || 'launch'
   // Use the user's actual role for tab visibility
   const tabs = getTabsForRole(teamType, user.role)
   const teamConfig = TEAM_TYPES[teamType]
 
   // Fetch real health score or show default for new users
-  const { data: healthData } = trpc.dashboard.getHealthScore.useQuery(undefined, {
+  const { data: healthData, refetch: refetchHealth } = trpc.dashboard.getHealthScore.useQuery(undefined, {
     // Don't error if dashboard isn't ready yet
     retry: false,
   })
   const metricValue = healthData?.overall ?? 0
+
+  // Refresh analysis mutation
+  const refreshMutation = trpc.dashboard.refreshAnalysis.useMutation({
+    onSuccess: (data) => {
+      setIsRefreshing(false)
+      if (data.success) {
+        toast({
+          title: 'Analysis refreshed',
+          description: `Synced ${data.totalItemsSynced} items, created ${data.predictionsCreated} predictions`,
+        })
+        // Refetch dashboard data
+        refetchHealth()
+      } else {
+        toast({
+          title: 'Refresh completed with errors',
+          description: data.errors.join(', '),
+          variant: 'destructive',
+        })
+      }
+    },
+    onError: (error) => {
+      setIsRefreshing(false)
+      toast({
+        title: 'Refresh failed',
+        description: error.message,
+        variant: 'destructive',
+      })
+    },
+  })
+
+  const handleRefresh = () => {
+    setIsRefreshing(true)
+    refreshMutation.mutate()
+  }
 
   const initials = user.name
     ?.split(' ')
@@ -210,9 +246,27 @@ export function NexFlowHeader({
 
         {/* Right */}
         <div className="flex items-center gap-3">
+          {/* Refresh button */}
+          <button
+            onClick={handleRefresh}
+            disabled={isRefreshing}
+            className={cn(
+              'flex items-center gap-1.5 px-2 py-1 border rounded transition-all',
+              isRefreshing
+                ? 'border-[#50e3c2]/30 text-[#50e3c2] cursor-wait'
+                : 'border-[#1a1a1a] text-[#555] hover:text-[#888] hover:border-[#252525]'
+            )}
+            title="Refresh all data and regenerate AI insights"
+          >
+            <RefreshCw className={cn('w-3 h-3', isRefreshing && 'animate-spin')} />
+            <span className="text-[11px] font-mono hidden sm:inline">
+              {isRefreshing ? 'Refreshing...' : 'Refresh'}
+            </span>
+          </button>
+
           {/* NexFlow AI pill - minimal */}
           <div className="flex items-center gap-1.5 px-2 py-1 border border-[#d4a574]/30 rounded">
-            <span className="w-1.5 h-1.5 rounded-full bg-[#d4a574] animate-pulse" />
+            <span className={cn('w-1.5 h-1.5 rounded-full bg-[#d4a574]', !isRefreshing && 'animate-pulse')} />
             <span className="text-[11px] font-mono text-[#d4a574]">AI</span>
           </div>
 
