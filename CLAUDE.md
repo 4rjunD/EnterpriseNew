@@ -52,9 +52,10 @@ packages/
 Routers are defined in `src/routers/` and registered in `src/router.ts`:
 - `dashboard`, `tasks`, `team`, `projects` - Core CRUD operations
 - `bottlenecks`, `predictions`, `analysis` - AI-powered insights
-- `integrations`, `sync` - External service connections
+- `integrations`, `sync`, `repositories` - External service connections and repo selection
 - `agentChat` - Conversational AI interface
 - `onboarding`, `invitations` - User management
+- `knowledgeBase`, `context`, `progress`, `calendar` - Organization intelligence
 
 Procedure authorization levels in `src/trpc.ts`:
 - `publicProcedure` - No auth required
@@ -83,9 +84,11 @@ Key files:
 - Context awareness via `ContextBuilder`
 - 11 skills in `src/agent/skills/`: create-task, send-nudge, analyze-risks, etc.
 
-**Autonomous Analyzer** (`src/autonomous/analyzer.ts`):
-- Analyzes GitHub repos to generate tasks, bottlenecks, predictions
-- Uses Claude to interpret repo structure and suggest improvements
+**Autonomous Analyzers** (`src/autonomous/`):
+- `analyzer.ts` - Analyzes GitHub repos to generate tasks, bottlenecks, predictions
+- `context-analyzer.ts` - Generates AI insights from company context (no repo required)
+- `guaranteed-analyzer.ts` - Ensures dashboard never empty, creates baseline content
+- All use Claude to interpret data and suggest improvements
 
 **Legacy Agents** (`src/agents/`):
 - `TaskReassignerAgent`, `NudgeSenderAgent`, `ScopeAdjusterAgent`
@@ -111,14 +114,31 @@ Prisma schema at `prisma/schema.prisma`. Key models:
 - `Integration` - OAuth tokens and sync state per org
 - `AgentConversation`, `AgentMessage`, `AgentMemory` - Chat system
 - `PasswordResetToken`, `EmailVerificationToken` - Self-serve auth
+- `ProjectContext` - Company context (industry, stage, goals, challenges, risk tolerance)
+- `SelectedRepository` - Repos chosen for tracking with cached metrics
+- `OrganizationKnowledgeBase` - AI-generated insights, risks, recommendations
 
 ### Data Flow
 
 1. User connects integration → OAuth callback stores tokens in `Integration`
-2. Sync runs → Tasks/PRs created with `organizationId` and `source` field
-3. `AutonomousAnalyzer` generates insights via Claude
-4. Dashboard displays via tRPC queries scoped to user's organization
-5. AI chat uses `AgentCore` with skills that can modify data
+2. User selects repos to track → stored in `SelectedRepository`
+3. Sync runs → Tasks/PRs created with `organizationId` and `source` field
+4. `AutonomousAnalyzer` generates insights via Claude from repo analysis
+5. `ContextBasedAnalyzer` generates insights from company context (fallback when no repos)
+6. `GuaranteedAnalyzer` ensures baseline content always exists
+7. Dashboard displays via tRPC queries scoped to user's organization
+8. AI chat uses `AgentCore` with skills that can modify data
+
+### Dashboard Tabs
+
+Tabs are configured per team type in `apps/web/src/lib/theme.ts`:
+- **Today** - Unified view: tasks, PRs, predictions, bottlenecks, risks, recommendations
+- **Predictions** - AI-generated delivery forecasts
+- **Team** - Members and pending invitations
+- **Context** - Editable project context (what you're building, company profile, milestones)
+- **Milestones** - Progress tracking toward goals
+- **Integrations** - Connected services (GitHub, Linear, Slack, etc.)
+- **Risks** - Active bottlenecks and risk indicators
 
 ## Environment Variables
 
@@ -155,3 +175,6 @@ REDIS_URL             # BullMQ job queue
 - For nullable fields in Prisma unique constraints, use `findFirst` + update/create instead of `upsert`
 - Synced data (Tasks, PRs) must include `organizationId` to appear in dashboard
 - OAuth callbacks encode `organizationId` in state parameter for multi-tenant support
+- Predictions require a `Project` to exist (foreign key constraint) - create default project first
+- Refresh button invalidates queries via `trpc.useUtils()` for immediate UI updates
+- `getUnifiedTodos` combines tasks, PRs, predictions, bottlenecks, risks, recommendations

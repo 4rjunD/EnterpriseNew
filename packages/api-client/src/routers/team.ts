@@ -60,12 +60,12 @@ export const teamRouter = router({
         },
       }))
 
-      // Include pending invitations if requested
+      // Include pending/expired invitations if requested
       if (input.includePendingInvites) {
-        const pendingInvitations = await prisma.invitation.findMany({
+        const invitations = await prisma.invitation.findMany({
           where: {
             organizationId: ctx.organizationId,
-            status: 'PENDING',
+            status: { in: ['PENDING', 'EXPIRED'] },
             ...(input.teamId && { teamId: input.teamId }),
           },
           include: {
@@ -73,19 +73,19 @@ export const teamRouter = router({
           },
         })
 
-        const pendingMembers = pendingInvitations.map(inv => ({
+        const inviteMembers = invitations.map(inv => ({
           id: inv.id,
           name: null,
           email: inv.email,
           image: null,
           role: inv.role,
-          status: 'PENDING' as const,
+          status: inv.status as 'PENDING' | 'EXPIRED',
           isPending: true as const,
           teams: inv.team ? [{ id: inv.team.id, name: inv.team.name, role: 'MEMBER' as const }] : [],
           workload: { activeTasks: 0, openPRs: 0 },
         }))
 
-        return [...members, ...pendingMembers]
+        return [...members, ...inviteMembers]
       }
 
       return members

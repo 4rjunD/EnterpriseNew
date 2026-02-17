@@ -13,7 +13,10 @@ export const predictionsRouter = router({
     .query(async ({ ctx, input }) => {
       return prisma.prediction.findMany({
         where: {
-          project: { organizationId: ctx.organizationId },
+          OR: [
+            { project: { organizationId: ctx.organizationId } },
+            { projectId: null },
+          ],
           isActive: true,
           ...(input.type && { type: input.type as PredictionType }),
           ...(input.projectId && { projectId: input.projectId }),
@@ -49,7 +52,10 @@ export const predictionsRouter = router({
   getStats: protectedProcedure.query(async ({ ctx }) => {
     const predictions = await prisma.prediction.findMany({
       where: {
-        project: { organizationId: ctx.organizationId },
+        OR: [
+          { project: { organizationId: ctx.organizationId } },
+          { projectId: null },
+        ],
         isActive: true,
       },
       select: { type: true, confidence: true },

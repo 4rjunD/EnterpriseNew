@@ -44,6 +44,30 @@ export class GuaranteedAnalyzer {
   }
 
   /**
+   * Get or create a default project for this org.
+   * Predictions and bottlenecks require a projectId to be queryable.
+   */
+  private async getOrCreateDefaultProject(): Promise<string> {
+    const existing = await prisma.project.findFirst({
+      where: { organizationId: this.organizationId },
+    })
+    if (existing) return existing.id
+
+    const org = await prisma.organization.findUnique({
+      where: { id: this.organizationId },
+    })
+    const project = await prisma.project.create({
+      data: {
+        organizationId: this.organizationId,
+        name: org?.name || 'General',
+        key: 'GEN',
+        description: 'Default project for organization-wide insights',
+      },
+    })
+    return project.id
+  }
+
+  /**
    * Main entry point: ensures dashboard has content after GitHub connection.
    * Call this after: OAuth, repo selection, sync, or dashboard load (with caching).
    */
@@ -52,6 +76,9 @@ export class GuaranteedAnalyzer {
     let bottlenecksCreated = 0
     let predictionsCreated = 0
     let contextAnalysisRan = false
+
+    // 0. Ensure a default project exists (predictions/bottlenecks need projectId to be queryable)
+    const projectId = await this.getOrCreateDefaultProject()
 
     // 1. Get selected repos
     const selectedRepos = await prisma.selectedRepository.findMany({
@@ -73,13 +100,13 @@ export class GuaranteedAnalyzer {
         const contextAnalyzer = new ContextBasedAnalyzer(this.organizationId)
         const contextResults = await contextAnalyzer.run()
 
-        tasksCreated += contextResults.predictionsCreated // Tasks created from context
+        // ContextBasedAnalyzer doesn't create tasks, only predictions/bottlenecks/risks/recommendations
         bottlenecksCreated += contextResults.bottlenecksCreated
         predictionsCreated += contextResults.predictionsCreated
         contextAnalysisRan = true
 
         // Return early if context analysis generated content
-        if (tasksCreated > 0 || bottlenecksCreated > 0 || predictionsCreated > 0) {
+        if (bottlenecksCreated > 0 || predictionsCreated > 0) {
           return {
             ...stats,
             selectedRepoCount: selectedRepos.length,
@@ -109,20 +136,20 @@ export class GuaranteedAnalyzer {
     // 5. Ensure minimum bottlenecks (risks)
     if (stats.bottleneckCount === 0 && bottlenecksCreated === 0) {
       if (selectedRepos.length > 0) {
-        bottlenecksCreated = await this.generateBottlenecksFromRepos(selectedRepos)
+        bottlenecksCreated = await this.generateBottlenecksFromRepos(selectedRepos, projectId)
       }
       if (bottlenecksCreated === 0) {
-        bottlenecksCreated = await this.createBaselineBottlenecks()
+        bottlenecksCreated = await this.createBaselineBottlenecks(projectId)
       }
     }
 
     // 6. Ensure minimum predictions
     if (stats.predictionCount === 0 && predictionsCreated === 0) {
       if (selectedRepos.length > 0) {
-        predictionsCreated = await this.generatePredictionsFromRepos(selectedRepos)
+        predictionsCreated = await this.generatePredictionsFromRepos(selectedRepos, projectId)
       }
       if (predictionsCreated === 0) {
-        predictionsCreated = await this.createBaselinePredictions()
+        predictionsCreated = await this.createBaselinePredictions(projectId)
       }
     }
 
@@ -144,13 +171,19 @@ export class GuaranteedAnalyzer {
       prisma.bottleneck.count({
         where: {
           status: 'ACTIVE',
-          project: { organizationId: this.organizationId },
+          OR: [
+            { project: { organizationId: this.organizationId } },
+            { projectId: null },
+          ],
         },
       }),
       prisma.prediction.count({
         where: {
           isActive: true,
-          project: { organizationId: this.organizationId },
+          OR: [
+            { project: { organizationId: this.organizationId } },
+            { projectId: null },
+          ],
         },
       }),
       prisma.selectedRepository.count({
@@ -303,7 +336,7 @@ export class GuaranteedAnalyzer {
   /**
    * Generate bottlenecks from repository analysis.
    */
-  private async generateBottlenecksFromRepos(repos: Array<{ fullName: string; openPRCount: number; completenessScore: number | null }>): Promise<number> {
+  private async generateBottlenecksFromRepos(repos: Array<{ fullName: string; openPRCount: number; completenessScore: number | null }>, projectId: string): Promise<number> {
     let created = 0
 
     // Check for repos with many open PRs
@@ -320,6 +353,7 @@ export class GuaranteedAnalyzer {
       if (!existing) {
         await prisma.bottleneck.create({
           data: {
+            projectId,
             type: BottleneckType.REVIEW_DELAY,
             severity: repo.openPRCount > 10 ? BottleneckSeverity.HIGH : BottleneckSeverity.MEDIUM,
             title: `High PR backlog in ${repo.fullName}`,
@@ -346,6 +380,7 @@ export class GuaranteedAnalyzer {
       if (!existing) {
         await prisma.bottleneck.create({
           data: {
+            projectId,
             type: BottleneckType.DEPENDENCY_BLOCK,
             severity: BottleneckSeverity.MEDIUM,
             title: `Technical debt in ${repo.fullName}`,
@@ -364,7 +399,7 @@ export class GuaranteedAnalyzer {
   /**
    * Create baseline bottlenecks when no repo-specific ones exist.
    */
-  private async createBaselineBottlenecks(): Promise<number> {
+  private async createBaselineBottlenecks(projectId: string): Promise<number> {
     const baselineBottlenecks = [
       {
         type: BottleneckType.REVIEW_DELAY,
@@ -396,6 +431,7 @@ export class GuaranteedAnalyzer {
         await prisma.bottleneck.create({
           data: {
             ...bottleneck,
+            projectId,
             status: 'ACTIVE',
           },
         })
@@ -409,7 +445,7 @@ export class GuaranteedAnalyzer {
   /**
    * Generate predictions from repository analysis.
    */
-  private async generatePredictionsFromRepos(repos: Array<{ fullName: string; openPRCount: number; todoCount: number }>): Promise<number> {
+  private async generatePredictionsFromRepos(repos: Array<{ fullName: string; openPRCount: number; todoCount: number }>, projectId: string): Promise<number> {
     let created = 0
 
     // Calculate aggregate metrics
@@ -427,11 +463,9 @@ export class GuaranteedAnalyzer {
       })
 
       if (!existing) {
-        const avgPRsPerRepo = totalOpenPRs / repos.length
-        const velocityRisk = avgPRsPerRepo > 5 ? 0.7 : avgPRsPerRepo > 2 ? 0.5 : 0.3
-
         await prisma.prediction.create({
           data: {
+            projectId,
             type: PredictionType.VELOCITY_FORECAST,
             confidence: 0.7,
             value: {
@@ -461,6 +495,7 @@ export class GuaranteedAnalyzer {
       if (!existing) {
         await prisma.prediction.create({
           data: {
+            projectId,
             type: PredictionType.SCOPE_CREEP,
             confidence: 0.6,
             value: {
@@ -483,7 +518,7 @@ export class GuaranteedAnalyzer {
   /**
    * Create baseline predictions when no repo-specific ones exist.
    */
-  private async createBaselinePredictions(): Promise<number> {
+  private async createBaselinePredictions(projectId: string): Promise<number> {
     const baselinePredictions = [
       {
         type: PredictionType.VELOCITY_FORECAST,
@@ -521,6 +556,7 @@ export class GuaranteedAnalyzer {
         await prisma.prediction.create({
           data: {
             ...prediction,
+            projectId,
             isActive: true,
             validUntil: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30 days
           },

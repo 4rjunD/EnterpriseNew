@@ -408,9 +408,13 @@ export const dashboardRouter = router({
       }
 
       // Step 2: Clear old predictions and bottlenecks to regenerate fresh ones
+      // Also catch orphaned records (null projectId) from previous buggy runs
       await prisma.prediction.updateMany({
         where: {
-          project: { organizationId: ctx.organizationId },
+          OR: [
+            { project: { organizationId: ctx.organizationId } },
+            { projectId: null },
+          ],
           isActive: true,
         },
         data: { isActive: false },
@@ -418,7 +422,10 @@ export const dashboardRouter = router({
 
       await prisma.bottleneck.updateMany({
         where: {
-          project: { organizationId: ctx.organizationId },
+          OR: [
+            { project: { organizationId: ctx.organizationId } },
+            { projectId: null },
+          ],
           status: 'ACTIVE',
         },
         data: { status: 'RESOLVED' },
@@ -591,8 +598,8 @@ export const dashboardRouter = router({
       prisma.task.count({ where: { organizationId: ctx.organizationId, status: 'IN_PROGRESS' } }),
       prisma.pullRequest.count({ where: { organizationId: ctx.organizationId, status: 'OPEN' } }),
       prisma.pullRequest.count({ where: { organizationId: ctx.organizationId, status: 'MERGED' } }),
-      prisma.bottleneck.count({ where: { project: { organizationId: ctx.organizationId }, status: 'ACTIVE' } }),
-      prisma.bottleneck.count({ where: { project: { organizationId: ctx.organizationId }, status: 'ACTIVE', severity: 'CRITICAL' } }),
+      prisma.bottleneck.count({ where: { OR: [{ project: { organizationId: ctx.organizationId } }, { projectId: null }], status: 'ACTIVE' } }),
+      prisma.bottleneck.count({ where: { OR: [{ project: { organizationId: ctx.organizationId } }, { projectId: null }], status: 'ACTIVE', severity: 'CRITICAL' } }),
     ])
 
     // Calculate metrics (0-100 scale)
@@ -706,7 +713,7 @@ export const dashboardRouter = router({
           },
         }),
         prisma.bottleneck.findMany({
-          where: { project: { organizationId: ctx.organizationId } },
+          where: { OR: [{ project: { organizationId: ctx.organizationId } }, { projectId: null }] },
           orderBy: { updatedAt: 'desc' },
           take: input.limit,
         }),
@@ -747,7 +754,7 @@ export const dashboardRouter = router({
   getSummaryStats: protectedProcedure.query(async ({ ctx }) => {
     // Check if we need to auto-run analysis (no predictions exist)
     const existingPredictions = await prisma.prediction.count({
-      where: { project: { organizationId: ctx.organizationId }, isActive: true },
+      where: { OR: [{ project: { organizationId: ctx.organizationId } }, { projectId: null }], isActive: true },
     })
 
     // Auto-trigger analysis if no predictions exist
@@ -804,14 +811,14 @@ export const dashboardRouter = router({
     ] = await Promise.all([
       // Health score components
       prisma.task.count({ where: { organizationId: ctx.organizationId, status: 'DONE' } }),
-      prisma.bottleneck.count({ where: { project: { organizationId: ctx.organizationId }, status: 'ACTIVE' } }),
-      prisma.bottleneck.count({ where: { project: { organizationId: ctx.organizationId }, status: 'ACTIVE', severity: 'CRITICAL' } }),
+      prisma.bottleneck.count({ where: { OR: [{ project: { organizationId: ctx.organizationId } }, { projectId: null }], status: 'ACTIVE' } }),
+      prisma.bottleneck.count({ where: { OR: [{ project: { organizationId: ctx.organizationId } }, { projectId: null }], status: 'ACTIVE', severity: 'CRITICAL' } }),
       prisma.user.count({ where: { organizationId: ctx.organizationId } }),
       prisma.user.count({ where: { organizationId: ctx.organizationId, status: 'ONLINE' } }),
       prisma.task.count({ where: { organizationId: ctx.organizationId } }),
       prisma.task.count({ where: { organizationId: ctx.organizationId, status: 'IN_PROGRESS' } }),
-      prisma.prediction.count({ where: { project: { organizationId: ctx.organizationId }, isActive: true } }),
-      prisma.prediction.count({ where: { project: { organizationId: ctx.organizationId }, isActive: true, confidence: { gte: 0.7 } } }),
+      prisma.prediction.count({ where: { OR: [{ project: { organizationId: ctx.organizationId } }, { projectId: null }], isActive: true } }),
+      prisma.prediction.count({ where: { OR: [{ project: { organizationId: ctx.organizationId } }, { projectId: null }], isActive: true, confidence: { gte: 0.7 } } }),
       prisma.project.count({ where: { organizationId: ctx.organizationId, status: 'ACTIVE' } }),
       prisma.integration.count({ where: { organizationId: ctx.organizationId, status: 'CONNECTED' } }),
       prisma.integration.count({ where: { organizationId: ctx.organizationId } }),
@@ -962,7 +969,10 @@ export const dashboardRouter = router({
         // Recent bottleneck detections
         prisma.bottleneck.findMany({
           where: {
-            project: { organizationId: ctx.organizationId },
+            OR: [
+              { project: { organizationId: ctx.organizationId } },
+              { projectId: null },
+            ],
             detectedAt: { gte: sevenDaysAgo },
           },
           include: {
@@ -974,7 +984,10 @@ export const dashboardRouter = router({
         // Recent predictions
         prisma.prediction.findMany({
           where: {
-            project: { organizationId: ctx.organizationId },
+            OR: [
+              { project: { organizationId: ctx.organizationId } },
+              { projectId: null },
+            ],
             createdAt: { gte: sevenDaysAgo },
             isActive: true,
           },

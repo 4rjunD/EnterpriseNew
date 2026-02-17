@@ -14,7 +14,10 @@ export const bottlenecksRouter = router({
     .query(async ({ ctx, input }) => {
       const bottlenecks = await prisma.bottleneck.findMany({
         where: {
-          project: { organizationId: ctx.organizationId },
+          OR: [
+            { project: { organizationId: ctx.organizationId } },
+            { projectId: null },
+          ],
           ...(input.status && { status: input.status as BottleneckStatus }),
           ...(input.type && { type: input.type as BottleneckType }),
           ...(input.severity && { severity: input.severity as BottleneckSeverity }),
@@ -66,26 +69,32 @@ export const bottlenecksRouter = router({
     }),
 
   getStats: protectedProcedure.query(async ({ ctx }) => {
+    const orgFilter = {
+      OR: [
+        { project: { organizationId: ctx.organizationId } },
+        { projectId: null },
+      ],
+    }
     const [byType, bySeverity, resolved24h, total] = await Promise.all([
       prisma.bottleneck.groupBy({
         by: ['type'],
-        where: { project: { organizationId: ctx.organizationId }, status: 'ACTIVE' },
+        where: { ...orgFilter, status: 'ACTIVE' },
         _count: { type: true },
       }),
       prisma.bottleneck.groupBy({
         by: ['severity'],
-        where: { project: { organizationId: ctx.organizationId }, status: 'ACTIVE' },
+        where: { ...orgFilter, status: 'ACTIVE' },
         _count: { severity: true },
       }),
       prisma.bottleneck.count({
         where: {
-          project: { organizationId: ctx.organizationId },
+          ...orgFilter,
           status: 'RESOLVED',
           resolvedAt: { gte: new Date(Date.now() - 24 * 60 * 60 * 1000) },
         },
       }),
       prisma.bottleneck.count({
-        where: { project: { organizationId: ctx.organizationId }, status: 'ACTIVE' },
+        where: { ...orgFilter, status: 'ACTIVE' },
       }),
     ])
 

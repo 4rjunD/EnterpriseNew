@@ -6,18 +6,21 @@ export const tasksRouter = router({
   // Unified TODOs for dashboard - combines tasks, PRs, repo insights, predictions, bottlenecks, risks
   getUnifiedTodos: protectedProcedure.query(async ({ ctx }) => {
     const [tasks, prsToReview, selectedRepos, predictions, bottlenecks, knowledgeBase] = await Promise.all([
-      // User's assigned tasks (not done)
+      // User's assigned tasks + unassigned org tasks (not done)
       prisma.task.findMany({
         where: {
           organizationId: ctx.organizationId,
-          assigneeId: ctx.userId,
+          OR: [
+            { assigneeId: ctx.userId },
+            { assigneeId: null },
+          ],
           status: { notIn: ['DONE', 'CANCELLED'] },
         },
         orderBy: [
           { priority: 'desc' },
           { dueDate: 'asc' },
         ],
-        take: 15,
+        take: 20,
         include: {
           project: { select: { id: true, name: true, key: true } },
         },
@@ -53,10 +56,13 @@ export const tasksRouter = router({
         orderBy: { updatedAt: 'desc' },
       }),
 
-      // Active predictions
+      // Active predictions (include orphaned null-projectId records for backward compat)
       prisma.prediction.findMany({
         where: {
-          project: { organizationId: ctx.organizationId },
+          OR: [
+            { project: { organizationId: ctx.organizationId } },
+            { projectId: null },
+          ],
           isActive: true,
         },
         orderBy: [{ confidence: 'desc' }, { createdAt: 'desc' }],
@@ -66,10 +72,13 @@ export const tasksRouter = router({
         },
       }),
 
-      // Active bottlenecks
+      // Active bottlenecks (include orphaned null-projectId records for backward compat)
       prisma.bottleneck.findMany({
         where: {
-          project: { organizationId: ctx.organizationId },
+          OR: [
+            { project: { organizationId: ctx.organizationId } },
+            { projectId: null },
+          ],
           status: 'ACTIVE',
         },
         orderBy: [{ severity: 'desc' }, { detectedAt: 'desc' }],

@@ -17,6 +17,7 @@ import {
   ScheduleTab,
   ProjectsTab,
 } from '@/components/dashboard/tabs'
+import { ContextTab } from '@/components/dashboard/tabs/context-tab'
 import { type TeamType } from '@/lib/theme'
 import { trpc } from '@/lib/trpc'
 
@@ -88,6 +89,8 @@ export function DashboardWrapper({ user, workspace }: DashboardWrapperProps) {
         return <PredictionsTab {...props} />
       case 'team':
         return <TeamTab />
+      case 'context':
+        return <ContextTab />
       case 'sprint':
         return <SprintTab />
       case 'risks':
