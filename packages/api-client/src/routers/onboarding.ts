@@ -146,6 +146,55 @@ export const onboardingRouter = router({
       })
     }),
 
+  // Save company context during onboarding
+  saveCompanyContext: protectedProcedure
+    .input(
+      z.object({
+        industry: z.string().optional(),
+        companyStage: z.string().optional(),
+        teamDistribution: z.string().optional(),
+        developmentMethod: z.string().optional(),
+        primaryChallenges: z.array(z.string()).optional(),
+        riskTolerance: z.string().optional(),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      const primaryChallenges = input.primaryChallenges?.filter((c) => c.trim()) || []
+
+      // First check if project context exists
+      const existing = await prisma.projectContext.findFirst({
+        where: { organizationId: ctx.organizationId },
+      })
+
+      if (existing) {
+        return prisma.projectContext.update({
+          where: { id: existing.id },
+          data: {
+            industry: input.industry,
+            companyStage: input.companyStage,
+            teamDistribution: input.teamDistribution,
+            developmentMethod: input.developmentMethod,
+            primaryChallenges,
+            riskTolerance: input.riskTolerance,
+          },
+        })
+      }
+
+      // Create with minimal buildingDescription - will be updated later
+      return prisma.projectContext.create({
+        data: {
+          organizationId: ctx.organizationId,
+          buildingDescription: 'To be defined',
+          industry: input.industry,
+          companyStage: input.companyStage,
+          teamDistribution: input.teamDistribution,
+          developmentMethod: input.developmentMethod,
+          primaryChallenges,
+          riskTolerance: input.riskTolerance,
+        },
+      })
+    }),
+
   // Get existing project context
   getProjectContext: protectedProcedure.query(async ({ ctx }) => {
     return prisma.projectContext.findFirst({

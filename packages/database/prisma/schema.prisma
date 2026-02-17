@@ -52,6 +52,14 @@ model ProjectContext {
   goals               String[]
   techStack           String[]
 
+  // Company context for AI predictions
+  industry           String?   // SaaS, E-commerce, FinTech, Healthcare, etc.
+  companyStage       String?   // Startup, Growth, Enterprise
+  teamDistribution   String?   // Remote, Hybrid, On-site
+  developmentMethod  String?   // Agile, Kanban, Waterfall, etc.
+  primaryChallenges  String[]  // Technical debt, Scaling, Team velocity, etc.
+  riskTolerance      String?   // Conservative, Moderate, Aggressive
+
   // Link to project or organization (one per org for org-level context)
   projectId      String?       @unique
   project        Project?      @relation(fields: [projectId], references: [id])

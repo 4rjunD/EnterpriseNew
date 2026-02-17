@@ -1,7 +1,7 @@
 import { z } from 'zod'
 import { router, protectedProcedure } from '../trpc'
 import { prisma } from '@nexflow/database'
-import { BottleneckDetector, PredictionEngine, GuaranteedAnalyzer } from '@nexflow/ai'
+import { BottleneckDetector, PredictionEngine, GuaranteedAnalyzer, ContextBasedAnalyzer } from '@nexflow/ai'
 
 // Cache for ensureContent to avoid running on every request
 const contentEnsureCache = new Map<string, number>()
@@ -39,6 +39,30 @@ export const dashboardRouter = router({
     } catch (error) {
       console.error('ensureContent failed:', error)
       return { skipped: true, reason: 'error', error: String(error) }
+    }
+  }),
+
+  // Run context-based AI analysis
+  // Generates predictions, bottlenecks, and recommendations from company context
+  runContextAnalysis: protectedProcedure.mutation(async ({ ctx }) => {
+    try {
+      const analyzer = new ContextBasedAnalyzer(ctx.organizationId)
+      const result = await analyzer.run()
+
+      return {
+        success: true,
+        ...result,
+      }
+    } catch (error) {
+      console.error('Context analysis failed:', error)
+      return {
+        success: false,
+        error: String(error),
+        predictionsCreated: 0,
+        bottlenecksCreated: 0,
+        risksGenerated: 0,
+        recommendationsGenerated: 0,
+      }
     }
   }),
 

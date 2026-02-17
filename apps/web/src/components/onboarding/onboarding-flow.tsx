@@ -9,6 +9,7 @@ import { Button } from '@/components/nf/button'
 import { StepWorkspace } from './step-workspace'
 import { StepTeamType } from './step-team-type'
 import { StepConfigure } from './step-configure'
+import { StepCompanyContext } from './step-company-context'
 import { StepIntegrations } from './step-integrations'
 import { StepInvite } from './step-invite'
 import { StepSignIn, loadOnboardingData, clearOnboardingData } from './step-signin'
@@ -40,9 +41,16 @@ export interface OnboardingData {
   targetDeploys?: string
   targetReviewTime?: string
   engineeringFocus?: string
-  // Step 4: Integrations
+  // Step 4: Company Context (for AI predictions)
+  industry?: string
+  companyStage?: string
+  teamDistribution?: string
+  developmentMethod?: string
+  primaryChallenges?: string[]
+  riskTolerance?: string
+  // Step 5: Integrations
   connectedIntegrations: string[]
-  // Step 5: Invites
+  // Step 6: Invites
   invites: { email: string; name: string; role: 'member' | 'admin' | 'cofounder' }[]
 }
 
@@ -60,11 +68,12 @@ const initialData: OnboardingData = {
 // 1. Workspace
 // 2. Team Type
 // 3. Configure
-// 4. Integrations
-// 5. Invite (skippable)
-// 6. Sign In (Google/GitHub OAuth)
-// 7. Scanning (after auth)
-const TOTAL_STEPS = 7
+// 4. Company Context (for AI predictions)
+// 5. Integrations
+// 6. Invite (skippable)
+// 7. Sign In (Google/GitHub OAuth)
+// 8. Scanning (after auth)
+const TOTAL_STEPS = 8
 
 export function OnboardingFlow() {
   const router = useRouter()
@@ -77,10 +86,10 @@ export function OnboardingFlow() {
   const isReturningFromIntegration = stepParam === 'integrations'
 
   const [step, setStep] = useState(() => {
-    // If returning from integration OAuth, go to step 4
-    if (isReturningFromIntegration) return 4
-    // If returning from auth and signed in, go to scanning
-    if (isReturningFromAuth) return 7
+    // If returning from integration OAuth, go to step 5 (integrations)
+    if (isReturningFromIntegration) return 5
+    // If returning from auth and signed in, go to scanning (step 8)
+    if (isReturningFromAuth) return 8
     return 1
   })
 
@@ -104,18 +113,18 @@ export function OnboardingFlow() {
       const savedData = loadOnboardingData()
       if (savedData) {
         setData(savedData)
-        setStep(7) // Go to scanning
+        setStep(8) // Go to scanning
       }
     }
   }, [isReturningFromAuth, status])
 
-  // If returning from integration OAuth, restore data and go to step 4
+  // If returning from integration OAuth, restore data and go to step 5 (integrations)
   useEffect(() => {
     if (isReturningFromIntegration) {
       const savedData = loadOnboardingData()
       if (savedData) {
         setData(savedData)
-        setStep(4) // Go to integrations step
+        setStep(5) // Go to integrations step
       }
     }
   }, [isReturningFromIntegration])
@@ -137,13 +146,15 @@ export function OnboardingFlow() {
         }
         return true // Other types have optional fields
       case 4:
-        return true // Integrations are optional - can connect later
+        return true // Company context is optional but recommended
       case 5:
-        return true // Invites are optional
+        return true // Integrations are optional - can connect later
       case 6:
-        return true // Sign-in step handles its own flow
+        return true // Invites are optional
       case 7:
-        return true
+        return true // Sign-in step handles its own flow
+      case 8:
+        return true // Scanning
       default:
         return false
     }
@@ -173,25 +184,27 @@ export function OnboardingFlow() {
   }, [step, completeOnboarding])
 
   const handleBack = useCallback(() => {
-    if (step > 1 && step < 7) {
+    if (step > 1 && step < 8) {
       setStep(step - 1)
     }
   }, [step])
 
   const handleSkip = useCallback(() => {
-    // Only step 5 (invites) can be skipped
-    if (step === 5) {
-      setStep(6)
+    // Step 4 (company context) and step 6 (invites) can be skipped
+    if (step === 4) {
+      setStep(5)
+    } else if (step === 6) {
+      setStep(7)
     }
   }, [step])
 
   const handleSignedIn = useCallback(() => {
-    // After sign-in, proceed to scanning
-    setStep(7)
+    // After sign-in, proceed to scanning (step 8)
+    setStep(8)
   }, [])
 
   const getEstimatedTime = () => {
-    const times = [2, 2, 1, 2, 1, 1, 1]
+    const times = [2, 2, 1, 2, 2, 1, 1, 1]
     const remaining = times.slice(step - 1).reduce((a, b) => a + b, 0)
     return remaining
   }
@@ -205,12 +218,14 @@ export function OnboardingFlow() {
       case 3:
         return <StepConfigure data={data} updateData={updateData} />
       case 4:
-        return <StepIntegrations data={data} updateData={updateData} />
+        return <StepCompanyContext data={data} updateData={updateData} />
       case 5:
-        return <StepInvite data={data} updateData={updateData} />
+        return <StepIntegrations data={data} updateData={updateData} />
       case 6:
-        return <StepSignIn data={data} onSignedIn={handleSignedIn} />
+        return <StepInvite data={data} updateData={updateData} />
       case 7:
+        return <StepSignIn data={data} onSignedIn={handleSignedIn} />
+      case 8:
         return <StepScanning data={data} onComplete={handleNext} />
       default:
         return null
@@ -218,7 +233,7 @@ export function OnboardingFlow() {
   }
 
   // Show footer navigation (except on sign-in and scanning steps)
-  const showFooter = step < 6
+  const showFooter = step < 7
 
   return (
     <div className="min-h-screen bg-background flex flex-col">
@@ -253,7 +268,7 @@ export function OnboardingFlow() {
           <span className="text-sm font-semibold text-foreground">NexFlow</span>
         </div>
         <span className="text-xs text-foreground-tertiary font-mono">
-          Step {Math.min(step, 6)} of 6 · ~{getEstimatedTime()} min left
+          Step {Math.min(step, 7)} of 7 · ~{getEstimatedTime()} min left
         </span>
       </header>
 
@@ -275,7 +290,7 @@ export function OnboardingFlow() {
               Back
             </Button>
             <div className="flex items-center gap-3">
-              {step === 5 && (
+              {(step === 4 || step === 6) && (
                 <button
                   onClick={handleSkip}
                   className="text-sm text-foreground-secondary hover:text-foreground transition-colors"

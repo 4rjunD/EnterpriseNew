@@ -40,8 +40,9 @@ export function StepScanning({ data, onComplete }: StepScanningProps) {
   const teamType = data.teamType || 'launch'
   const config = TEAM_TYPES[teamType]
 
-  // tRPC mutation to complete onboarding
+  // tRPC mutations
   const completeOnboarding = trpc.onboarding.complete.useMutation()
+  const saveCompanyContext = trpc.onboarding.saveCompanyContext.useMutation()
 
   // Fetch real connected integrations
   const { data: integrationsData } = trpc.integrations.list.useQuery()
@@ -104,6 +105,18 @@ export function StepScanning({ data, onComplete }: StepScanningProps) {
   const handleOpenDashboard = useCallback(async () => {
     setIsRedirecting(true)
     try {
+      // Save company context if provided
+      if (data.industry || data.companyStage || data.developmentMethod || (data.primaryChallenges && data.primaryChallenges.length > 0)) {
+        await saveCompanyContext.mutateAsync({
+          industry: data.industry,
+          companyStage: data.companyStage,
+          teamDistribution: data.teamDistribution,
+          developmentMethod: data.developmentMethod,
+          primaryChallenges: data.primaryChallenges,
+          riskTolerance: data.riskTolerance,
+        })
+      }
+
       // Send invites if any were added
       const validInvites = data.invites.filter(inv => inv.email.trim())
       await completeOnboarding.mutateAsync({
@@ -116,7 +129,7 @@ export function StepScanning({ data, onComplete }: StepScanningProps) {
       // Try redirect anyway
       window.location.href = '/dashboard'
     }
-  }, [completeOnboarding, data.invites])
+  }, [completeOnboarding, saveCompanyContext, data])
 
   const currentPhase = SCANNING_PHASES[phaseIndex]
   const connectedIntegrations = integrationsData?.connected || []

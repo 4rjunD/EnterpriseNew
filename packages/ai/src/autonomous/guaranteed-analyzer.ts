@@ -1,5 +1,6 @@
 import { prisma, TaskStatus, TaskPriority, TaskSource, BottleneckType, BottleneckSeverity, PredictionType } from '@nexflow/database'
 import Anthropic from '@anthropic-ai/sdk'
+import { ContextBasedAnalyzer } from './context-analyzer'
 
 interface ContentStats {
   taskCount: number
@@ -12,12 +13,16 @@ interface AnalysisResult extends ContentStats {
   tasksCreated: number
   bottlenecksCreated: number
   predictionsCreated: number
+  contextAnalysisRan: boolean
 }
 
 /**
  * GuaranteedAnalyzer ensures the dashboard is NEVER empty after GitHub connection.
  * It provides baseline content when repos haven't been analyzed yet, and generates
  * real insights once repo analysis is available.
+ *
+ * For new accounts, it uses ContextBasedAnalyzer to generate AI-powered insights
+ * from company context (industry, stage, methodology, etc.).
  */
 export class GuaranteedAnalyzer {
   private organizationId: string
@@ -46,6 +51,7 @@ export class GuaranteedAnalyzer {
     let tasksCreated = 0
     let bottlenecksCreated = 0
     let predictionsCreated = 0
+    let contextAnalysisRan = false
 
     // 1. Get selected repos
     const selectedRepos = await prisma.selectedRepository.findMany({
@@ -55,8 +61,42 @@ export class GuaranteedAnalyzer {
     // 2. Get current content stats
     const stats = await this.getContentStats()
 
-    // 3. Ensure minimum tasks
-    if (stats.taskCount === 0) {
+    // 3. Check if we should run context-based analysis
+    // Run if: no repos selected AND (no tasks OR no predictions OR no bottlenecks)
+    const needsContextAnalysis =
+      selectedRepos.length === 0 &&
+      (stats.taskCount === 0 || stats.bottleneckCount === 0 || stats.predictionCount === 0)
+
+    if (needsContextAnalysis) {
+      // Try context-based AI analysis first
+      try {
+        const contextAnalyzer = new ContextBasedAnalyzer(this.organizationId)
+        const contextResults = await contextAnalyzer.run()
+
+        tasksCreated += contextResults.predictionsCreated // Tasks created from context
+        bottlenecksCreated += contextResults.bottlenecksCreated
+        predictionsCreated += contextResults.predictionsCreated
+        contextAnalysisRan = true
+
+        // Return early if context analysis generated content
+        if (tasksCreated > 0 || bottlenecksCreated > 0 || predictionsCreated > 0) {
+          return {
+            ...stats,
+            selectedRepoCount: selectedRepos.length,
+            tasksCreated,
+            bottlenecksCreated,
+            predictionsCreated,
+            contextAnalysisRan,
+          }
+        }
+      } catch (error) {
+        console.error('Context-based analysis failed:', error)
+        // Fall through to baseline generation
+      }
+    }
+
+    // 4. Ensure minimum tasks
+    if (stats.taskCount === 0 && tasksCreated === 0) {
       if (selectedRepos.length > 0) {
         tasksCreated = await this.generateTasksFromRepos(selectedRepos)
       }
@@ -66,8 +106,8 @@ export class GuaranteedAnalyzer {
       }
     }
 
-    // 4. Ensure minimum bottlenecks (risks)
-    if (stats.bottleneckCount === 0) {
+    // 5. Ensure minimum bottlenecks (risks)
+    if (stats.bottleneckCount === 0 && bottlenecksCreated === 0) {
       if (selectedRepos.length > 0) {
         bottlenecksCreated = await this.generateBottlenecksFromRepos(selectedRepos)
       }
@@ -76,8 +116,8 @@ export class GuaranteedAnalyzer {
       }
     }
 
-    // 5. Ensure minimum predictions
-    if (stats.predictionCount === 0) {
+    // 6. Ensure minimum predictions
+    if (stats.predictionCount === 0 && predictionsCreated === 0) {
       if (selectedRepos.length > 0) {
         predictionsCreated = await this.generatePredictionsFromRepos(selectedRepos)
       }
@@ -92,6 +132,7 @@ export class GuaranteedAnalyzer {
       tasksCreated,
       bottlenecksCreated,
       predictionsCreated,
+      contextAnalysisRan,
     }
   }
 
