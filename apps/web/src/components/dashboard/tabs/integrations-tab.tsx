@@ -1,12 +1,16 @@
 'use client'
 
+import { useState, useEffect } from 'react'
+import { useSearchParams } from 'next/navigation'
 import { cn } from '@nexflow/ui/utils'
 import { Card, CardContent } from '@/components/nf/card'
 import { Badge } from '@/components/nf/badge'
 import { Button } from '@/components/nf/button'
 import { BreathingDot } from '@/components/nf/breathing-dot'
 import { trpc } from '@/lib/trpc'
-import { Plug, RefreshCw, AlertCircle, CheckCircle2 } from 'lucide-react'
+import { toast } from '@nexflow/ui/toast'
+import { Plug, RefreshCw, AlertCircle, CheckCircle2, GitBranch } from 'lucide-react'
+import { RepoSelectionModal } from '@/components/integrations/repo-selection-modal'
 
 // Integration icons
 const GitHubIcon = () => (
@@ -256,12 +260,44 @@ function IntegrationStats({ connected, total }: { connected: number; total: numb
 
 export function IntegrationsTab() {
   const utils = trpc.useUtils()
+  const searchParams = useSearchParams()
+  const [showRepoModal, setShowRepoModal] = useState(false)
+
   const { data, isLoading } = trpc.integrations.list.useQuery()
+  const { data: githubRepos, isLoading: reposLoading, refetch: refetchRepos } = trpc.integrations.listGithubRepos.useQuery(
+    undefined,
+    { enabled: showRepoModal }
+  )
+  const { data: selectedRepos } = trpc.repositories.listSelected.useQuery()
+
   const syncMutation = trpc.integrations.triggerSync.useMutation({
     onSuccess: () => {
       utils.integrations.list.invalidate()
     },
   })
+
+  // Check for showRepoSelection param (from GitHub OAuth callback)
+  useEffect(() => {
+    const shouldShowRepoSelection = searchParams.get('showRepoSelection') === 'true'
+    const success = searchParams.get('success')
+
+    if (shouldShowRepoSelection && success === 'github_connected') {
+      // Delay modal to let the page render
+      const timer = setTimeout(() => {
+        setShowRepoModal(true)
+        toast({
+          title: 'GitHub connected!',
+          description: 'Select which repositories NexFlow should track',
+        })
+        // Clean up URL params
+        const url = new URL(window.location.href)
+        url.searchParams.delete('showRepoSelection')
+        url.searchParams.delete('success')
+        window.history.replaceState({}, '', url.toString())
+      }, 500)
+      return () => clearTimeout(timer)
+    }
+  }, [searchParams])
 
   const handleConnect = (type: string) => {
     const url = oauthUrls[type]
@@ -272,6 +308,11 @@ export function IntegrationsTab() {
 
   const handleSync = (type: string) => {
     syncMutation.mutate({ type })
+  }
+
+  const handleOpenRepoModal = () => {
+    setShowRepoModal(true)
+    refetchRepos()
   }
 
   if (isLoading) {
@@ -338,6 +379,10 @@ export function IntegrationsTab() {
     )
   }
 
+  // Check if GitHub is connected
+  const isGitHubConnected = connected.some(i => i.type === 'GITHUB')
+  const selectedRepoCount = selectedRepos?.length || 0
+
   return (
     <div className="p-6 space-y-6">
       <div>
@@ -348,6 +393,37 @@ export function IntegrationsTab() {
       </div>
 
       <IntegrationStats connected={connectedCount} total={totalCount} />
+
+      {/* Selected Repositories Card - Show when GitHub is connected */}
+      {isGitHubConnected && (
+        <Card hover>
+          <CardContent className="p-5">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-lg bg-status-success/10 flex items-center justify-center">
+                  <GitBranch className="w-5 h-5 text-status-success" />
+                </div>
+                <div>
+                  <h3 className="text-base font-medium text-foreground">Tracked Repositories</h3>
+                  <p className="text-sm text-foreground-secondary">
+                    {selectedRepoCount > 0
+                      ? `${selectedRepoCount} repositor${selectedRepoCount === 1 ? 'y' : 'ies'} being analyzed`
+                      : 'No repositories selected yet'}
+                  </p>
+                </div>
+              </div>
+              <Button
+                variant={selectedRepoCount > 0 ? 'secondary' : 'primary'}
+                size="sm"
+                onClick={handleOpenRepoModal}
+              >
+                <GitBranch className="w-4 h-4 mr-1.5" />
+                {selectedRepoCount > 0 ? 'Manage Repos' : 'Select Repos'}
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {filteredIntegrations.map(integration => (
@@ -378,6 +454,27 @@ export function IntegrationsTab() {
           </div>
         </div>
       </div>
+
+      {/* Repo Selection Modal */}
+      <RepoSelectionModal
+        isOpen={showRepoModal}
+        onClose={() => setShowRepoModal(false)}
+        availableRepos={(githubRepos || []).map(repo => ({
+          id: repo.id,
+          owner: repo.owner,
+          name: repo.name,
+          fullName: repo.fullName,
+          description: repo.description,
+          url: repo.url,
+          language: repo.language,
+          defaultBranch: repo.defaultBranch,
+          isPrivate: repo.isPrivate,
+          stars: repo.stars || 0,
+          updatedAt: repo.updatedAt,
+        }))}
+        isLoading={reposLoading}
+        onRefresh={() => refetchRepos()}
+      />
     </div>
   )
 }

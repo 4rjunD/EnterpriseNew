@@ -216,6 +216,30 @@ export const integrationsRouter = router({
       }
     }),
 
+  // List available GitHub repositories for selection
+  listGithubRepos: protectedProcedure.query(async ({ ctx }) => {
+    const integration = await prisma.integration.findFirst({
+      where: {
+        organizationId: ctx.organizationId,
+        type: 'GITHUB',
+        status: { in: ['CONNECTED', 'SYNCING'] },
+      },
+    })
+
+    if (!integration || !integration.accessToken) {
+      return []
+    }
+
+    try {
+      const client = new GitHubClient(ctx.organizationId)
+      const repos = await client.listUserRepositories()
+      return repos
+    } catch (e) {
+      console.error('Failed to list GitHub repos:', e)
+      return []
+    }
+  }),
+
   // Sync all connected integrations at once
   syncAll: protectedProcedure.mutation(async ({ ctx }) => {
     // Get all connected or syncing integrations (include SYNCING to fix stuck ones)

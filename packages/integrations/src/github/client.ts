@@ -283,4 +283,68 @@ export class GitHubClient implements IntegrationClient {
       return CIStatus.UNKNOWN
     }
   }
+
+  /**
+   * List all repositories the authenticated user has access to.
+   * Used for repository selection UI.
+   */
+  async listUserRepositories(): Promise<Array<{
+    id: number
+    owner: string
+    name: string
+    fullName: string
+    description: string | null
+    url: string
+    language: string | null
+    defaultBranch: string
+    isPrivate: boolean
+    stars: number
+    updatedAt: string
+  }>> {
+    const client = await this.getClient()
+
+    try {
+      // Fetch user's repos (including org repos they have access to)
+      const repos: Array<{
+        id: number
+        owner: { login: string }
+        name: string
+        full_name: string
+        description: string | null
+        html_url: string
+        language: string | null
+        default_branch: string
+        private: boolean
+        stargazers_count: number
+        pushed_at: string | null
+      }> = []
+
+      // Use pagination to get all repos
+      for await (const response of client.paginate.iterator(
+        client.repos.listForAuthenticatedUser,
+        { per_page: 100, sort: 'pushed' }
+      )) {
+        repos.push(...response.data)
+        // Limit to 200 repos to avoid too many API calls
+        if (repos.length >= 200) break
+      }
+
+      return repos.map(repo => ({
+        id: repo.id,
+        owner: repo.owner.login,
+        name: repo.name,
+        fullName: repo.full_name,
+        description: repo.description,
+        url: repo.html_url,
+        language: repo.language,
+        defaultBranch: repo.default_branch,
+        isPrivate: repo.private,
+        stars: repo.stargazers_count,
+        updatedAt: repo.pushed_at || new Date().toISOString(),
+      }))
+    } catch (e) {
+      console.error('Failed to list repositories:', e)
+      throw e
+    }
+  }
 }

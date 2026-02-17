@@ -35,6 +35,9 @@ model Organization {
   tasks               Task[]
   pullRequests        PullRequest[]
   integrationData     IntegrationData[]
+  selectedRepos       SelectedRepository[]
+  knowledgeBase       OrganizationKnowledgeBase?
+  repoAnalysisCache   RepoAnalysisCache[]
 
   @@map("organizations")
 }
@@ -243,12 +246,13 @@ model Project {
   teamId         String?
   team           Team?        @relation(fields: [teamId], references: [id])
 
-  tasks             Task[]
-  pullRequests      PullRequest[]
-  predictions       Prediction[]
-  bottlenecks       Bottleneck[]
-  context           ProjectContext?
-  progressSnapshots ProgressSnapshot[]
+  tasks              Task[]
+  pullRequests       PullRequest[]
+  predictions        Prediction[]
+  bottlenecks        Bottleneck[]
+  context            ProjectContext?
+  progressSnapshots  ProgressSnapshot[]
+  selectedRepos      SelectedRepository[]
 
   @@unique([organizationId, key])
   @@index([organizationId])
@@ -962,4 +966,91 @@ model HeartbeatConfig {
   updatedAt         DateTime   @updatedAt
 
   @@map("heartbeat_configs")
+}
+
+// ============================================================================
+// Repository Selection & Analysis
+// ============================================================================
+
+model SelectedRepository {
+  id              String       @id @default(cuid())
+  organizationId  String
+  organization    Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  // GitHub repo info
+  owner           String
+  name            String
+  fullName        String       // "owner/name"
+  description     String?
+  url             String
+  language        String?
+  defaultBranch   String       @default("main")
+  isPrivate       Boolean      @default(false)
+
+  // Link to NexFlow project (optional)
+  projectId       String?
+  project         Project?     @relation(fields: [projectId], references: [id])
+
+  // Sync settings
+  syncEnabled     Boolean      @default(true)
+
+  // Cached metrics from analysis
+  lastAnalyzedAt    DateTime?
+  completenessScore Int?
+  openPRCount       Int          @default(0)
+  openIssueCount    Int          @default(0)
+  todoCount         Int          @default(0)
+
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+
+  @@unique([organizationId, fullName])
+  @@index([organizationId])
+  @@map("selected_repositories")
+}
+
+model OrganizationKnowledgeBase {
+  id              String       @id @default(cuid())
+  organizationId  String       @unique
+  organization    Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  // AI-generated insights
+  techStackSummary    String?   @db.Text
+  architectureSummary String?   @db.Text
+  recommendations     Json?
+
+  // Goal alignment (vs ProjectContext)
+  goalProgress        Json?
+
+  // Metrics
+  totalRepos          Int       @default(0)
+  avgCompleteness     Float     @default(0)
+  totalTodos          Int       @default(0)
+  totalOpenPRs        Int       @default(0)
+
+  lastAnalyzedAt      DateTime?
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+
+  @@map("organization_knowledge_base")
+}
+
+model RepoAnalysisCache {
+  id              String       @id @default(cuid())
+  organizationId  String
+  organization    Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  repoFullName    String
+
+  // Cached analysis results
+  structure       Json         // hasTests, hasCI, hasDocs
+  codeInsights    Json         // todos, fixmes with file/line
+  metrics         Json         // completeness, PRs, issues
+
+  analyzedAt      DateTime
+  expiresAt       DateTime     // 24h cache
+
+  @@unique([organizationId, repoFullName])
+  @@index([organizationId])
+  @@map("repo_analysis_cache")
 }

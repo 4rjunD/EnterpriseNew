@@ -1,9 +1,47 @@
 import { z } from 'zod'
 import { router, protectedProcedure } from '../trpc'
 import { prisma } from '@nexflow/database'
-import { BottleneckDetector, PredictionEngine } from '@nexflow/ai'
+import { BottleneckDetector, PredictionEngine, GuaranteedAnalyzer } from '@nexflow/ai'
+
+// Cache for ensureContent to avoid running on every request
+const contentEnsureCache = new Map<string, number>()
+const CONTENT_ENSURE_INTERVAL = 5 * 60 * 1000 // 5 minutes
 
 export const dashboardRouter = router({
+  // Ensure dashboard has content (baseline tasks, predictions, etc.)
+  // Called on dashboard load with caching to avoid repeated runs
+  ensureContent: protectedProcedure.mutation(async ({ ctx }) => {
+    const cacheKey = ctx.organizationId
+    const lastRun = contentEnsureCache.get(cacheKey) || 0
+    const now = Date.now()
+
+    // Skip if run recently
+    if (now - lastRun < CONTENT_ENSURE_INTERVAL) {
+      return { skipped: true, reason: 'recent_run' }
+    }
+
+    try {
+      const analyzer = new GuaranteedAnalyzer(ctx.organizationId)
+      const stats = await analyzer.getContentStats()
+
+      // Only run if content is empty
+      if (stats.taskCount === 0 || stats.bottleneckCount === 0 || stats.predictionCount === 0) {
+        const result = await analyzer.ensureContent()
+        contentEnsureCache.set(cacheKey, now)
+        return {
+          skipped: false,
+          ...result,
+        }
+      }
+
+      contentEnsureCache.set(cacheKey, now)
+      return { skipped: true, reason: 'has_content', ...stats }
+    } catch (error) {
+      console.error('ensureContent failed:', error)
+      return { skipped: true, reason: 'error', error: String(error) }
+    }
+  }),
+
   getHealthScore: protectedProcedure.query(async ({ ctx }) => {
     const [
       totalTasks,

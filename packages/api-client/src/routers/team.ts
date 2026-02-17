@@ -8,6 +8,7 @@ export const teamRouter = router({
       teamId: z.string().optional(),
       status: z.string().optional(),
       search: z.string().optional(),
+      includePendingInvites: z.boolean().optional().default(false),
     }).optional().default({}))
     .query(async ({ ctx, input }) => {
       const users = await prisma.user.findMany({
@@ -40,13 +41,14 @@ export const teamRouter = router({
         orderBy: { name: 'asc' },
       })
 
-      return users.map(user => ({
+      const members = users.map(user => ({
         id: user.id,
         name: user.name,
         email: user.email,
         image: user.image,
         role: user.role,
         status: user.status,
+        isPending: false as const,
         teams: user.teamMemberships.map(tm => ({
           id: tm.team.id,
           name: tm.team.name,
@@ -57,6 +59,36 @@ export const teamRouter = router({
           openPRs: user._count.pullRequests,
         },
       }))
+
+      // Include pending invitations if requested
+      if (input.includePendingInvites) {
+        const pendingInvitations = await prisma.invitation.findMany({
+          where: {
+            organizationId: ctx.organizationId,
+            status: 'PENDING',
+            ...(input.teamId && { teamId: input.teamId }),
+          },
+          include: {
+            team: { select: { id: true, name: true } },
+          },
+        })
+
+        const pendingMembers = pendingInvitations.map(inv => ({
+          id: inv.id,
+          name: null,
+          email: inv.email,
+          image: null,
+          role: inv.role,
+          status: 'PENDING' as const,
+          isPending: true as const,
+          teams: inv.team ? [{ id: inv.team.id, name: inv.team.name, role: 'MEMBER' as const }] : [],
+          workload: { activeTasks: 0, openPRs: 0 },
+        }))
+
+        return [...members, ...pendingMembers]
+      }
+
+      return members
     }),
 
   getWorkloadHeatmap: managerProcedure

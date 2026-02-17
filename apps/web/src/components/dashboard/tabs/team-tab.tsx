@@ -13,6 +13,7 @@ interface TeamMember {
   image: string | null
   role: string
   status: string
+  isPending?: boolean
   teams: Array<{ id: string; name: string; role: string }>
   workload: {
     activeTasks: number
@@ -23,13 +24,14 @@ interface TeamMember {
 function MemberCard({ member }: { member: TeamMember }) {
   const totalWork = member.workload.activeTasks + member.workload.openPRs
   const isOverloaded = totalWork > 10
-  const hasWork = totalWork > 0
+  const isPending = member.isPending
 
   return (
     <div
       className={cn(
         'bg-[#0a0a0a] border border-[#1a1a1a] rounded-md transition-colors hover:border-[#252525]',
-        isOverloaded && 'border-l-2 border-l-[#f5a623]'
+        isOverloaded && !isPending && 'border-l-2 border-l-[#f5a623]',
+        isPending && 'border-dashed opacity-75'
       )}
     >
       <div className="p-4">
@@ -42,31 +44,45 @@ function MemberCard({ member }: { member: TeamMember }) {
                 className="w-9 h-9 rounded-full object-cover"
               />
             ) : (
-              <div className="w-9 h-9 rounded-full bg-[#1a1a1a] flex items-center justify-center text-[13px] font-medium text-[#ededed]">
+              <div className={cn(
+                'w-9 h-9 rounded-full flex items-center justify-center text-[13px] font-medium',
+                isPending ? 'bg-[#252525] text-[#555]' : 'bg-[#1a1a1a] text-[#ededed]'
+              )}>
                 {(member.name || member.email).charAt(0).toUpperCase()}
               </div>
             )}
-            <div className={cn(
-              'absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full border-2 border-[#0a0a0a]',
-              member.status === 'ONLINE' && 'bg-[#50e3c2]',
-              member.status === 'AWAY' && 'bg-[#f5a623]',
-              member.status === 'OFFLINE' && 'bg-[#555]'
-            )} />
+            {!isPending && (
+              <div className={cn(
+                'absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full border-2 border-[#0a0a0a]',
+                member.status === 'ONLINE' && 'bg-[#50e3c2]',
+                member.status === 'AWAY' && 'bg-[#f5a623]',
+                member.status === 'OFFLINE' && 'bg-[#555]'
+              )} />
+            )}
           </div>
 
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2">
-              <span className="text-[13px] font-medium text-[#ededed] truncate">
+              <span className={cn(
+                'text-[13px] font-medium truncate',
+                isPending ? 'text-[#888]' : 'text-[#ededed]'
+              )}>
                 {member.name || member.email.split('@')[0]}
               </span>
-              <span className={cn(
-                'text-[10px] font-mono uppercase tracking-[0.5px]',
-                member.role === 'ADMIN' && 'text-[#50e3c2]',
-                member.role === 'MANAGER' && 'text-[#a78bfa]',
-                member.role === 'IC' && 'text-[#555]'
-              )}>
-                {member.role}
-              </span>
+              {isPending ? (
+                <span className="text-[10px] font-mono uppercase tracking-[0.5px] text-[#f5a623] px-1.5 py-0.5 bg-[#f5a623]/10 rounded">
+                  PENDING
+                </span>
+              ) : (
+                <span className={cn(
+                  'text-[10px] font-mono uppercase tracking-[0.5px]',
+                  member.role === 'ADMIN' && 'text-[#50e3c2]',
+                  member.role === 'MANAGER' && 'text-[#a78bfa]',
+                  member.role === 'IC' && 'text-[#555]'
+                )}>
+                  {member.role}
+                </span>
+              )}
             </div>
             <p className="text-[11px] font-mono text-[#555] truncate">{member.email}</p>
           </div>
@@ -85,41 +101,48 @@ function MemberCard({ member }: { member: TeamMember }) {
           </div>
         )}
 
-        <div className="pt-3 border-t border-[#1a1a1a]">
-          <div className="grid grid-cols-2 gap-px bg-[#1a1a1a] rounded overflow-hidden">
-            <div className="bg-[#0a0a0a] p-2 text-center">
-              <div className={cn(
-                'text-[16px] font-mono font-semibold',
-                member.workload.activeTasks > 5 ? 'text-[#f5a623]' : 'text-[#ededed]'
-              )}>
-                {member.workload.activeTasks}
+        {isPending ? (
+          <div className="pt-3 border-t border-[#1a1a1a] flex items-center justify-center py-3">
+            <span className="text-[11px] text-[#555]">Invitation sent • Awaiting acceptance</span>
+          </div>
+        ) : (
+          <div className="pt-3 border-t border-[#1a1a1a]">
+            <div className="grid grid-cols-2 gap-px bg-[#1a1a1a] rounded overflow-hidden">
+              <div className="bg-[#0a0a0a] p-2 text-center">
+                <div className={cn(
+                  'text-[16px] font-mono font-semibold',
+                  member.workload.activeTasks > 5 ? 'text-[#f5a623]' : 'text-[#ededed]'
+                )}>
+                  {member.workload.activeTasks}
+                </div>
+                <div className="text-[10px] font-mono uppercase tracking-[0.5px] text-[#555]">Tasks</div>
               </div>
-              <div className="text-[10px] font-mono uppercase tracking-[0.5px] text-[#555]">Tasks</div>
-            </div>
-            <div className="bg-[#0a0a0a] p-2 text-center">
-              <div className="text-[16px] font-mono font-semibold text-[#ededed]">
-                {member.workload.openPRs}
+              <div className="bg-[#0a0a0a] p-2 text-center">
+                <div className="text-[16px] font-mono font-semibold text-[#ededed]">
+                  {member.workload.openPRs}
+                </div>
+                <div className="text-[10px] font-mono uppercase tracking-[0.5px] text-[#555]">Open PRs</div>
               </div>
-              <div className="text-[10px] font-mono uppercase tracking-[0.5px] text-[#555]">Open PRs</div>
             </div>
           </div>
-        </div>
+        )}
       </div>
     </div>
   )
 }
 
 function TeamStats({ members }: { members: TeamMember[] }) {
-  const totalTasks = members.reduce((acc, m) => acc + m.workload.activeTasks, 0)
-  const totalPRs = members.reduce((acc, m) => acc + m.workload.openPRs, 0)
-  const online = members.filter(m => m.status === 'ONLINE').length
-  const overloaded = members.filter(m => m.workload.activeTasks + m.workload.openPRs > 10).length
+  const activeMembers = members.filter(m => !m.isPending)
+  const pendingMembers = members.filter(m => m.isPending)
+  const totalTasks = activeMembers.reduce((acc, m) => acc + m.workload.activeTasks, 0)
+  const totalPRs = activeMembers.reduce((acc, m) => acc + m.workload.openPRs, 0)
+  const online = activeMembers.filter(m => m.status === 'ONLINE').length
 
   const stats = [
-    { value: members.length.toString(), label: 'Team Members', color: '#ededed' },
+    { value: activeMembers.length.toString(), label: 'Team Members', color: '#ededed' },
     { value: totalTasks.toString(), label: 'Active Tasks', color: '#ededed' },
     { value: totalPRs.toString(), label: 'Open PRs', color: '#ededed' },
-    { value: `${online}/${members.length}`, label: 'Online', color: '#50e3c2' },
+    { value: pendingMembers.length > 0 ? `${online}/${activeMembers.length} (+${pendingMembers.length})` : `${online}/${activeMembers.length}`, label: pendingMembers.length > 0 ? 'Online (Pending)' : 'Online', color: '#50e3c2' },
   ]
 
   return (
@@ -174,7 +197,7 @@ function LoadingSkeleton() {
 }
 
 export function TeamTab() {
-  const { data: members, isLoading } = trpc.team.listMembers.useQuery({})
+  const { data: members, isLoading } = trpc.team.listMembers.useQuery({ includePendingInvites: true })
   const [sortBy, setSortBy] = useState<'name' | 'tasks' | 'status'>('tasks')
 
   if (isLoading) {
@@ -198,14 +221,21 @@ export function TeamTab() {
     )
   }
 
-  // Sort team
-  const sortedTeam = [...teamMembers].sort((a, b) => {
+  // Separate active members and pending invitations
+  const activeMembers = teamMembers.filter(m => !m.isPending)
+  const pendingMembers = teamMembers.filter(m => m.isPending)
+
+  // Sort active members
+  const sortedActive = [...activeMembers].sort((a, b) => {
     if (sortBy === 'name') return (a.name || a.email).localeCompare(b.name || b.email)
     if (sortBy === 'tasks') return b.workload.activeTasks - a.workload.activeTasks
     // Sort by status: online first, then away, then offline
     const statusOrder = { ONLINE: 0, AWAY: 1, OFFLINE: 2 }
     return (statusOrder[a.status as keyof typeof statusOrder] || 2) - (statusOrder[b.status as keyof typeof statusOrder] || 2)
   })
+
+  // Pending members at the end
+  const sortedTeam = [...sortedActive, ...pendingMembers]
 
   return (
     <div className="space-y-4">

@@ -1,7 +1,8 @@
 export * from './predictions'
 export * from './agents'
 export { BottleneckDetector } from './bottleneck-detector'
-export { AutonomousAnalyzer, type AnalysisResult } from './autonomous'
+export { AutonomousAnalyzer, GuaranteedAnalyzer, type AnalysisResult } from './autonomous'
+export { KnowledgeBaseBuilder } from './knowledge-base'
 
 // AI Agent Chat System
 // Re-export specific items to avoid conflicts with ./agents AgentContext

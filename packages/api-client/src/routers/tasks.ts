@@ -3,6 +3,111 @@ import { router, protectedProcedure, managerProcedure } from '../trpc'
 import { prisma, TaskStatus, TaskPriority, TaskSource } from '@nexflow/database'
 
 export const tasksRouter = router({
+  // Unified TODOs for dashboard - combines tasks, PRs, and repo insights
+  getUnifiedTodos: protectedProcedure.query(async ({ ctx }) => {
+    const [tasks, prsToReview, selectedRepos] = await Promise.all([
+      // User's assigned tasks (not done)
+      prisma.task.findMany({
+        where: {
+          organizationId: ctx.organizationId,
+          assigneeId: ctx.userId,
+          status: { notIn: ['DONE', 'CANCELLED'] },
+        },
+        orderBy: [
+          { priority: 'desc' },
+          { dueDate: 'asc' },
+        ],
+        take: 15,
+        include: {
+          project: { select: { id: true, name: true, key: true } },
+        },
+      }),
+
+      // Open PRs in tracked repos
+      prisma.pullRequest.findMany({
+        where: {
+          organizationId: ctx.organizationId,
+          status: 'OPEN',
+        },
+        orderBy: { createdAt: 'asc' },
+        take: 10,
+        include: {
+          author: { select: { id: true, name: true, image: true } },
+        },
+      }),
+
+      // Selected repos with metrics
+      prisma.selectedRepository.findMany({
+        where: { organizationId: ctx.organizationId, syncEnabled: true },
+        select: {
+          id: true,
+          fullName: true,
+          description: true,
+          language: true,
+          completenessScore: true,
+          openPRCount: true,
+          openIssueCount: true,
+          todoCount: true,
+          lastAnalyzedAt: true,
+        },
+        orderBy: { updatedAt: 'desc' },
+      }),
+    ])
+
+    // Calculate summary stats
+    const totalTasks = tasks.length
+    const urgentTasks = tasks.filter(t => t.priority === 'URGENT' || t.priority === 'HIGH').length
+    const overdueTasks = tasks.filter(t => t.dueDate && new Date(t.dueDate) < new Date()).length
+    const totalPRs = prsToReview.length
+    const totalTodos = selectedRepos.reduce((sum, r) => sum + r.todoCount, 0)
+
+    return {
+      tasks: tasks.map(t => ({
+        id: t.id,
+        title: t.title,
+        status: t.status,
+        priority: t.priority,
+        dueDate: t.dueDate,
+        source: t.source,
+        externalUrl: t.externalUrl,
+        labels: t.labels,
+        project: t.project,
+      })),
+      prsToReview: prsToReview.map(pr => ({
+        id: pr.id,
+        number: pr.number,
+        title: pr.title,
+        url: pr.url,
+        repository: pr.repository,
+        isDraft: pr.isDraft,
+        createdAt: pr.createdAt,
+        additions: pr.additions,
+        deletions: pr.deletions,
+        author: pr.author,
+        isStuck: pr.isStuck,
+      })),
+      repoStats: selectedRepos.map(r => ({
+        id: r.id,
+        fullName: r.fullName,
+        description: r.description,
+        language: r.language,
+        completenessScore: r.completenessScore,
+        openPRCount: r.openPRCount,
+        openIssueCount: r.openIssueCount,
+        todoCount: r.todoCount,
+        lastAnalyzedAt: r.lastAnalyzedAt,
+      })),
+      summary: {
+        totalTasks,
+        urgentTasks,
+        overdueTasks,
+        totalPRs,
+        totalTodos,
+        hasContent: totalTasks > 0 || totalPRs > 0 || selectedRepos.length > 0,
+      },
+    }
+  }),
+
   list: protectedProcedure
     .input(z.object({
       projectId: z.string().optional(),

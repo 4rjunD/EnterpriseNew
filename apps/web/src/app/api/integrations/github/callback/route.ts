@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { GitHubClient } from '@nexflow/integrations/github'
+import { GuaranteedAnalyzer } from '@nexflow/ai'
 
 export const dynamic = 'force-dynamic'
 
@@ -46,7 +47,18 @@ export async function GET(req: NextRequest) {
       // Don't fail the OAuth flow if sync fails - it will retry later
     }
 
-    return NextResponse.redirect(`${baseUrl}${redirectPath}&success=github_connected`)
+    // Ensure dashboard has content (baseline tasks, predictions, etc.)
+    try {
+      const guaranteedAnalyzer = new GuaranteedAnalyzer(organizationId)
+      const result = await guaranteedAnalyzer.ensureContent()
+      console.log(`Guaranteed content generated: ${result.tasksCreated} tasks, ${result.bottlenecksCreated} bottlenecks, ${result.predictionsCreated} predictions`)
+    } catch (analyzerError) {
+      console.error('Guaranteed analyzer failed (non-blocking):', analyzerError)
+      // Don't fail - dashboard will still work, just maybe empty initially
+    }
+
+    // Add showRepoSelection flag to prompt user to select repos
+    return NextResponse.redirect(`${baseUrl}${redirectPath}&success=github_connected&showRepoSelection=true`)
   } catch (error) {
     console.error('GitHub OAuth error:', error)
     return NextResponse.redirect(`${baseUrl}${redirectPath}&error=github_failed`)

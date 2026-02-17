@@ -2,7 +2,17 @@
 
 import { cn } from '@nexflow/ui/utils'
 import { trpc } from '@/lib/trpc'
-import { CheckCircle2, Circle, AlertCircle, Clock, Inbox, Plug } from 'lucide-react'
+import {
+  CheckCircle2,
+  Circle,
+  GitPullRequest,
+  GitBranch,
+  AlertCircle,
+  Clock,
+  Plug,
+  ExternalLink,
+  ChevronRight,
+} from 'lucide-react'
 import Link from 'next/link'
 
 function EmptyState({ hasIntegrations }: { hasIntegrations: boolean }) {
@@ -31,7 +41,7 @@ function EmptyState({ hasIntegrations }: { hasIntegrations: boolean }) {
       <div className="w-16 h-16 rounded-full bg-[#1a1a1a] flex items-center justify-center mb-4">
         <CheckCircle2 className="w-8 h-8 text-[#50e3c2]" />
       </div>
-      <h3 className="text-[16px] font-medium text-[#ededed] mb-2">All clear!</h3>
+      <h3 className="text-[16px] font-medium text-[#ededed] mb-2">All caught up!</h3>
       <p className="text-[13px] text-[#888] text-center max-w-md">
         No urgent actions right now. Check back later or sync your integrations to see the latest updates.
       </p>
@@ -39,7 +49,19 @@ function EmptyState({ hasIntegrations }: { hasIntegrations: boolean }) {
   )
 }
 
-function TaskRow({ task }: { task: { id: string; title: string; status: string; priority: string; dueDate: string | null; source: string } }) {
+function TaskRow({ task }: {
+  task: {
+    id: string
+    title: string
+    status: string
+    priority: string
+    dueDate: string | null
+    source: string
+    externalUrl?: string | null
+    labels: string[]
+    project?: { id: string; name: string; key: string } | null
+  }
+}) {
   const isOverdue = task.dueDate && new Date(task.dueDate) < new Date()
   const isDueToday = task.dueDate && new Date(task.dueDate).toDateString() === new Date().toDateString()
 
@@ -55,7 +77,7 @@ function TaskRow({ task }: { task: { id: string; title: string; status: string; 
 
   return (
     <div className={cn(
-      'flex items-center gap-3 p-4 border-b border-[#1a1a1a] last:border-b-0 hover:bg-[#111] transition-colors',
+      'flex items-center gap-3 p-4 border-b border-[#1a1a1a] last:border-b-0 hover:bg-[#111] transition-colors group',
       isOverdue && 'bg-[#ff4444]/5'
     )}>
       <div className="w-5 h-5 rounded-full border border-[#333] flex items-center justify-center flex-shrink-0">
@@ -78,6 +100,12 @@ function TaskRow({ task }: { task: { id: string; title: string; status: string; 
         </div>
         <div className="flex items-center gap-2 mt-1">
           <span className="text-[11px] text-[#555] font-mono uppercase">{task.source}</span>
+          {task.project && (
+            <>
+              <span className="text-[#333]">·</span>
+              <span className="text-[11px] text-[#555]">{task.project.key}</span>
+            </>
+          )}
           {task.dueDate && (
             <>
               <span className="text-[#333]">·</span>
@@ -91,6 +119,140 @@ function TaskRow({ task }: { task: { id: string; title: string; status: string; 
           )}
         </div>
       </div>
+
+      {task.externalUrl && (
+        <a
+          href={task.externalUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="opacity-0 group-hover:opacity-100 text-[#555] hover:text-[#ededed] transition-all"
+        >
+          <ExternalLink className="w-4 h-4" />
+        </a>
+      )}
+    </div>
+  )
+}
+
+function PRCard({ pr }: {
+  pr: {
+    id: string
+    number: number
+    title: string
+    url: string
+    repository: string
+    isDraft: boolean
+    createdAt: string | Date
+    additions: number
+    deletions: number
+    author?: { id: string; name: string | null; image: string | null } | null
+    isStuck: boolean
+  }
+}) {
+  const daysOld = Math.floor((Date.now() - new Date(pr.createdAt).getTime()) / (1000 * 60 * 60 * 24))
+  const isStale = daysOld > 3
+
+  return (
+    <a
+      href={pr.url}
+      target="_blank"
+      rel="noopener noreferrer"
+      className={cn(
+        'block p-3 border-b border-[#1a1a1a] last:border-b-0 hover:bg-[#111] transition-colors',
+        pr.isStuck && 'border-l-2 border-l-[#f5a623]'
+      )}
+    >
+      <div className="flex items-start gap-3">
+        <GitPullRequest className={cn(
+          'w-4 h-4 mt-0.5 flex-shrink-0',
+          pr.isDraft ? 'text-[#555]' : 'text-[#50e3c2]'
+        )} />
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2">
+            <span className="text-[13px] text-[#ededed] truncate">
+              #{pr.number} {pr.title}
+            </span>
+            {pr.isDraft && (
+              <span className="text-[10px] font-mono text-[#555] px-1.5 py-0.5 bg-[#1a1a1a] rounded">DRAFT</span>
+            )}
+            {isStale && !pr.isDraft && (
+              <span className="text-[10px] font-mono text-[#f5a623] px-1.5 py-0.5 bg-[#f5a623]/10 rounded">
+                {daysOld}d OLD
+              </span>
+            )}
+          </div>
+          <div className="flex items-center gap-2 mt-1">
+            <span className="text-[11px] text-[#555] truncate">{pr.repository}</span>
+            <span className="text-[#333]">·</span>
+            <span className="text-[11px] text-[#50e3c2]">+{pr.additions}</span>
+            <span className="text-[11px] text-[#ff4444]">-{pr.deletions}</span>
+            {pr.author && (
+              <>
+                <span className="text-[#333]">·</span>
+                <span className="text-[11px] text-[#555]">{pr.author.name || 'Unknown'}</span>
+              </>
+            )}
+          </div>
+        </div>
+        <ChevronRight className="w-4 h-4 text-[#333] flex-shrink-0" />
+      </div>
+    </a>
+  )
+}
+
+function RepoHealthCard({ repo }: {
+  repo: {
+    id: string
+    fullName: string
+    description: string | null
+    language: string | null
+    completenessScore: number | null
+    openPRCount: number
+    openIssueCount: number
+    todoCount: number
+    lastAnalyzedAt: string | Date | null
+  }
+}) {
+  const score = repo.completenessScore || 0
+  const scoreColor = score >= 80 ? '#50e3c2' : score >= 50 ? '#f5a623' : '#ff4444'
+
+  return (
+    <div className="p-3 bg-[#0a0a0a] rounded-md">
+      <div className="flex items-center justify-between mb-2">
+        <span className="text-[13px] font-medium text-[#ededed] truncate">{repo.fullName}</span>
+        {repo.completenessScore !== null && (
+          <span className="text-[12px] font-mono" style={{ color: scoreColor }}>
+            {score}%
+          </span>
+        )}
+      </div>
+      <div className="flex items-center gap-3 text-[11px] text-[#555]">
+        <span>{repo.openPRCount} PRs</span>
+        <span>{repo.openIssueCount} issues</span>
+        <span>{repo.todoCount} TODOs</span>
+      </div>
+    </div>
+  )
+}
+
+function Section({ title, icon, children, count }: {
+  title: string
+  icon: React.ReactNode
+  children: React.ReactNode
+  count?: number
+}) {
+  return (
+    <div>
+      <div className="flex items-center gap-2 mb-3">
+        <span className="text-[#555]">{icon}</span>
+        <span className="text-[12px] font-medium text-[#888] uppercase tracking-[0.5px]">{title}</span>
+        {count !== undefined && count > 0 && (
+          <span className="text-[10px] font-mono text-[#ededed] px-1.5 py-0.5 bg-[#1a1a1a] rounded">
+            {count}
+          </span>
+        )}
+      </div>
+      {children}
     </div>
   )
 }
@@ -114,41 +276,37 @@ function LoadingSkeleton() {
 
 export function TodayTab() {
   const { data: integrations, isLoading: integrationsLoading } = trpc.integrations.list.useQuery()
-  const { data: tasks, isLoading: tasksLoading } = trpc.tasks.list.useQuery({
-    status: ['TODO', 'IN_PROGRESS', 'IN_REVIEW', 'BLOCKED'],
-    limit: 20,
-  })
+  const { data: unifiedData, isLoading: todosLoading } = trpc.tasks.getUnifiedTodos.useQuery()
 
-  const isLoading = integrationsLoading || tasksLoading
+  // Trigger content guarantee on load (with caching)
+  trpc.dashboard.ensureContent.useMutation()
+
+  const isLoading = integrationsLoading || todosLoading
 
   if (isLoading) {
     return <LoadingSkeleton />
   }
 
   const hasIntegrations = (integrations?.connected?.length || 0) > 0
-  const taskList = tasks?.tasks || []
 
-  // Sort by priority and due date
-  const sortedTasks = [...taskList].sort((a, b) => {
-    const priorityOrder = { URGENT: 0, HIGH: 1, MEDIUM: 2, LOW: 3 }
-    const aPriority = priorityOrder[a.priority as keyof typeof priorityOrder] ?? 2
-    const bPriority = priorityOrder[b.priority as keyof typeof priorityOrder] ?? 2
+  if (!unifiedData || !unifiedData.summary.hasContent) {
+    return (
+      <div className="space-y-4">
+        <div>
+          <h2 className="text-[20px] font-semibold text-[#ededed] tracking-[-0.5px]">Today</h2>
+          <p className="text-[13px] text-[#888] mt-1">
+            Your prioritized action queue
+          </p>
+        </div>
+        <EmptyState hasIntegrations={hasIntegrations} />
+      </div>
+    )
+  }
 
-    if (aPriority !== bPriority) return aPriority - bPriority
-
-    if (a.dueDate && b.dueDate) {
-      return new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime()
-    }
-    return a.dueDate ? -1 : 1
-  })
-
-  // Calculate stats
-  const overdueTasks = taskList.filter(t => t.dueDate && new Date(t.dueDate) < new Date()).length
-  const todayTasks = taskList.filter(t => t.dueDate && new Date(t.dueDate).toDateString() === new Date().toDateString()).length
-  const urgentTasks = taskList.filter(t => t.priority === 'URGENT' || t.priority === 'HIGH').length
+  const { tasks, prsToReview, repoStats, summary } = unifiedData
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-6">
       {/* Header */}
       <div>
         <h2 className="text-[20px] font-semibold text-[#ededed] tracking-[-0.5px]">Today</h2>
@@ -158,57 +316,84 @@ export function TodayTab() {
       </div>
 
       {/* Stats */}
-      {hasIntegrations && taskList.length > 0 && (
-        <div className="grid grid-cols-3 gap-3">
-          <div className="bg-[#0a0a0a] border border-[#1a1a1a] rounded-md p-3">
-            <div className={cn(
-              'text-[20px] font-mono font-semibold',
-              overdueTasks > 0 ? 'text-[#ff4444]' : 'text-[#ededed]'
-            )}>
-              {overdueTasks}
-            </div>
-            <div className="text-[10px] font-mono uppercase tracking-[0.5px] text-[#555] mt-1">Overdue</div>
+      <div className="grid grid-cols-4 gap-3">
+        <div className="bg-[#0a0a0a] border border-[#1a1a1a] rounded-md p-3">
+          <div className={cn(
+            'text-[20px] font-mono font-semibold',
+            summary.overdueTasks > 0 ? 'text-[#ff4444]' : 'text-[#ededed]'
+          )}>
+            {summary.overdueTasks}
           </div>
-          <div className="bg-[#0a0a0a] border border-[#1a1a1a] rounded-md p-3">
-            <div className={cn(
-              'text-[20px] font-mono font-semibold',
-              todayTasks > 0 ? 'text-[#f5a623]' : 'text-[#ededed]'
-            )}>
-              {todayTasks}
-            </div>
-            <div className="text-[10px] font-mono uppercase tracking-[0.5px] text-[#555] mt-1">Due Today</div>
-          </div>
-          <div className="bg-[#0a0a0a] border border-[#1a1a1a] rounded-md p-3">
-            <div className="text-[20px] font-mono font-semibold text-[#ededed]">{urgentTasks}</div>
-            <div className="text-[10px] font-mono uppercase tracking-[0.5px] text-[#555] mt-1">High Priority</div>
-          </div>
+          <div className="text-[10px] font-mono uppercase tracking-[0.5px] text-[#555] mt-1">Overdue</div>
         </div>
+        <div className="bg-[#0a0a0a] border border-[#1a1a1a] rounded-md p-3">
+          <div className={cn(
+            'text-[20px] font-mono font-semibold',
+            summary.urgentTasks > 0 ? 'text-[#f5a623]' : 'text-[#ededed]'
+          )}>
+            {summary.urgentTasks}
+          </div>
+          <div className="text-[10px] font-mono uppercase tracking-[0.5px] text-[#555] mt-1">High Priority</div>
+        </div>
+        <div className="bg-[#0a0a0a] border border-[#1a1a1a] rounded-md p-3">
+          <div className="text-[20px] font-mono font-semibold text-[#ededed]">{summary.totalPRs}</div>
+          <div className="text-[10px] font-mono uppercase tracking-[0.5px] text-[#555] mt-1">Open PRs</div>
+        </div>
+        <div className="bg-[#0a0a0a] border border-[#1a1a1a] rounded-md p-3">
+          <div className="text-[20px] font-mono font-semibold text-[#ededed]">{summary.totalTodos}</div>
+          <div className="text-[10px] font-mono uppercase tracking-[0.5px] text-[#555] mt-1">Code TODOs</div>
+        </div>
+      </div>
+
+      {/* PRs needing attention */}
+      {prsToReview.length > 0 && (
+        <Section title="Pull Requests" icon={<GitPullRequest className="w-4 h-4" />} count={prsToReview.length}>
+          <div className="border border-[#1a1a1a] rounded-md overflow-hidden">
+            {prsToReview.slice(0, 5).map(pr => (
+              <PRCard key={pr.id} pr={pr} />
+            ))}
+            {prsToReview.length > 5 && (
+              <div className="p-3 text-center text-[12px] text-[#555] bg-[#0a0a0a]">
+                +{prsToReview.length - 5} more PRs
+              </div>
+            )}
+          </div>
+        </Section>
       )}
 
-      {/* Task list or empty state */}
-      {!hasIntegrations || taskList.length === 0 ? (
-        <EmptyState hasIntegrations={hasIntegrations} />
-      ) : (
-        <div className="border border-[#1a1a1a] rounded-md overflow-hidden">
-          {sortedTasks.slice(0, 10).map(task => (
-            <TaskRow
-              key={task.id}
-              task={{
-                id: task.id,
-                title: task.title,
-                status: task.status,
-                priority: task.priority,
-                dueDate: task.dueDate,
-                source: task.source,
-              }}
-            />
-          ))}
-          {taskList.length > 10 && (
-            <div className="p-3 text-center text-[12px] text-[#555] bg-[#0a0a0a]">
-              +{taskList.length - 10} more tasks
-            </div>
+      {/* Assigned tasks */}
+      {tasks.length > 0 && (
+        <Section title="Your Tasks" icon={<CheckCircle2 className="w-4 h-4" />} count={tasks.length}>
+          <div className="border border-[#1a1a1a] rounded-md overflow-hidden">
+            {tasks.slice(0, 10).map(task => (
+              <TaskRow key={task.id} task={task} />
+            ))}
+            {tasks.length > 10 && (
+              <div className="p-3 text-center text-[12px] text-[#555] bg-[#0a0a0a]">
+                +{tasks.length - 10} more tasks
+              </div>
+            )}
+          </div>
+        </Section>
+      )}
+
+      {/* Repository health */}
+      {repoStats.length > 0 && (
+        <Section title="Repository Health" icon={<GitBranch className="w-4 h-4" />} count={repoStats.length}>
+          <div className="grid grid-cols-2 gap-2">
+            {repoStats.slice(0, 4).map(repo => (
+              <RepoHealthCard key={repo.id} repo={repo} />
+            ))}
+          </div>
+          {repoStats.length > 4 && (
+            <Link
+              href="/dashboard?card=integrations"
+              className="block mt-2 text-center text-[12px] text-[#555] hover:text-[#888] transition-colors"
+            >
+              View all {repoStats.length} repositories
+            </Link>
           )}
-        </div>
+        </Section>
       )}
     </div>
   )
