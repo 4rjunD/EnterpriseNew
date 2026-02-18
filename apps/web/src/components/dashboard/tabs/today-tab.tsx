@@ -19,6 +19,10 @@ import {
   Lightbulb,
   ShieldAlert,
   Zap,
+  Code2,
+  Bug,
+  FileText,
+  Activity,
 } from 'lucide-react'
 import Link from 'next/link'
 
@@ -50,10 +54,27 @@ function EmptyState({ hasIntegrations }: { hasIntegrations: boolean }) {
       </div>
       <h3 className="text-[16px] font-medium text-[#ededed] mb-2">All caught up!</h3>
       <p className="text-[13px] text-[#888] text-center max-w-md">
-        No urgent actions right now. Check back later or sync your integrations to see the latest updates.
+        No urgent actions right now. Click <strong>Refresh</strong> in the header to generate AI insights.
       </p>
     </div>
   )
+}
+
+// Priority/status detail maps
+const STATUS_DETAILS: Record<string, { label: string; color: string; description: string }> = {
+  BACKLOG: { label: 'Backlog', color: '#555', description: 'Not yet planned for a sprint' },
+  TODO: { label: 'To Do', color: '#888', description: 'Planned and ready to start' },
+  IN_PROGRESS: { label: 'In Progress', color: '#50e3c2', description: 'Currently being worked on' },
+  IN_REVIEW: { label: 'In Review', color: '#a78bfa', description: 'Waiting for code review' },
+  DONE: { label: 'Done', color: '#50e3c2', description: 'Completed' },
+  CANCELLED: { label: 'Cancelled', color: '#ff4444', description: 'Will not be worked on' },
+}
+
+const PRIORITY_DETAILS: Record<string, { label: string; color: string; description: string }> = {
+  URGENT: { label: 'Urgent', color: '#ff4444', description: 'Needs immediate attention — blocking others' },
+  HIGH: { label: 'High', color: '#f5a623', description: 'Important and time-sensitive' },
+  MEDIUM: { label: 'Medium', color: '#888', description: 'Standard priority' },
+  LOW: { label: 'Low', color: '#555', description: 'Nice-to-have, do when time allows' },
 }
 
 function TaskRow({ task }: {
@@ -62,7 +83,7 @@ function TaskRow({ task }: {
     title: string
     status: string
     priority: string
-    dueDate: string | null
+    dueDate: string | Date | null
     source: string
     externalUrl?: string | null
     labels: string[]
@@ -83,6 +104,9 @@ function TaskRow({ task }: {
     : task.priority === 'HIGH'
     ? { label: 'HIGH', color: '#f5a623', bg: 'rgba(245,166,35,0.1)' }
     : { label: 'NORMAL', color: '#555', bg: 'transparent' }
+
+  const statusInfo = STATUS_DETAILS[task.status] || { label: task.status, color: '#555', description: '' }
+  const priorityInfo = PRIORITY_DETAILS[task.priority] || { label: task.priority, color: '#555', description: '' }
 
   return (
     <div
@@ -153,21 +177,46 @@ function TaskRow({ task }: {
 
       {expanded && (
         <div className="px-4 pb-4 border-t border-[#1a1a1a]">
-          <div className="pt-3 ml-8 space-y-2">
-            {task.description && (
-              <p className="text-[12px] text-[#888]">{task.description}</p>
+          <div className="pt-3 ml-8 space-y-3">
+            {/* Description */}
+            {task.description ? (
+              <p className="text-[12px] text-[#888] leading-relaxed">{task.description}</p>
+            ) : (
+              <p className="text-[12px] text-[#555] italic">No description provided</p>
             )}
-            <div className="flex flex-wrap gap-2">
-              {task.labels.map(label => (
-                <span key={label} className="text-[10px] font-mono px-2 py-0.5 bg-[#1a1a1a] rounded text-[#888]">
-                  {label}
-                </span>
-              ))}
+
+            {/* Status and Priority detail */}
+            <div className="grid grid-cols-2 gap-3">
+              <div className="bg-[#111] rounded p-2.5">
+                <span className="text-[10px] text-[#555] uppercase tracking-wide block mb-1">Status</span>
+                <span className="text-[12px] font-medium" style={{ color: statusInfo.color }}>{statusInfo.label}</span>
+                <p className="text-[10px] text-[#555] mt-0.5">{statusInfo.description}</p>
+              </div>
+              <div className="bg-[#111] rounded p-2.5">
+                <span className="text-[10px] text-[#555] uppercase tracking-wide block mb-1">Priority</span>
+                <span className="text-[12px] font-medium" style={{ color: priorityInfo.color }}>{priorityInfo.label}</span>
+                <p className="text-[10px] text-[#555] mt-0.5">{priorityInfo.description}</p>
+              </div>
             </div>
-            <div className="flex items-center gap-3 text-[11px] text-[#555]">
-              <span>Status: <span className="text-[#888]">{task.status}</span></span>
-              <span>Priority: <span style={{ color: urgencyConfig.color }}>{task.priority}</span></span>
-            </div>
+
+            {/* Labels */}
+            {task.labels.length > 0 && (
+              <div className="flex flex-wrap gap-1.5">
+                {task.labels.map(label => (
+                  <span key={label} className="text-[10px] font-mono px-2 py-0.5 bg-[#1a1a1a] rounded text-[#888]">
+                    {label}
+                  </span>
+                ))}
+              </div>
+            )}
+
+            {/* Project info */}
+            {task.project && (
+              <div className="flex items-center gap-2 text-[11px] text-[#555]">
+                <FileText className="w-3 h-3" />
+                <span>Project: <span className="text-[#888]">{task.project.name}</span> ({task.project.key})</span>
+              </div>
+            )}
           </div>
         </div>
       )}
@@ -190,54 +239,93 @@ function PRCard({ pr }: {
     isStuck: boolean
   }
 }) {
+  const [expanded, setExpanded] = useState(false)
   const daysOld = Math.floor((Date.now() - new Date(pr.createdAt).getTime()) / (1000 * 60 * 60 * 24))
   const isStale = daysOld > 3
+  const totalChanges = pr.additions + pr.deletions
+  const sizeLabel = totalChanges > 500 ? 'Large' : totalChanges > 100 ? 'Medium' : 'Small'
+  const sizeColor = totalChanges > 500 ? '#ff4444' : totalChanges > 100 ? '#f5a623' : '#50e3c2'
 
   return (
-    <a
-      href={pr.url}
-      target="_blank"
-      rel="noopener noreferrer"
+    <div
       className={cn(
-        'block p-3 border-b border-[#1a1a1a] last:border-b-0 hover:bg-[#111] transition-colors',
+        'border-b border-[#1a1a1a] last:border-b-0 hover:bg-[#111] transition-colors cursor-pointer',
         pr.isStuck && 'border-l-2 border-l-[#f5a623]'
       )}
+      onClick={() => setExpanded(!expanded)}
     >
-      <div className="flex items-start gap-3">
-        <GitPullRequest className={cn(
-          'w-4 h-4 mt-0.5 flex-shrink-0',
-          pr.isDraft ? 'text-[#555]' : 'text-[#50e3c2]'
-        )} />
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2">
-            <span className="text-[13px] text-[#ededed] truncate">
-              #{pr.number} {pr.title}
-            </span>
-            {pr.isDraft && (
-              <span className="text-[10px] font-mono text-[#555] px-1.5 py-0.5 bg-[#1a1a1a] rounded">DRAFT</span>
-            )}
-            {isStale && !pr.isDraft && (
-              <span className="text-[10px] font-mono text-[#f5a623] px-1.5 py-0.5 bg-[#f5a623]/10 rounded">
-                {daysOld}d OLD
+      <div className="p-3">
+        <div className="flex items-start gap-3">
+          <GitPullRequest className={cn(
+            'w-4 h-4 mt-0.5 flex-shrink-0',
+            pr.isDraft ? 'text-[#555]' : 'text-[#50e3c2]'
+          )} />
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2">
+              <span className="text-[13px] text-[#ededed] truncate">
+                #{pr.number} {pr.title}
               </span>
-            )}
+              {pr.isDraft && (
+                <span className="text-[10px] font-mono text-[#555] px-1.5 py-0.5 bg-[#1a1a1a] rounded">DRAFT</span>
+              )}
+              {isStale && !pr.isDraft && (
+                <span className="text-[10px] font-mono text-[#f5a623] px-1.5 py-0.5 bg-[#f5a623]/10 rounded">
+                  {daysOld}d OLD
+                </span>
+              )}
+            </div>
+            <div className="flex items-center gap-2 mt-1">
+              <span className="text-[11px] text-[#555] truncate">{pr.repository}</span>
+              <span className="text-[#333]">·</span>
+              <span className="text-[11px] text-[#50e3c2]">+{pr.additions}</span>
+              <span className="text-[11px] text-[#ff4444]">-{pr.deletions}</span>
+              {pr.author && (
+                <>
+                  <span className="text-[#333]">·</span>
+                  <span className="text-[11px] text-[#555]">{pr.author.name || 'Unknown'}</span>
+                </>
+              )}
+            </div>
           </div>
-          <div className="flex items-center gap-2 mt-1">
-            <span className="text-[11px] text-[#555] truncate">{pr.repository}</span>
-            <span className="text-[#333]">·</span>
-            <span className="text-[11px] text-[#50e3c2]">+{pr.additions}</span>
-            <span className="text-[11px] text-[#ff4444]">-{pr.deletions}</span>
-            {pr.author && (
-              <>
-                <span className="text-[#333]">·</span>
-                <span className="text-[11px] text-[#555]">{pr.author.name || 'Unknown'}</span>
-              </>
-            )}
+          <span className="text-[#555] flex-shrink-0">
+            {expanded ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
+          </span>
+        </div>
+      </div>
+
+      {expanded && (
+        <div className="px-3 pb-3 border-t border-[#1a1a1a]">
+          <div className="pt-2 ml-7 space-y-2">
+            <div className="grid grid-cols-3 gap-2">
+              <div className="bg-[#111] rounded p-2">
+                <span className="text-[10px] text-[#555] block">Size</span>
+                <span className="text-[12px] font-mono" style={{ color: sizeColor }}>{sizeLabel} ({totalChanges} lines)</span>
+              </div>
+              <div className="bg-[#111] rounded p-2">
+                <span className="text-[10px] text-[#555] block">Age</span>
+                <span className={cn('text-[12px] font-mono', daysOld > 3 ? 'text-[#f5a623]' : 'text-[#888]')}>
+                  {daysOld === 0 ? 'Today' : `${daysOld} days`}
+                </span>
+              </div>
+              <div className="bg-[#111] rounded p-2">
+                <span className="text-[10px] text-[#555] block">Repository</span>
+                <span className="text-[12px] font-mono text-[#888] truncate block">{pr.repository.split('/')[1]}</span>
+              </div>
+            </div>
+            <a
+              href={pr.url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1.5 text-[11px] text-[#50e3c2] hover:underline"
+              onClick={e => e.stopPropagation()}
+            >
+              <ExternalLink className="w-3 h-3" />
+              Open on GitHub
+            </a>
           </div>
         </div>
-        <ChevronRight className="w-4 h-4 text-[#333] flex-shrink-0" />
-      </div>
-    </a>
+      )}
+    </div>
   )
 }
 
@@ -254,24 +342,112 @@ function RepoHealthCard({ repo }: {
     lastAnalyzedAt: string | Date | null
   }
 }) {
+  const [expanded, setExpanded] = useState(false)
   const score = repo.completenessScore || 0
   const scoreColor = score >= 80 ? '#50e3c2' : score >= 50 ? '#f5a623' : '#ff4444'
 
+  const langColors: Record<string, string> = {
+    TypeScript: '#3178c6', JavaScript: '#f7df1e', Python: '#3776ab', Go: '#00add8',
+    Rust: '#dea584', Java: '#b07219', Ruby: '#cc342d', 'C#': '#239120',
+  }
+  const langColor = langColors[repo.language || ''] || '#888'
+
   return (
-    <div className="p-3 bg-[#0a0a0a] rounded-md">
-      <div className="flex items-center justify-between mb-2">
-        <span className="text-[13px] font-medium text-[#ededed] truncate">{repo.fullName}</span>
-        {repo.completenessScore !== null && (
-          <span className="text-[12px] font-mono" style={{ color: scoreColor }}>
-            {score}%
-          </span>
-        )}
+    <div
+      className="bg-[#0a0a0a] border border-[#1a1a1a] rounded-lg hover:border-[#252525] transition-colors cursor-pointer"
+      onClick={() => setExpanded(!expanded)}
+    >
+      <div className="p-3">
+        <div className="flex items-center justify-between mb-1">
+          <div className="flex items-center gap-2 min-w-0">
+            <Code2 className="w-3.5 h-3.5 text-[#555] flex-shrink-0" />
+            <span className="text-[13px] font-medium text-[#ededed] truncate">{repo.fullName}</span>
+          </div>
+          <div className="flex items-center gap-2 flex-shrink-0">
+            {repo.completenessScore !== null && (
+              <span className="text-[12px] font-mono font-semibold" style={{ color: scoreColor }}>
+                {score}%
+              </span>
+            )}
+            <span className="text-[#555]">
+              {expanded ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />}
+            </span>
+          </div>
+        </div>
+        <div className="flex items-center gap-3 text-[11px] text-[#555] ml-[22px]">
+          {repo.language && (
+            <span className="flex items-center gap-1">
+              <span className="w-2 h-2 rounded-full" style={{ backgroundColor: langColor }} />
+              {repo.language}
+            </span>
+          )}
+          <span>{repo.openPRCount} PRs</span>
+          <span>{repo.openIssueCount} issues</span>
+          <span>{repo.todoCount} TODOs</span>
+        </div>
       </div>
-      <div className="flex items-center gap-3 text-[11px] text-[#555]">
-        <span>{repo.openPRCount} PRs</span>
-        <span>{repo.openIssueCount} issues</span>
-        <span>{repo.todoCount} TODOs</span>
-      </div>
+
+      {expanded && (
+        <div className="px-3 pb-3 border-t border-[#1a1a1a]">
+          <div className="pt-2 space-y-2">
+            {repo.description && (
+              <p className="text-[12px] text-[#888]">{repo.description}</p>
+            )}
+
+            {/* Health breakdown */}
+            <div className="grid grid-cols-4 gap-2">
+              <div className="bg-[#111] rounded p-2 text-center">
+                <GitPullRequest className="w-3.5 h-3.5 text-[#50e3c2] mx-auto mb-1" />
+                <span className={cn('text-[14px] font-mono font-semibold block', repo.openPRCount > 5 ? 'text-[#f5a623]' : 'text-[#ededed]')}>
+                  {repo.openPRCount}
+                </span>
+                <span className="text-[9px] text-[#555] uppercase">Open PRs</span>
+              </div>
+              <div className="bg-[#111] rounded p-2 text-center">
+                <Bug className="w-3.5 h-3.5 text-[#ff4444] mx-auto mb-1" />
+                <span className={cn('text-[14px] font-mono font-semibold block', repo.openIssueCount > 10 ? 'text-[#ff4444]' : 'text-[#ededed]')}>
+                  {repo.openIssueCount}
+                </span>
+                <span className="text-[9px] text-[#555] uppercase">Issues</span>
+              </div>
+              <div className="bg-[#111] rounded p-2 text-center">
+                <FileText className="w-3.5 h-3.5 text-[#f5a623] mx-auto mb-1" />
+                <span className={cn('text-[14px] font-mono font-semibold block', repo.todoCount > 10 ? 'text-[#f5a623]' : 'text-[#ededed]')}>
+                  {repo.todoCount}
+                </span>
+                <span className="text-[9px] text-[#555] uppercase">TODOs</span>
+              </div>
+              <div className="bg-[#111] rounded p-2 text-center">
+                <Activity className="w-3.5 h-3.5 mx-auto mb-1" style={{ color: scoreColor }} />
+                <span className="text-[14px] font-mono font-semibold block" style={{ color: scoreColor }}>
+                  {score}%
+                </span>
+                <span className="text-[9px] text-[#555] uppercase">Health</span>
+              </div>
+            </div>
+
+            {/* Completeness bar */}
+            <div>
+              <div className="flex items-center justify-between mb-1">
+                <span className="text-[10px] text-[#555]">Completeness</span>
+                <span className="text-[10px] font-mono" style={{ color: scoreColor }}>{score}%</span>
+              </div>
+              <div className="w-full h-1.5 bg-[#1a1a1a] rounded-full overflow-hidden">
+                <div
+                  className="h-full rounded-full transition-all"
+                  style={{ width: `${score}%`, backgroundColor: scoreColor }}
+                />
+              </div>
+            </div>
+
+            {repo.lastAnalyzedAt && (
+              <p className="text-[10px] text-[#555]">
+                Last analyzed: {new Date(repo.lastAnalyzedAt).toLocaleDateString()}
+              </p>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   )
 }
@@ -333,18 +509,39 @@ function PredictionCard({ prediction }: {
         <div className="px-3 pb-3 border-t border-[#1a1a1a]">
           <div className="pt-2 ml-7 space-y-2">
             {prediction.value?.description && (
-              <p className="text-[12px] text-[#888]">{prediction.value.description}</p>
+              <p className="text-[12px] text-[#888] leading-relaxed">{prediction.value.description}</p>
             )}
+
+            {/* Confidence meter */}
+            <div className="bg-[#111] rounded p-2">
+              <div className="flex items-center justify-between mb-1">
+                <span className="text-[10px] text-[#555]">Confidence</span>
+                <span className="text-[10px] font-mono" style={{ color: confidence >= 70 ? '#50e3c2' : confidence >= 40 ? '#f5a623' : '#ff4444' }}>
+                  {confidence}%
+                </span>
+              </div>
+              <div className="w-full h-1.5 bg-[#1a1a1a] rounded-full overflow-hidden">
+                <div
+                  className="h-full rounded-full"
+                  style={{
+                    width: `${confidence}%`,
+                    backgroundColor: confidence >= 70 ? '#50e3c2' : confidence >= 40 ? '#f5a623' : '#ff4444',
+                  }}
+                />
+              </div>
+            </div>
+
             {prediction.reasoning && prediction.reasoning !== prediction.value?.title && (
               <div className="bg-[#0a0a0a] rounded p-2">
-                <span className="text-[10px] text-[#555] uppercase tracking-wide block mb-1">Reasoning</span>
+                <span className="text-[10px] text-[#555] uppercase tracking-wide block mb-1">AI Reasoning</span>
                 <p className="text-[11px] text-[#888]">{prediction.reasoning}</p>
               </div>
             )}
             {prediction.value?.suggestedAction && (
-              <p className="text-[11px] text-[#50e3c2]">
-                → {prediction.value.suggestedAction}
-              </p>
+              <div className="bg-[#50e3c2]/5 border border-[#50e3c2]/20 rounded p-2">
+                <span className="text-[10px] text-[#50e3c2] uppercase tracking-wide block mb-1">Suggested Action</span>
+                <p className="text-[11px] text-[#50e3c2]">{prediction.value.suggestedAction}</p>
+              </div>
             )}
           </div>
         </div>
@@ -365,11 +562,16 @@ function BottleneckCard({ bottleneck }: {
   }
 }) {
   const [expanded, setExpanded] = useState(false)
-  const severityConfig: Record<string, { color: string; bg: string }> = {
-    CRITICAL: { color: '#ff4444', bg: 'rgba(255,68,68,0.1)' },
-    HIGH: { color: '#f5a623', bg: 'rgba(245,166,35,0.1)' },
-    MEDIUM: { color: '#888', bg: 'rgba(136,136,136,0.1)' },
-    LOW: { color: '#555', bg: 'transparent' },
+  const severityConfig: Record<string, { color: string; bg: string; description: string }> = {
+    CRITICAL: { color: '#ff4444', bg: 'rgba(255,68,68,0.1)', description: 'Immediate action required — team velocity severely impacted' },
+    HIGH: { color: '#f5a623', bg: 'rgba(245,166,35,0.1)', description: 'Should be addressed this sprint — moderate impact on delivery' },
+    MEDIUM: { color: '#888', bg: 'rgba(136,136,136,0.1)', description: 'Plan to address soon — minor impact currently' },
+    LOW: { color: '#555', bg: 'transparent', description: 'Worth tracking but not urgent' },
+  }
+
+  const TYPE_LABELS: Record<string, string> = {
+    STUCK_PR: 'Stuck Pull Request', STALE_TASK: 'Stale Task', DEPENDENCY_BLOCK: 'Dependency Block',
+    REVIEW_DELAY: 'Review Delay', CI_FAILURE: 'CI/CD Failure',
   }
 
   const config = severityConfig[bottleneck.severity] || severityConfig.MEDIUM
@@ -394,7 +596,9 @@ function BottleneckCard({ bottleneck }: {
               >
                 {bottleneck.severity}
               </span>
-              <span className="text-[10px] font-mono text-[#555] uppercase">{bottleneck.type.replace('_', ' ')}</span>
+              <span className="text-[10px] font-mono text-[#555] uppercase">
+                {TYPE_LABELS[bottleneck.type] || bottleneck.type.replace(/_/g, ' ')}
+              </span>
             </div>
             <p className="text-[13px] text-[#ededed] mt-1">{bottleneck.title}</p>
             {!expanded && bottleneck.description && (
@@ -409,8 +613,14 @@ function BottleneckCard({ bottleneck }: {
       {expanded && (
         <div className="px-3 pb-3 border-t border-[#1a1a1a]">
           <div className="pt-2 ml-7 space-y-2">
+            {/* Severity explanation */}
+            <div className="bg-[#111] rounded p-2">
+              <span className="text-[10px] text-[#555] uppercase tracking-wide block mb-1">Severity: {bottleneck.severity}</span>
+              <p className="text-[11px] text-[#888]">{config.description}</p>
+            </div>
+
             {bottleneck.description && (
-              <p className="text-[12px] text-[#888]">{bottleneck.description}</p>
+              <p className="text-[12px] text-[#888] leading-relaxed">{bottleneck.description}</p>
             )}
             {bottleneck.impact && (
               <div className="bg-[#f5a623]/5 border border-[#f5a623]/20 rounded p-2">
@@ -435,6 +645,7 @@ function RiskCard({ risk }: {
     mitigation: string
   }
 }) {
+  const [expanded, setExpanded] = useState(false)
   const impactConfig: Record<string, { color: string }> = {
     HIGH: { color: '#ff4444' },
     MEDIUM: { color: '#f5a623' },
@@ -444,22 +655,56 @@ function RiskCard({ risk }: {
   const config = impactConfig[risk.impact] || impactConfig.MEDIUM
 
   return (
-    <div className="p-3 border-b border-[#1a1a1a] last:border-b-0 hover:bg-[#111] transition-colors">
-      <div className="flex items-start gap-3">
-        <ShieldAlert className="w-4 h-4 flex-shrink-0 mt-0.5" style={{ color: config.color }} />
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2">
-            <span className="text-[10px] font-mono text-[#555] uppercase">{risk.category}</span>
-            <span className="text-[#333]">·</span>
-            <span className="text-[10px] font-mono" style={{ color: config.color }}>
-              {risk.likelihood} likelihood
-            </span>
+    <div
+      className="border-b border-[#1a1a1a] last:border-b-0 hover:bg-[#111] transition-colors cursor-pointer"
+      onClick={() => setExpanded(!expanded)}
+    >
+      <div className="p-3">
+        <div className="flex items-start gap-3">
+          <ShieldAlert className="w-4 h-4 flex-shrink-0 mt-0.5" style={{ color: config.color }} />
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2">
+              <span className="text-[10px] font-mono text-[#555] uppercase">{risk.category}</span>
+              <span className="text-[#333]">·</span>
+              <span className="text-[10px] font-mono" style={{ color: config.color }}>
+                {risk.likelihood} likelihood · {risk.impact} impact
+              </span>
+            </div>
+            <p className="text-[13px] text-[#ededed] mt-1">{risk.title}</p>
+            {!expanded && (
+              <p className="text-[11px] text-[#888] mt-1 line-clamp-1">{risk.description}</p>
+            )}
           </div>
-          <p className="text-[13px] text-[#ededed] mt-1">{risk.title}</p>
-          <p className="text-[11px] text-[#888] mt-1">{risk.description}</p>
-          <p className="text-[11px] text-[#50e3c2] mt-1">→ {risk.mitigation}</p>
+          <span className="text-[#555] flex-shrink-0">
+            {expanded ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
+          </span>
         </div>
       </div>
+      {expanded && (
+        <div className="px-3 pb-3 border-t border-[#1a1a1a]">
+          <div className="pt-2 ml-7 space-y-2">
+            <p className="text-[12px] text-[#888] leading-relaxed">{risk.description}</p>
+
+            <div className="grid grid-cols-2 gap-2">
+              <div className="bg-[#111] rounded p-2">
+                <span className="text-[10px] text-[#555] block">Likelihood</span>
+                <span className="text-[12px] font-mono" style={{ color: risk.likelihood === 'HIGH' ? '#ff4444' : risk.likelihood === 'MEDIUM' ? '#f5a623' : '#50e3c2' }}>
+                  {risk.likelihood}
+                </span>
+              </div>
+              <div className="bg-[#111] rounded p-2">
+                <span className="text-[10px] text-[#555] block">Impact</span>
+                <span className="text-[12px] font-mono" style={{ color: config.color }}>{risk.impact}</span>
+              </div>
+            </div>
+
+            <div className="bg-[#50e3c2]/5 border border-[#50e3c2]/20 rounded p-2">
+              <span className="text-[10px] text-[#50e3c2] uppercase tracking-wide block mb-1">Mitigation</span>
+              <p className="text-[11px] text-[#50e3c2]">{risk.mitigation}</p>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
@@ -472,32 +717,55 @@ function RecommendationCard({ recommendation }: {
     category: string
   }
 }) {
-  const priorityConfig: Record<string, { color: string }> = {
-    HIGH: { color: '#ff4444' },
-    MEDIUM: { color: '#f5a623' },
-    LOW: { color: '#50e3c2' },
+  const [expanded, setExpanded] = useState(false)
+  const priorityConfig: Record<string, { color: string; description: string }> = {
+    HIGH: { color: '#ff4444', description: 'Address immediately for maximum impact' },
+    MEDIUM: { color: '#f5a623', description: 'Plan to address within this sprint' },
+    LOW: { color: '#50e3c2', description: 'Nice-to-have improvement' },
   }
 
   const config = priorityConfig[recommendation.priority] || priorityConfig.MEDIUM
 
   return (
-    <div className="p-3 border-b border-[#1a1a1a] last:border-b-0 hover:bg-[#111] transition-colors">
-      <div className="flex items-start gap-3">
-        <Lightbulb className="w-4 h-4 flex-shrink-0 mt-0.5 text-[#f5a623]" />
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2">
-            <span
-              className="text-[10px] font-mono font-medium uppercase tracking-[0.5px] px-1.5 py-0.5 rounded"
-              style={{ color: config.color, backgroundColor: `${config.color}15` }}
-            >
-              {recommendation.priority}
-            </span>
-            <span className="text-[10px] font-mono text-[#555] uppercase">{recommendation.category}</span>
+    <div
+      className="border-b border-[#1a1a1a] last:border-b-0 hover:bg-[#111] transition-colors cursor-pointer"
+      onClick={() => setExpanded(!expanded)}
+    >
+      <div className="p-3">
+        <div className="flex items-start gap-3">
+          <Lightbulb className="w-4 h-4 flex-shrink-0 mt-0.5 text-[#f5a623]" />
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2">
+              <span
+                className="text-[10px] font-mono font-medium uppercase tracking-[0.5px] px-1.5 py-0.5 rounded"
+                style={{ color: config.color, backgroundColor: `${config.color}15` }}
+              >
+                {recommendation.priority}
+              </span>
+              <span className="text-[10px] font-mono text-[#555] uppercase">{recommendation.category}</span>
+            </div>
+            <p className="text-[13px] text-[#ededed] mt-1">{recommendation.title}</p>
+            {!expanded && (
+              <p className="text-[11px] text-[#888] mt-1 line-clamp-1">{recommendation.description}</p>
+            )}
           </div>
-          <p className="text-[13px] text-[#ededed] mt-1">{recommendation.title}</p>
-          <p className="text-[11px] text-[#888] mt-1">{recommendation.description}</p>
+          <span className="text-[#555] flex-shrink-0">
+            {expanded ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
+          </span>
         </div>
       </div>
+      {expanded && (
+        <div className="px-3 pb-3 border-t border-[#1a1a1a]">
+          <div className="pt-2 ml-7 space-y-2">
+            <p className="text-[12px] text-[#888] leading-relaxed">{recommendation.description}</p>
+            <div className="bg-[#111] rounded p-2">
+              <span className="text-[10px] text-[#555] uppercase tracking-wide block mb-1">Priority</span>
+              <span className="text-[12px] font-medium" style={{ color: config.color }}>{recommendation.priority}</span>
+              <p className="text-[10px] text-[#555] mt-0.5">{config.description}</p>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
@@ -527,8 +795,8 @@ function Section({ title, icon, children, count }: {
 function LoadingSkeleton() {
   return (
     <div className="space-y-4 animate-pulse">
-      <div className="grid grid-cols-3 gap-3">
-        {[1, 2, 3].map(i => (
+      <div className="grid grid-cols-4 gap-3">
+        {[1, 2, 3, 4].map(i => (
           <div key={i} className="h-16 bg-[#1a1a1a] rounded" />
         ))}
       </div>
@@ -578,12 +846,16 @@ export function TodayTab() {
       <div>
         <h2 className="text-[20px] font-semibold text-[#ededed] tracking-[-0.5px]">Today</h2>
         <p className="text-[13px] text-[#888] mt-1">
-          Your prioritized action queue
+          Your prioritized action queue — click any item to expand
         </p>
       </div>
 
       {/* Stats */}
-      <div className="grid grid-cols-4 gap-3">
+      <div className="grid grid-cols-5 gap-3">
+        <div className="bg-[#0a0a0a] border border-[#1a1a1a] rounded-md p-3">
+          <div className="text-[20px] font-mono font-semibold text-[#ededed]">{summary.totalTasks}</div>
+          <div className="text-[10px] font-mono uppercase tracking-[0.5px] text-[#555] mt-1">Tasks</div>
+        </div>
         <div className="bg-[#0a0a0a] border border-[#1a1a1a] rounded-md p-3">
           <div className={cn(
             'text-[20px] font-mono font-semibold',
@@ -621,7 +893,7 @@ export function TodayTab() {
       {bottlenecks && bottlenecks.length > 0 && (
         <Section title="Active Bottlenecks" icon={<AlertCircle className="w-4 h-4" />} count={bottlenecks.length}>
           <div className="border border-[#1a1a1a] rounded-md overflow-hidden">
-            {bottlenecks.slice(0, 5).map(bottleneck => (
+            {bottlenecks.map(bottleneck => (
               <BottleneckCard key={bottleneck.id} bottleneck={bottleneck} />
             ))}
           </div>
@@ -632,7 +904,7 @@ export function TodayTab() {
       {predictions && predictions.length > 0 && (
         <Section title="AI Predictions" icon={<TrendingUp className="w-4 h-4" />} count={predictions.length}>
           <div className="border border-[#1a1a1a] rounded-md overflow-hidden">
-            {predictions.slice(0, 5).map(prediction => (
+            {predictions.map(prediction => (
               <PredictionCard key={prediction.id} prediction={prediction} />
             ))}
           </div>
@@ -643,7 +915,7 @@ export function TodayTab() {
       {risks && risks.length > 0 && (
         <Section title="Risk Analysis" icon={<ShieldAlert className="w-4 h-4" />} count={risks.length}>
           <div className="border border-[#1a1a1a] rounded-md overflow-hidden">
-            {risks.slice(0, 4).map((risk, idx) => (
+            {risks.map((risk, idx) => (
               <RiskCard key={idx} risk={risk} />
             ))}
           </div>
@@ -654,8 +926,19 @@ export function TodayTab() {
       {recommendations && recommendations.length > 0 && (
         <Section title="Recommendations" icon={<Lightbulb className="w-4 h-4" />} count={recommendations.length}>
           <div className="border border-[#1a1a1a] rounded-md overflow-hidden">
-            {recommendations.slice(0, 4).map((rec, idx) => (
+            {recommendations.map((rec, idx) => (
               <RecommendationCard key={idx} recommendation={rec} />
+            ))}
+          </div>
+        </Section>
+      )}
+
+      {/* Repository health - enhanced with expand */}
+      {repoStats.length > 0 && (
+        <Section title="Repository Health" icon={<GitBranch className="w-4 h-4" />} count={repoStats.length}>
+          <div className="space-y-2">
+            {repoStats.map(repo => (
+              <RepoHealthCard key={repo.id} repo={repo} />
             ))}
           </div>
         </Section>
@@ -665,14 +948,9 @@ export function TodayTab() {
       {prsToReview.length > 0 && (
         <Section title="Pull Requests" icon={<GitPullRequest className="w-4 h-4" />} count={prsToReview.length}>
           <div className="border border-[#1a1a1a] rounded-md overflow-hidden">
-            {prsToReview.slice(0, 5).map(pr => (
+            {prsToReview.map(pr => (
               <PRCard key={pr.id} pr={pr} />
             ))}
-            {prsToReview.length > 5 && (
-              <div className="p-3 text-center text-[12px] text-[#555] bg-[#0a0a0a]">
-                +{prsToReview.length - 5} more PRs
-              </div>
-            )}
           </div>
         </Section>
       )}
@@ -681,34 +959,10 @@ export function TodayTab() {
       {tasks.length > 0 && (
         <Section title="Your Tasks" icon={<CheckCircle2 className="w-4 h-4" />} count={tasks.length}>
           <div className="border border-[#1a1a1a] rounded-md overflow-hidden">
-            {tasks.slice(0, 10).map(task => (
+            {tasks.map(task => (
               <TaskRow key={task.id} task={task} />
             ))}
-            {tasks.length > 10 && (
-              <div className="p-3 text-center text-[12px] text-[#555] bg-[#0a0a0a]">
-                +{tasks.length - 10} more tasks
-              </div>
-            )}
           </div>
-        </Section>
-      )}
-
-      {/* Repository health */}
-      {repoStats.length > 0 && (
-        <Section title="Repository Health" icon={<GitBranch className="w-4 h-4" />} count={repoStats.length}>
-          <div className="grid grid-cols-2 gap-2">
-            {repoStats.slice(0, 4).map(repo => (
-              <RepoHealthCard key={repo.id} repo={repo} />
-            ))}
-          </div>
-          {repoStats.length > 4 && (
-            <Link
-              href="/dashboard?card=integrations"
-              className="block mt-2 text-center text-[12px] text-[#555] hover:text-[#888] transition-colors"
-            >
-              View all {repoStats.length} repositories
-            </Link>
-          )}
         </Section>
       )}
     </div>

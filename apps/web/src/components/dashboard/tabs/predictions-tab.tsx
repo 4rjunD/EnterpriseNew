@@ -65,7 +65,7 @@ function PredictionCard({ prediction }: {
             className="w-8 h-8 rounded flex items-center justify-center flex-shrink-0"
             style={{ backgroundColor: `${config.color}15` }}
           >
-            <Icon className="w-4 h-4" style={{ color: config.color }} />
+            <span style={{ color: config.color }}><Icon className="w-4 h-4" /></span>
           </div>
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 mb-1">

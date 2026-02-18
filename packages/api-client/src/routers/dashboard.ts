@@ -1,6 +1,6 @@
 import { z } from 'zod'
 import { router, protectedProcedure } from '../trpc'
-import { prisma } from '@nexflow/database'
+import { prisma, TaskStatus, TaskPriority, TaskSource } from '@nexflow/database'
 import { BottleneckDetector, PredictionEngine, GuaranteedAnalyzer, ContextBasedAnalyzer, AutonomousAnalyzer } from '@nexflow/ai'
 import { GitHubClient, LinearClient, DiscordClient, GitHubRepoAnalyzer } from '@nexflow/integrations'
 
@@ -738,6 +738,206 @@ export const dashboardRouter = router({
         }
       } catch (e) {
         results.errors.push(`Default milestones failed: ${String(e)}`)
+      }
+
+      // Step 9: ABSOLUTE FALLBACK — if we still have zero content after all steps,
+      // create it directly with Prisma. No external APIs needed.
+      try {
+        const [activePreds, activeBNs] = await Promise.all([
+          prisma.prediction.count({
+            where: {
+              OR: [
+                { project: { organizationId: ctx.organizationId } },
+                { projectId: null },
+              ],
+              isActive: true,
+            },
+          }),
+          prisma.bottleneck.count({
+            where: {
+              OR: [
+                { project: { organizationId: ctx.organizationId } },
+                { projectId: null },
+              ],
+              status: 'ACTIVE',
+            },
+          }),
+        ])
+
+        // Also ensure baseline tasks exist
+        const taskCount = await prisma.task.count({
+          where: { organizationId: ctx.organizationId },
+        })
+
+        if (taskCount === 0) {
+          const baselineTasks = [
+            { title: 'Set up continuous integration (CI)', description: 'Configure GitHub Actions, CircleCI, or similar for automated builds and tests', priority: TaskPriority.HIGH, labels: ['infrastructure', 'ci-cd'] },
+            { title: 'Add automated testing', description: 'Implement unit tests and integration tests for critical paths', priority: TaskPriority.HIGH, labels: ['testing', 'quality'] },
+            { title: 'Create project documentation', description: 'Add README, contributing guidelines, and architecture documentation', priority: TaskPriority.MEDIUM, labels: ['documentation'] },
+            { title: 'Configure error monitoring', description: 'Set up Sentry, LogRocket, or similar for production error tracking', priority: TaskPriority.MEDIUM, labels: ['infrastructure', 'monitoring'] },
+            { title: 'Review and merge open pull requests', description: 'Go through pending PRs to unblock teammates and maintain velocity', priority: TaskPriority.HIGH, labels: ['pr-review'] },
+          ]
+          for (const t of baselineTasks) {
+            await prisma.task.create({
+              data: {
+                title: t.title,
+                description: t.description,
+                status: TaskStatus.TODO,
+                priority: t.priority,
+                source: TaskSource.INTERNAL,
+                organizationId: ctx.organizationId,
+                labels: [...t.labels, 'baseline', 'auto-generated'],
+              },
+            })
+            results.tasksCreated++
+          }
+        }
+
+        if (activePreds === 0) {
+          // Create baseline predictions directly — no API required
+          const baselinePredictions = [
+            {
+              type: 'DEADLINE_RISK' as const,
+              confidence: 0.75,
+              value: {
+                title: 'Initial setup period may cause delays',
+                description: 'New teams typically take 2-4 weeks to establish effective workflows. Factor this into your timeline.',
+                suggestedAction: 'Add a 2-week buffer to your first major deadline.',
+              },
+              reasoning: 'Based on typical onboarding patterns for engineering teams.',
+            },
+            {
+              type: 'VELOCITY_FORECAST' as const,
+              confidence: 0.8,
+              value: {
+                title: 'Team velocity will stabilize in 3-4 sprints',
+                description: 'Expect velocity fluctuations of 30-50% as the team forms and establishes norms.',
+                suggestedAction: 'Track velocity trends rather than individual sprint performance.',
+              },
+              reasoning: 'Teams typically need 3-4 sprints to establish consistent velocity patterns.',
+            },
+            {
+              type: 'BURNOUT_INDICATOR' as const,
+              confidence: 0.65,
+              value: {
+                title: 'Watch for early signs of overcommitment',
+                description: 'New teams often overcommit in early sprints leading to sustainable pace issues.',
+                suggestedAction: 'Target 70% capacity utilization initially, then adjust based on actual throughput.',
+              },
+              reasoning: 'Enthusiasm in new teams frequently leads to overestimation of capacity.',
+            },
+            {
+              type: 'SCOPE_CREEP' as const,
+              confidence: 0.7,
+              value: {
+                title: 'Scope definition needs attention',
+                description: 'Without clear project boundaries, features tend to expand beyond initial estimates.',
+                suggestedAction: 'Document acceptance criteria for each feature before development begins.',
+              },
+              reasoning: 'Undefined scope is the leading cause of project delays.',
+            },
+          ]
+
+          for (const pred of baselinePredictions) {
+            await prisma.prediction.create({
+              data: {
+                projectId: defaultProject.id,
+                ...pred,
+                isActive: true,
+                validUntil: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000),
+              },
+            })
+            results.predictionsCreated++
+          }
+        }
+
+        if (activeBNs === 0) {
+          // Create baseline bottlenecks directly — no API required
+          const baselineBottlenecks = [
+            {
+              type: 'REVIEW_DELAY' as const,
+              severity: 'MEDIUM' as const,
+              title: 'Code review process needs definition',
+              description: 'Without established review practices, PRs may sit longer than necessary, blocking feature delivery.',
+              impact: 'Slower delivery, potential merge conflicts, and developer frustration.',
+            },
+            {
+              type: 'CI_FAILURE' as const,
+              severity: 'HIGH' as const,
+              title: 'CI/CD pipeline setup required',
+              description: 'Without automated testing and deployment, bugs are more likely to reach production.',
+              impact: 'Higher bug rate, slower deployments, and increased manual testing burden.',
+            },
+            {
+              type: 'DEPENDENCY_BLOCK' as const,
+              severity: 'MEDIUM' as const,
+              title: 'Integration connections pending',
+              description: 'Connect your development tools (GitHub, Linear, etc.) to enable automated tracking and insights.',
+              impact: 'Manual tracking is error-prone and consumes valuable engineering time.',
+            },
+          ]
+
+          for (const bn of baselineBottlenecks) {
+            await prisma.bottleneck.create({
+              data: {
+                projectId: defaultProject.id,
+                ...bn,
+                status: 'ACTIVE',
+              },
+            })
+            results.bottlenecksCreated++
+          }
+        }
+
+        // Ensure knowledge base has risks and recommendations
+        const existingKB = await prisma.organizationKnowledgeBase.findUnique({
+          where: { organizationId: ctx.organizationId },
+        })
+
+        const currentRisks = (existingKB?.goalProgress as { risks?: unknown[] })?.risks || []
+        const currentRecs = existingKB?.recommendations as unknown[] || []
+
+        if (currentRisks.length === 0 || currentRecs.length === 0) {
+          const baselineRisks = [
+            { category: 'Process', title: 'Undefined development workflows', description: 'Without clear processes, work may be duplicated, dropped, or blocked.', likelihood: 'HIGH', impact: 'MEDIUM', mitigation: 'Document key workflows (PR process, deployment, on-call) and review with the team.' },
+            { category: 'Team', title: 'Communication gaps between team members', description: 'New teams often struggle to establish effective communication patterns.', likelihood: 'MEDIUM', impact: 'HIGH', mitigation: 'Establish regular standups, retrospectives, and async communication norms.' },
+            { category: 'Technical', title: 'Technical debt accumulation', description: 'Fast-moving teams often accrue technical debt that compounds over time.', likelihood: 'HIGH', impact: 'MEDIUM', mitigation: 'Allocate 20% of sprint capacity for maintenance and debt reduction.' },
+            { category: 'External', title: 'Dependency on external services', description: 'Third-party service outages or API changes can block development.', likelihood: 'LOW', impact: 'HIGH', mitigation: 'Identify critical dependencies and have fallback plans in place.' },
+            { category: 'Technical', title: 'Security vulnerabilities in dependencies', description: 'Outdated packages may contain known security vulnerabilities.', likelihood: 'MEDIUM', impact: 'HIGH', mitigation: 'Set up automated dependency scanning and regular update cycles.' },
+          ]
+
+          const baselineRecs = [
+            { title: 'Connect your development tools', description: 'Link GitHub, Linear, or Jira to enable automated insights and real-time tracking.', priority: 'HIGH', category: 'tooling' },
+            { title: 'Define clear project milestones', description: 'Break your project into measurable milestones to track progress and identify risks early.', priority: 'HIGH', category: 'process' },
+            { title: 'Set up automated testing', description: 'Implement unit and integration tests to catch bugs before they reach production.', priority: 'HIGH', category: 'tooling' },
+            { title: 'Establish code review guidelines', description: 'Define SLAs for PR reviews (e.g., 24-hour turnaround) to maintain velocity.', priority: 'MEDIUM', category: 'process' },
+            { title: 'Invite your team members', description: 'Team insights improve with more participants. NexFlow works best with full team visibility.', priority: 'MEDIUM', category: 'team' },
+          ]
+
+          const kbData = {
+            recommendations: (currentRecs.length > 0 ? currentRecs : baselineRecs) as object,
+            goalProgress: {
+              risks: currentRisks.length > 0 ? currentRisks : baselineRisks,
+              lastAnalyzedAt: new Date().toISOString(),
+            } as object,
+          }
+
+          if (existingKB) {
+            await prisma.organizationKnowledgeBase.update({
+              where: { organizationId: ctx.organizationId },
+              data: kbData,
+            })
+          } else {
+            await prisma.organizationKnowledgeBase.create({
+              data: {
+                organizationId: ctx.organizationId,
+                ...kbData,
+              },
+            })
+          }
+        }
+      } catch (e) {
+        results.errors.push(`Baseline fallback failed: ${String(e)}`)
       }
 
       const duration = Date.now() - startTime
