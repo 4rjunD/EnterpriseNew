@@ -840,13 +840,24 @@ export function TodayTab() {
 
   const { tasks, prsToReview, repoStats, predictions, bottlenecks, risks, recommendations, summary } = unifiedData
 
+  // Generate positive signals from the data
+  const strengths: string[] = []
+  if (repoStats.length > 0) strengths.push(`Tracking ${repoStats.length} active repositor${repoStats.length === 1 ? 'y' : 'ies'}`)
+  if (summary.totalTasks > 0) strengths.push(`${summary.totalTasks} tasks organized and tracked`)
+  if (summary.totalPRs === 0) strengths.push('No stale PRs — clean review queue')
+  if (repoStats.some(r => (r.completenessScore || 0) >= 70)) strengths.push('Repos showing strong health scores')
+  const completedTasks = tasks.filter(t => t.status === 'DONE').length
+  if (completedTasks > 0) strengths.push(`${completedTasks} task${completedTasks !== 1 ? 's' : ''} completed`)
+  if ((summary.totalBottlenecks || 0) === 0) strengths.push('No active bottlenecks detected')
+  if (predictions.length > 0) strengths.push('AI insights generating from your data')
+
   return (
     <div className="space-y-6">
       {/* Header */}
       <div>
         <h2 className="text-[20px] font-semibold text-[#ededed] tracking-[-0.5px]">Today</h2>
         <p className="text-[13px] text-[#888] mt-1">
-          Your prioritized action queue — click any item to expand
+          Your dashboard overview — click any item to expand
         </p>
       </div>
 
@@ -857,13 +868,8 @@ export function TodayTab() {
           <div className="text-[10px] font-mono uppercase tracking-[0.5px] text-[#555] mt-1">Tasks</div>
         </div>
         <div className="bg-[#0a0a0a] border border-[#1a1a1a] rounded-md p-3">
-          <div className={cn(
-            'text-[20px] font-mono font-semibold',
-            (summary.totalBottlenecks || 0) > 0 ? 'text-[#ff4444]' : 'text-[#ededed]'
-          )}>
-            {summary.totalBottlenecks || 0}
-          </div>
-          <div className="text-[10px] font-mono uppercase tracking-[0.5px] text-[#555] mt-1">Bottlenecks</div>
+          <div className="text-[20px] font-mono font-semibold text-[#ededed]">{repoStats.length}</div>
+          <div className="text-[10px] font-mono uppercase tracking-[0.5px] text-[#555] mt-1">Repos</div>
         </div>
         <div className="bg-[#0a0a0a] border border-[#1a1a1a] rounded-md p-3">
           <div className={cn(
@@ -872,16 +878,16 @@ export function TodayTab() {
           )}>
             {summary.totalPredictions || 0}
           </div>
-          <div className="text-[10px] font-mono uppercase tracking-[0.5px] text-[#555] mt-1">Predictions</div>
+          <div className="text-[10px] font-mono uppercase tracking-[0.5px] text-[#555] mt-1">Insights</div>
         </div>
         <div className="bg-[#0a0a0a] border border-[#1a1a1a] rounded-md p-3">
           <div className={cn(
             'text-[20px] font-mono font-semibold',
-            (summary.totalRisks || 0) > 0 ? 'text-[#a78bfa]' : 'text-[#ededed]'
+            (summary.totalBottlenecks || 0) > 0 ? 'text-[#ff4444]' : 'text-[#50e3c2]'
           )}>
-            {summary.totalRisks || 0}
+            {summary.totalBottlenecks || 0}
           </div>
-          <div className="text-[10px] font-mono uppercase tracking-[0.5px] text-[#555] mt-1">Risks</div>
+          <div className="text-[10px] font-mono uppercase tracking-[0.5px] text-[#555] mt-1">Bottlenecks</div>
         </div>
         <div className="bg-[#0a0a0a] border border-[#1a1a1a] rounded-md p-3">
           <div className="text-[20px] font-mono font-semibold text-[#ededed]">{summary.totalPRs}</div>
@@ -889,7 +895,46 @@ export function TodayTab() {
         </div>
       </div>
 
-      {/* Bottlenecks - highest priority */}
+      {/* Strengths — always show positive signals first */}
+      {strengths.length > 0 && (
+        <div className="bg-[#50e3c2]/5 border border-[#50e3c2]/20 rounded-md p-4">
+          <div className="flex items-center gap-2 mb-2">
+            <CheckCircle2 className="w-4 h-4 text-[#50e3c2]" />
+            <span className="text-[12px] font-medium text-[#50e3c2] uppercase tracking-[0.5px]">What&apos;s Going Well</span>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {strengths.map((s, i) => (
+              <span key={i} className="text-[12px] text-[#50e3c2]/80 bg-[#50e3c2]/10 px-2.5 py-1 rounded">
+                {s}
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Recommendations — actionable next steps near the top */}
+      {recommendations && recommendations.length > 0 && (
+        <Section title="Recommended Next Steps" icon={<Lightbulb className="w-4 h-4" />} count={recommendations.length}>
+          <div className="border border-[#1a1a1a] rounded-md overflow-hidden">
+            {recommendations.map((rec, idx) => (
+              <RecommendationCard key={idx} recommendation={rec} />
+            ))}
+          </div>
+        </Section>
+      )}
+
+      {/* AI Predictions */}
+      {predictions && predictions.length > 0 && (
+        <Section title="AI Predictions" icon={<TrendingUp className="w-4 h-4" />} count={predictions.length}>
+          <div className="border border-[#1a1a1a] rounded-md overflow-hidden">
+            {predictions.map(prediction => (
+              <PredictionCard key={prediction.id} prediction={prediction} />
+            ))}
+          </div>
+        </Section>
+      )}
+
+      {/* Bottlenecks */}
       {bottlenecks && bottlenecks.length > 0 && (
         <Section title="Active Bottlenecks" icon={<AlertCircle className="w-4 h-4" />} count={bottlenecks.length}>
           <div className="border border-[#1a1a1a] rounded-md overflow-hidden">
@@ -900,12 +945,12 @@ export function TodayTab() {
         </Section>
       )}
 
-      {/* Predictions */}
-      {predictions && predictions.length > 0 && (
-        <Section title="AI Predictions" icon={<TrendingUp className="w-4 h-4" />} count={predictions.length}>
-          <div className="border border-[#1a1a1a] rounded-md overflow-hidden">
-            {predictions.map(prediction => (
-              <PredictionCard key={prediction.id} prediction={prediction} />
+      {/* Repository health */}
+      {repoStats.length > 0 && (
+        <Section title="Repository Health" icon={<GitBranch className="w-4 h-4" />} count={repoStats.length}>
+          <div className="space-y-2">
+            {repoStats.map(repo => (
+              <RepoHealthCard key={repo.id} repo={repo} />
             ))}
           </div>
         </Section>
@@ -917,28 +962,6 @@ export function TodayTab() {
           <div className="border border-[#1a1a1a] rounded-md overflow-hidden">
             {risks.map((risk, idx) => (
               <RiskCard key={idx} risk={risk} />
-            ))}
-          </div>
-        </Section>
-      )}
-
-      {/* Recommendations */}
-      {recommendations && recommendations.length > 0 && (
-        <Section title="Recommendations" icon={<Lightbulb className="w-4 h-4" />} count={recommendations.length}>
-          <div className="border border-[#1a1a1a] rounded-md overflow-hidden">
-            {recommendations.map((rec, idx) => (
-              <RecommendationCard key={idx} recommendation={rec} />
-            ))}
-          </div>
-        </Section>
-      )}
-
-      {/* Repository health - enhanced with expand */}
-      {repoStats.length > 0 && (
-        <Section title="Repository Health" icon={<GitBranch className="w-4 h-4" />} count={repoStats.length}>
-          <div className="space-y-2">
-            {repoStats.map(repo => (
-              <RepoHealthCard key={repo.id} repo={repo} />
             ))}
           </div>
         </Section>

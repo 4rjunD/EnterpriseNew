@@ -314,6 +314,9 @@ export const dashboardRouter = router({
       errors: [] as string[],
     }
 
+    // Track which prediction types have been created to avoid duplicates across steps
+    const createdPredictionTypes = new Set<string>()
+
     // Track if GitHub is rate-limited so we skip heavy API calls
     let githubRateLimited = false
 
@@ -527,37 +530,43 @@ export const dashboardRouter = router({
           )
 
           if (commitPatterns.totalCommits > 0) {
+            // Helper to create a prediction only if the type hasn't been created yet
+            const createPredictionIfNew = async (type: string, data: Parameters<typeof prisma.prediction.create>[0]['data']) => {
+              if (createdPredictionTypes.has(type)) return false
+              await prisma.prediction.create({ data })
+              createdPredictionTypes.add(type)
+              results.predictionsCreated++
+              return true
+            }
+
             // Velocity prediction from real commit data
-            await prisma.prediction.create({
-              data: {
-                projectId: defaultProject.id,
-                type: 'VELOCITY_FORECAST',
-                confidence: Math.min(0.9, 0.5 + (commitPatterns.totalCommits / 200)),
-                value: {
-                  title: `Development velocity: ${commitPatterns.commitsPerDay} commits/day`,
-                  description: `Analyzed ${commitPatterns.totalCommits} commits across ${commitPatterns.repoBreakdown.length} repos over the last 30 days. ${commitPatterns.activeContributors} active contributors. Velocity trend: ${commitPatterns.velocityTrend}.`,
-                  suggestedAction: commitPatterns.velocityTrend === 'decelerating'
-                    ? 'Velocity is decreasing — review blockers, reduce context switching, and consider reducing WIP.'
-                    : commitPatterns.velocityTrend === 'accelerating'
-                    ? 'Velocity is increasing — maintain momentum and watch for quality trade-offs.'
-                    : 'Velocity is stable — consider process improvements to boost throughput.',
-                  metrics: {
-                    commitsPerDay: commitPatterns.commitsPerDay,
-                    totalCommits: commitPatterns.totalCommits,
-                    activeContributors: commitPatterns.activeContributors,
-                    velocityTrend: commitPatterns.velocityTrend,
-                    recentActivity: commitPatterns.recentActivity,
-                    featureCommits: commitPatterns.commitPatterns.featureCommits,
-                    fixCommits: commitPatterns.commitPatterns.fixCommits,
-                    refactorCommits: commitPatterns.commitPatterns.refactorCommits,
-                  },
+            await createPredictionIfNew('VELOCITY_FORECAST', {
+              projectId: defaultProject.id,
+              type: 'VELOCITY_FORECAST',
+              confidence: Math.min(0.9, 0.5 + (commitPatterns.totalCommits / 200)),
+              value: {
+                title: `${commitPatterns.commitsPerDay} commits/day across ${commitPatterns.repoBreakdown.length} repos`,
+                description: `${commitPatterns.totalCommits} commits in 30 days by ${commitPatterns.activeContributors} contributor${commitPatterns.activeContributors !== 1 ? 's' : ''}. Trend: ${commitPatterns.velocityTrend}.`,
+                suggestedAction: commitPatterns.velocityTrend === 'decelerating'
+                  ? 'Velocity is decreasing — review blockers and reduce context switching.'
+                  : commitPatterns.velocityTrend === 'accelerating'
+                  ? 'Great momentum — watch for quality trade-offs as speed increases.'
+                  : 'Stable pace — consider small process improvements to boost throughput.',
+                metrics: {
+                  commitsPerDay: commitPatterns.commitsPerDay,
+                  totalCommits: commitPatterns.totalCommits,
+                  activeContributors: commitPatterns.activeContributors,
+                  velocityTrend: commitPatterns.velocityTrend,
+                  recentActivity: commitPatterns.recentActivity,
+                  featureCommits: commitPatterns.commitPatterns.featureCommits,
+                  fixCommits: commitPatterns.commitPatterns.fixCommits,
+                  refactorCommits: commitPatterns.commitPatterns.refactorCommits,
                 },
-                reasoning: `Based on ${commitPatterns.totalCommits} commits over 30 days (${commitPatterns.commitsPerDay}/day). Top contributors: ${commitPatterns.topContributors.slice(0, 3).map(c => `${c.name} (${c.commits})`).join(', ')}. Trend: ${commitPatterns.velocityTrend}.`,
-                isActive: true,
-                validUntil: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
               },
+              reasoning: `${commitPatterns.totalCommits} commits over 30 days (${commitPatterns.commitsPerDay}/day). Trend: ${commitPatterns.velocityTrend}.`,
+              isActive: true,
+              validUntil: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
             })
-            results.predictionsCreated++
 
             // Burnout risk from after-hours/weekend commits
             const totalCommits = commitPatterns.totalCommits
@@ -566,28 +575,23 @@ export const dashboardRouter = router({
 
             if (afterHoursRatio > 0.15 || weekendRatio > 0.1) {
               const burnoutConfidence = Math.min(0.85, 0.4 + afterHoursRatio + weekendRatio)
-              await prisma.prediction.create({
-                data: {
-                  projectId: defaultProject.id,
-                  type: 'BURNOUT_INDICATOR',
-                  confidence: burnoutConfidence,
-                  value: {
-                    title: 'After-hours work pattern detected',
-                    description: `${Math.round(afterHoursRatio * 100)}% of commits are outside business hours, ${Math.round(weekendRatio * 100)}% on weekends. This may indicate workload pressure or timezone distribution.`,
-                    suggestedAction: 'Review workload distribution, consider async work policies, and check if deadlines are realistic.',
-                    metrics: {
-                      afterHoursPercent: Math.round(afterHoursRatio * 100),
-                      weekendPercent: Math.round(weekendRatio * 100),
-                      afterHoursCommits: commitPatterns.commitPatterns.afterHoursCommits,
-                      weekendCommits: commitPatterns.commitPatterns.weekendCommits,
-                    },
+              await createPredictionIfNew('BURNOUT_INDICATOR', {
+                projectId: defaultProject.id,
+                type: 'BURNOUT_INDICATOR',
+                confidence: burnoutConfidence,
+                value: {
+                  title: 'After-hours work pattern detected',
+                  description: `${Math.round(afterHoursRatio * 100)}% of commits outside business hours, ${Math.round(weekendRatio * 100)}% on weekends.`,
+                  suggestedAction: 'Review workload distribution and check if deadlines are realistic.',
+                  metrics: {
+                    afterHoursPercent: Math.round(afterHoursRatio * 100),
+                    weekendPercent: Math.round(weekendRatio * 100),
                   },
-                  reasoning: `${commitPatterns.commitPatterns.afterHoursCommits} commits outside business hours (${Math.round(afterHoursRatio * 100)}%) and ${commitPatterns.commitPatterns.weekendCommits} weekend commits (${Math.round(weekendRatio * 100)}%). Sustained off-hours work is a leading indicator of burnout.`,
-                  isActive: true,
-                  validUntil: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000),
                 },
+                reasoning: `${Math.round(afterHoursRatio * 100)}% after-hours, ${Math.round(weekendRatio * 100)}% weekend commits.`,
+                isActive: true,
+                validUntil: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000),
               })
-              results.predictionsCreated++
             }
 
             // Technical debt / scope creep from fix-heavy commit patterns
@@ -595,54 +599,46 @@ export const dashboardRouter = router({
             const featureRatio = totalCommits > 0 ? commitPatterns.commitPatterns.featureCommits / totalCommits : 0
 
             if (fixRatio > 0.3 || (fixRatio > featureRatio && totalCommits > 20)) {
-              await prisma.prediction.create({
-                data: {
-                  projectId: defaultProject.id,
-                  type: 'SCOPE_CREEP',
-                  confidence: Math.min(0.8, 0.4 + fixRatio),
-                  value: {
-                    title: 'Bug-fix heavy development cycle',
-                    description: `${Math.round(fixRatio * 100)}% of commits are bug fixes vs ${Math.round(featureRatio * 100)}% feature work. High fix ratios suggest accumulating technical debt.`,
-                    suggestedAction: 'Allocate dedicated time for test coverage, code review improvements, and refactoring to reduce bug introduction rate.',
-                    metrics: {
-                      fixPercent: Math.round(fixRatio * 100),
-                      featurePercent: Math.round(featureRatio * 100),
-                      refactorPercent: Math.round((commitPatterns.commitPatterns.refactorCommits / totalCommits) * 100),
-                      fixCommits: commitPatterns.commitPatterns.fixCommits,
-                      featureCommits: commitPatterns.commitPatterns.featureCommits,
-                    },
+              await createPredictionIfNew('SCOPE_CREEP', {
+                projectId: defaultProject.id,
+                type: 'SCOPE_CREEP',
+                confidence: Math.min(0.8, 0.4 + fixRatio),
+                value: {
+                  title: `${Math.round(fixRatio * 100)}% bug fixes vs ${Math.round(featureRatio * 100)}% features`,
+                  description: 'High fix ratio suggests accumulating technical debt. Consider allocating time for refactoring.',
+                  suggestedAction: 'Dedicate time for test coverage and code review improvements.',
+                  metrics: {
+                    fixPercent: Math.round(fixRatio * 100),
+                    featurePercent: Math.round(featureRatio * 100),
+                    refactorPercent: Math.round((commitPatterns.commitPatterns.refactorCommits / totalCommits) * 100),
                   },
-                  reasoning: `${commitPatterns.commitPatterns.fixCommits} fix/bug commits (${Math.round(fixRatio * 100)}%) vs ${commitPatterns.commitPatterns.featureCommits} feature commits (${Math.round(featureRatio * 100)}%). When fixes outpace features, delivery velocity degrades.`,
-                  isActive: true,
-                  validUntil: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000),
                 },
+                reasoning: `${Math.round(fixRatio * 100)}% fix commits vs ${Math.round(featureRatio * 100)}% feature commits.`,
+                isActive: true,
+                validUntil: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000),
               })
-              results.predictionsCreated++
             }
 
             // Deadline risk from decelerating velocity
             if (commitPatterns.velocityTrend === 'decelerating') {
-              await prisma.prediction.create({
-                data: {
-                  projectId: defaultProject.id,
-                  type: 'DEADLINE_RISK',
-                  confidence: 0.7,
-                  value: {
-                    title: 'Delivery velocity is declining',
-                    description: `Commit frequency has decreased in the last 2 weeks compared to the prior 2 weeks. Current rate: ${commitPatterns.commitsPerDay} commits/day with ${commitPatterns.activeContributors} active contributors.`,
-                    suggestedAction: 'Review recent blockers, check for scope changes, and consider a team retrospective to identify friction points.',
-                    metrics: {
-                      commitsPerDay: commitPatterns.commitsPerDay,
-                      velocityTrend: commitPatterns.velocityTrend,
-                      activeContributors: commitPatterns.activeContributors,
-                    },
+              await createPredictionIfNew('DEADLINE_RISK', {
+                projectId: defaultProject.id,
+                type: 'DEADLINE_RISK',
+                confidence: 0.7,
+                value: {
+                  title: 'Delivery velocity is declining',
+                  description: `Commit frequency dropped in the last 2 weeks. Current: ${commitPatterns.commitsPerDay} commits/day.`,
+                  suggestedAction: 'Review recent blockers and check for scope changes.',
+                  metrics: {
+                    commitsPerDay: commitPatterns.commitsPerDay,
+                    velocityTrend: commitPatterns.velocityTrend,
+                    activeContributors: commitPatterns.activeContributors,
                   },
-                  reasoning: `Velocity trend is decelerating — the second half of the 30-day window has significantly fewer commits than the first half. This pattern often precedes deadline misses.`,
-                  isActive: true,
-                  validUntil: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
                 },
+                reasoning: 'Velocity trend is decelerating — fewer commits in the second half of the 30-day window.',
+                isActive: true,
+                validUntil: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
               })
-              results.predictionsCreated++
             }
           }
         } catch (e) {
@@ -798,43 +794,43 @@ export const dashboardRouter = router({
           const baselinePredictions = [
             {
               type: 'DEADLINE_RISK' as const,
-              confidence: 0.75,
+              confidence: 0.6,
               value: {
-                title: 'Initial setup period may cause delays',
-                description: 'New teams typically take 2-4 weeks to establish effective workflows. Factor this into your timeline.',
-                suggestedAction: 'Add a 2-week buffer to your first major deadline.',
+                title: 'Build buffer into early milestones',
+                description: 'New projects take 2-4 weeks to find their rhythm. A small buffer prevents downstream stress.',
+                suggestedAction: 'Add a 1-2 week buffer to your next milestone.',
               },
-              reasoning: 'Based on typical onboarding patterns for engineering teams.',
+              reasoning: 'Early-stage projects benefit from timeline flexibility.',
             },
             {
               type: 'VELOCITY_FORECAST' as const,
-              confidence: 0.8,
+              confidence: 0.5,
               value: {
-                title: 'Team velocity will stabilize in 3-4 sprints',
-                description: 'Expect velocity fluctuations of 30-50% as the team forms and establishes norms.',
-                suggestedAction: 'Track velocity trends rather than individual sprint performance.',
+                title: 'Velocity data building up',
+                description: 'Complete a few sprints for accurate velocity tracking. Connect repos for commit-based insights.',
+                suggestedAction: 'Connect GitHub to enable data-driven velocity forecasting.',
               },
-              reasoning: 'Teams typically need 3-4 sprints to establish consistent velocity patterns.',
+              reasoning: 'Insufficient data for a reliable velocity prediction yet.',
             },
             {
               type: 'BURNOUT_INDICATOR' as const,
-              confidence: 0.65,
+              confidence: 0.4,
               value: {
-                title: 'Watch for early signs of overcommitment',
-                description: 'New teams often overcommit in early sprints leading to sustainable pace issues.',
-                suggestedAction: 'Target 70% capacity utilization initially, then adjust based on actual throughput.',
+                title: 'Set sustainable pace early',
+                description: 'Channel early-stage energy by setting clear work boundaries from the start.',
+                suggestedAction: 'Define core working hours and target 70-80% capacity utilization.',
               },
-              reasoning: 'Enthusiasm in new teams frequently leads to overestimation of capacity.',
+              reasoning: 'Sustainable practices are easier to establish early than to fix later.',
             },
             {
               type: 'SCOPE_CREEP' as const,
-              confidence: 0.7,
+              confidence: 0.55,
               value: {
-                title: 'Scope definition needs attention',
-                description: 'Without clear project boundaries, features tend to expand beyond initial estimates.',
-                suggestedAction: 'Document acceptance criteria for each feature before development begins.',
+                title: 'Define feature boundaries upfront',
+                description: 'Write acceptance criteria before building. Clear scope is the #1 predictor of on-time delivery.',
+                suggestedAction: 'Write 3-bullet acceptance criteria for your next feature before coding.',
               },
-              reasoning: 'Undefined scope is the leading cause of project delays.',
+              reasoning: 'Scope clarity directly correlates with delivery predictability.',
             },
           ]
 
@@ -857,23 +853,16 @@ export const dashboardRouter = router({
             {
               type: 'REVIEW_DELAY' as const,
               severity: 'MEDIUM' as const,
-              title: 'Code review process needs definition',
-              description: 'Without established review practices, PRs may sit longer than necessary, blocking feature delivery.',
-              impact: 'Slower delivery, potential merge conflicts, and developer frustration.',
-            },
-            {
-              type: 'CI_FAILURE' as const,
-              severity: 'HIGH' as const,
-              title: 'CI/CD pipeline setup required',
-              description: 'Without automated testing and deployment, bugs are more likely to reach production.',
-              impact: 'Higher bug rate, slower deployments, and increased manual testing burden.',
+              title: 'Set up a review workflow',
+              description: 'Define how code gets reviewed to keep PRs moving and catch issues early.',
+              impact: 'Unreviewed PRs create merge conflicts and slow delivery.',
             },
             {
               type: 'DEPENDENCY_BLOCK' as const,
-              severity: 'MEDIUM' as const,
-              title: 'Integration connections pending',
-              description: 'Connect your development tools (GitHub, Linear, etc.) to enable automated tracking and insights.',
-              impact: 'Manual tracking is error-prone and consumes valuable engineering time.',
+              severity: 'LOW' as const,
+              title: 'Connect development tools',
+              description: 'Link GitHub, Linear, etc. so NexFlow can provide automated insights from real data.',
+              impact: 'Without tool connections, insights are based on context alone.',
             },
           ]
 
@@ -899,19 +888,16 @@ export const dashboardRouter = router({
 
         if (currentRisks.length === 0 || currentRecs.length === 0) {
           const baselineRisks = [
-            { category: 'Process', title: 'Undefined development workflows', description: 'Without clear processes, work may be duplicated, dropped, or blocked.', likelihood: 'HIGH', impact: 'MEDIUM', mitigation: 'Document key workflows (PR process, deployment, on-call) and review with the team.' },
-            { category: 'Team', title: 'Communication gaps between team members', description: 'New teams often struggle to establish effective communication patterns.', likelihood: 'MEDIUM', impact: 'HIGH', mitigation: 'Establish regular standups, retrospectives, and async communication norms.' },
-            { category: 'Technical', title: 'Technical debt accumulation', description: 'Fast-moving teams often accrue technical debt that compounds over time.', likelihood: 'HIGH', impact: 'MEDIUM', mitigation: 'Allocate 20% of sprint capacity for maintenance and debt reduction.' },
-            { category: 'External', title: 'Dependency on external services', description: 'Third-party service outages or API changes can block development.', likelihood: 'LOW', impact: 'HIGH', mitigation: 'Identify critical dependencies and have fallback plans in place.' },
-            { category: 'Technical', title: 'Security vulnerabilities in dependencies', description: 'Outdated packages may contain known security vulnerabilities.', likelihood: 'MEDIUM', impact: 'HIGH', mitigation: 'Set up automated dependency scanning and regular update cycles.' },
+            { category: 'Process', title: 'Document workflows as you go', description: 'Capture processes while fresh — even lightweight docs save time later.', likelihood: 'MEDIUM', impact: 'MEDIUM', mitigation: 'Spend 15 min/week documenting your most common workflows.' },
+            { category: 'Technical', title: 'Keep dependencies current', description: 'Outdated packages accumulate security and compatibility issues over time.', likelihood: 'MEDIUM', impact: 'MEDIUM', mitigation: 'Set up Dependabot or Renovate for automated dependency updates.' },
+            { category: 'External', title: 'Plan for service outages', description: 'Critical external services can go down. Have a fallback for key dependencies.', likelihood: 'LOW', impact: 'HIGH', mitigation: 'Identify top 3 external dependencies and document what happens if each goes down.' },
           ]
 
           const baselineRecs = [
-            { title: 'Connect your development tools', description: 'Link GitHub, Linear, or Jira to enable automated insights and real-time tracking.', priority: 'HIGH', category: 'tooling' },
-            { title: 'Define clear project milestones', description: 'Break your project into measurable milestones to track progress and identify risks early.', priority: 'HIGH', category: 'process' },
-            { title: 'Set up automated testing', description: 'Implement unit and integration tests to catch bugs before they reach production.', priority: 'HIGH', category: 'tooling' },
-            { title: 'Establish code review guidelines', description: 'Define SLAs for PR reviews (e.g., 24-hour turnaround) to maintain velocity.', priority: 'MEDIUM', category: 'process' },
-            { title: 'Invite your team members', description: 'Team insights improve with more participants. NexFlow works best with full team visibility.', priority: 'MEDIUM', category: 'team' },
+            { title: 'Connect your development tools', description: 'Link GitHub to enable automated repo analysis, commit insights, and PR tracking.', priority: 'HIGH', category: 'tooling' },
+            { title: 'Set up your first milestone', description: 'Break your project into 2-4 week milestones. Small wins build momentum.', priority: 'HIGH', category: 'process' },
+            { title: 'Add automated tests early', description: 'Even a few key tests now will save hours of debugging later.', priority: 'MEDIUM', category: 'tooling' },
+            { title: 'Invite collaborators', description: 'NexFlow insights improve with more context. Invite teammates for better predictions.', priority: 'MEDIUM', category: 'team' },
           ]
 
           const kbData = {

@@ -11,7 +11,7 @@ export const predictionsRouter = router({
       limit: z.number().default(50),
     }).optional().default({}))
     .query(async ({ ctx, input }) => {
-      return prisma.prediction.findMany({
+      const predictions = await prisma.prediction.findMany({
         where: {
           OR: [
             { project: { organizationId: ctx.organizationId } },
@@ -26,8 +26,25 @@ export const predictionsRouter = router({
           project: { select: { id: true, name: true, key: true } },
         },
         orderBy: [{ confidence: 'desc' }, { createdAt: 'desc' }],
-        take: input.limit,
+        take: input.limit * 2, // Fetch extra to allow deduplication
       })
+
+      // Deduplicate by type — keep highest confidence per type
+      if (!input.type) {
+        const byType = new Map<string, typeof predictions[0]>()
+        for (const p of predictions) {
+          const existing = byType.get(p.type)
+          if (!existing || p.confidence > existing.confidence ||
+              (p.confidence === existing.confidence && p.createdAt > existing.createdAt)) {
+            byType.set(p.type, p)
+          }
+        }
+        return Array.from(byType.values())
+          .sort((a, b) => b.confidence - a.confidence)
+          .slice(0, input.limit)
+      }
+
+      return predictions.slice(0, input.limit)
     }),
 
   getForProject: protectedProcedure

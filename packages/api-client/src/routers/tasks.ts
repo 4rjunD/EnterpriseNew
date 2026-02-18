@@ -94,6 +94,18 @@ export const tasksRouter = router({
       }),
     ])
 
+    // Deduplicate predictions by type — keep highest confidence per type
+    const predictionsByType = new Map<string, typeof predictions[0]>()
+    for (const p of predictions) {
+      const existing = predictionsByType.get(p.type)
+      if (!existing || p.confidence > existing.confidence ||
+          (p.confidence === existing.confidence && p.createdAt > existing.createdAt)) {
+        predictionsByType.set(p.type, p)
+      }
+    }
+    const dedupedPredictions = Array.from(predictionsByType.values())
+      .sort((a, b) => b.confidence - a.confidence)
+
     // Extract risks and recommendations from knowledge base
     const risks = (knowledgeBase?.goalProgress as { risks?: Array<{
       category: string
@@ -120,7 +132,7 @@ export const tasksRouter = router({
 
     // Content is available if we have any insights
     const hasContent = totalTasks > 0 || totalPRs > 0 || selectedRepos.length > 0 ||
-      predictions.length > 0 || bottlenecks.length > 0 || risks.length > 0
+      dedupedPredictions.length > 0 || bottlenecks.length > 0 || risks.length > 0
 
     return {
       tasks: tasks.map(t => ({
@@ -159,7 +171,7 @@ export const tasksRouter = router({
         todoCount: r.todoCount,
         lastAnalyzedAt: r.lastAnalyzedAt,
       })),
-      predictions: predictions.map(p => ({
+      predictions: dedupedPredictions.map(p => ({
         id: p.id,
         type: p.type,
         confidence: p.confidence,
@@ -186,7 +198,7 @@ export const tasksRouter = router({
         overdueTasks,
         totalPRs,
         totalTodos,
-        totalPredictions: predictions.length,
+        totalPredictions: dedupedPredictions.length,
         totalBottlenecks: bottlenecks.length,
         totalRisks: risks.length,
         hasContent,
