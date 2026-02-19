@@ -254,7 +254,15 @@ export class PredictionEngine {
     let riskLevel: DeadlineRiskPrediction['riskLevel'] = 'low'
     let probability = 0.1
 
-    if (requiredDailyVelocity > historicalVelocity * 2) {
+    if (historicalVelocity === 0) {
+      // No completed tasks in 30 days — can't meaningfully assess risk from velocity.
+      // Use moderate confidence; mark medium only if there are remaining tasks.
+      if (remainingTasks > 0) {
+        riskLevel = 'medium'
+        probability = 0.35
+      }
+      // With no history and no remaining tasks, leave as 'low'
+    } else if (requiredDailyVelocity > historicalVelocity * 2) {
       riskLevel = 'critical'
       probability = 0.9
     } else if (requiredDailyVelocity > historicalVelocity * 1.5) {
@@ -274,7 +282,9 @@ export class PredictionEngine {
     }
 
     const factors: string[] = []
-    if (requiredDailyVelocity > historicalVelocity) {
+    if (historicalVelocity === 0 && remainingTasks > 0) {
+      factors.push(`No completed tasks in the last 30 days — insufficient data for velocity comparison`)
+    } else if (requiredDailyVelocity > historicalVelocity) {
       factors.push(`Required velocity (${requiredDailyVelocity.toFixed(1)}/day) exceeds historical (${historicalVelocity.toFixed(1)}/day)`)
     }
     if (criticalBottlenecks > 0) {
@@ -298,7 +308,9 @@ export class PredictionEngine {
     const predictionData: DeadlineRiskPrediction = {
       riskLevel,
       probability,
-      estimatedDelay: riskLevel !== 'low' ? Math.ceil((remainingTasks / historicalVelocity) - daysUntilDeadline) : undefined,
+      estimatedDelay: riskLevel !== 'low' && historicalVelocity > 0
+        ? Math.ceil((remainingTasks / historicalVelocity) - daysUntilDeadline)
+        : undefined,
       factors,
       recommendations,
     }
@@ -419,6 +431,9 @@ export class PredictionEngine {
       },
     })
 
+    // Skip if no completed tasks — ensureBaselinePredictions() will handle this case
+    if (tasks.length === 0) return
+
     // Group by week
     const weeklyVelocity: number[] = [0, 0, 0, 0]
     tasks.forEach((task) => {
@@ -445,7 +460,8 @@ export class PredictionEngine {
       trend = 'decreasing'
     }
 
-    const confidence = Math.min(0.9, 0.5 + (tasks.length / 100) * 0.4)
+    // Confidence scales with data: 3+ tasks = 0.5, 100+ tasks = 0.9
+    const confidence = Math.min(0.9, 0.3 + (tasks.length / 100) * 0.6)
 
     const predictionData: VelocityForecast = {
       predictedVelocity: avgVelocity,
@@ -537,12 +553,32 @@ export class PredictionEngine {
     value: object,
     reasoning?: string
   ): Promise<void> {
-    // Deactivate old predictions of same type
+    // Check if a higher-confidence prediction of this type already exists
+    // (e.g. from commit analysis or context analyzer). If so, don't overwrite.
+    const existing = await prisma.prediction.findFirst({
+      where: {
+        type,
+        isActive: true,
+        ...(this.context.projectId
+          ? { projectId: this.context.projectId }
+          : { project: { organizationId: this.context.organizationId } }),
+      },
+      orderBy: { confidence: 'desc' },
+    })
+
+    if (existing && existing.confidence >= confidence) {
+      // A better or equal prediction already exists — skip
+      return
+    }
+
+    // Deactivate old predictions of same type — scoped to our exact context
     await prisma.prediction.updateMany({
       where: {
         type,
-        projectId: this.context.projectId,
         isActive: true,
+        ...(this.context.projectId
+          ? { projectId: this.context.projectId }
+          : { projectId: null }), // Org-level: only deactivate null-projectId predictions
       },
       data: { isActive: false },
     })
@@ -554,7 +590,7 @@ export class PredictionEngine {
         confidence,
         value: value as object,
         reasoning,
-        projectId: this.context.projectId,
+        projectId: this.context.projectId || null,
         isActive: true,
       },
     })
