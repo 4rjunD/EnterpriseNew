@@ -39,10 +39,13 @@ export class BottleneckDetector {
    * Create baseline insights when there's little to no data
    */
   private async ensureBaselineInsights(): Promise<void> {
-    // Check if any bottlenecks exist
+    // Check if any bottlenecks exist (include both project-scoped and org-level)
     const existingBottlenecks = await prisma.bottleneck.count({
       where: {
-        project: { organizationId: this.organizationId },
+        OR: [
+          { project: { organizationId: this.organizationId } },
+          { projectId: null },
+        ],
         status: BottleneckStatus.ACTIVE,
       },
     })
